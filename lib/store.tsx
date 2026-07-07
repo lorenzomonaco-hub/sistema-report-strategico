@@ -5,8 +5,8 @@
 
 import React, { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import { AppState, Apprendimento, FaseId, Pratica, TipoLavoro, VersioneDocumento } from './types'
-import { faseSuccessiva, statoCartella } from './fasi'
-import { batteriaIdPerTipo, ETICHETTA_TIPO } from './batterie'
+import { documentiTutorPronti, faseById, faseSuccessiva, statoCartella } from './fasi'
+import { batteriaIdPerTipo, batteriaPerTipo, ETICHETTA_TIPO } from './batterie'
 import {
   ASSESSFIRST_MOCK,
   DOC_UNIFICATO_MOCK,
@@ -18,8 +18,8 @@ import {
   TRASCRIZIONE_MOCK,
 } from './mock'
 
-// v2: modello cartella cliente (questionario/trascrizione/assessfirst/report-irene)
-const STORAGE_KEY = 'sistema-report-strategico-v2'
+// v3: area commerciale a due persone (Tutor + Irene) con fase dedicata report-irene
+const STORAGE_KEY = 'sistema-report-strategico-v3'
 
 // Quando un revisore modifica un documento nella fase X, l'apprendimento
 // migliora i passaggi PRECEDENTI (chi ha prodotto il documento che è stato corretto).
@@ -50,8 +50,10 @@ type Azione =
   | { type: 'CREA_PRATICA'; azienda: string; cliente: string; email: string; dipendenti: string[] }
   | { type: 'INVIA_ASSESSMENT'; praticaId: string }
   | { type: 'CARICA_QUESTIONARIO_TRASCRIZIONE'; praticaId: string }
+  | { type: 'CONFERMA_DOCUMENTI'; praticaId: string }
   | { type: 'CARICA_ASSESSFIRST'; praticaId: string; dipendenti: string[] }
   | { type: 'GENERA_REPORT_IRENE'; praticaId: string }
+  | { type: 'AGGIORNA_REPORT_IRENE'; praticaId: string; contenuto: string }
   | { type: 'PASSA_A_EROGAZIONE'; praticaId: string }
   | { type: 'IMPOSTA_TIPO_LAVORO'; praticaId: string; tipo: TipoLavoro }
   | { type: 'SPOSTA_FASE'; praticaId: string; nuovaFase: FaseId; autore: string }
@@ -88,7 +90,6 @@ function reducer(state: AppState, azione: Azione): AppState {
         azienda: azione.azienda,
         cliente: azione.cliente,
         email: azione.email,
-        venditore: 'Marco V.',
         tutor: 'Giulia T.',
         dipendenti: azione.dipendenti,
         tipoLavoro: null,
@@ -96,7 +97,7 @@ function reducer(state: AppState, azione: Azione): AppState {
         dataCreazione: ora(),
         allegati: [],
         versioni: [],
-        storico: [{ fase: 'vendita', azione: 'Pratica creata dal venditore', autore: 'Marco V.', dataOra: ora() }],
+        storico: [{ fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: ora() }],
       }
       return { ...state, pratiche: [nuova, ...state.pratiche] }
     }
@@ -107,9 +108,22 @@ function reducer(state: AppState, azione: Azione): AppState {
         faseCorrente: 'raccolta-documenti',
         storico: [
           ...p.storico,
-          { fase: 'vendita', azione: 'Assessment e questionario inviati al cliente — la cartella passa al team commerciale', autore: 'Marco V.', dataOra: ora() },
+          { fase: 'vendita', azione: 'Assessment e questionario inviati al cliente', autore: 'Giulia T. (Tutor)', dataOra: ora() },
         ],
       }))
+
+    case 'CONFERMA_DOCUMENTI': {
+      const pratica = state.pratiche.find((p) => p.id === azione.praticaId)
+      if (!pratica || !documentiTutorPronti(pratica)) return state
+      return aggiornaPratica(state, azione.praticaId, (p) => ({
+        ...p,
+        faseCorrente: 'report-irene',
+        storico: [
+          ...p.storico,
+          { fase: 'raccolta-documenti', azione: 'Il tutor ha confermato che tutti i dati sono presenti — Irene notificata', autore: 'Giulia T. (Tutor)', dataOra: ora() },
+        ],
+      }))
+    }
 
     case 'CARICA_QUESTIONARIO_TRASCRIZIONE':
       return aggiornaPratica(state, azione.praticaId, (p) => ({
@@ -133,7 +147,7 @@ function reducer(state: AppState, azione: Azione): AppState {
               id: `al-${uid()}`,
               nome: `AssessFirst - ${d}.pdf`,
               tipo: 'assessfirst' as const,
-              caricatoDa: 'Elisa',
+              caricatoDa: 'Irene',
               dataCaricamento: ora(),
               dipendente: d,
               contenuto: ASSESSFIRST_MOCK(d),
@@ -141,7 +155,7 @@ function reducer(state: AppState, azione: Azione): AppState {
         ],
         storico: [
           ...p.storico,
-          { fase: 'raccolta-documenti', azione: `AssessFirst caricati (${azione.dipendenti.length} dipendenti)`, autore: 'Elisa', dataOra: ora() },
+          { fase: 'report-irene', azione: `AssessFirst caricati nel blocco cliente (${azione.dipendenti.length} dipendenti)`, autore: 'Irene', dataOra: ora() },
         ],
       }))
 
@@ -154,7 +168,17 @@ function reducer(state: AppState, azione: Azione): AppState {
         ],
         storico: [
           ...p.storico,
-          { fase: 'raccolta-documenti', azione: 'Report AssessFirst del team generato con il prompt dedicato', autore: 'Irene', dataOra: ora() },
+          { fase: 'report-irene', azione: 'Report AssessFirst del team generato con il prompt dedicato', autore: 'Irene', dataOra: ora() },
+        ],
+      }))
+
+    case 'AGGIORNA_REPORT_IRENE':
+      return aggiornaPratica(state, azione.praticaId, (p) => ({
+        ...p,
+        allegati: p.allegati.map((a) => (a.tipo === 'report-irene' ? { ...a, contenuto: azione.contenuto } : a)),
+        storico: [
+          ...p.storico,
+          { fase: 'report-irene', azione: 'Report AssessFirst ricontrollato e sistemato', autore: 'Irene', dataOra: ora() },
         ],
       }))
 
@@ -166,7 +190,7 @@ function reducer(state: AppState, azione: Azione): AppState {
         faseCorrente: 'generazione',
         storico: [
           ...p.storico,
-          { fase: 'raccolta-documenti', azione: 'Cartella cliente completa — passata a Erogazione Copy (Carlo notificato)', autore: 'Elisa', dataOra: ora() },
+          { fase: 'report-irene', azione: 'Blocco cliente completo — inviato a Erogazione Copy (Carlo notificato)', autore: 'Irene', dataOra: ora() },
         ],
       }))
     }
@@ -194,7 +218,7 @@ function reducer(state: AppState, azione: Azione): AppState {
         faseCorrente: azione.nuovaFase,
         storico: [
           ...p.storico,
-          { fase: azione.nuovaFase, azione: `Spostata manualmente nella colonna "${azione.nuovaFase}" dalla board`, autore: azione.autore, dataOra: ora() },
+          { fase: azione.nuovaFase, azione: `Spostata manualmente nella colonna "${faseById(azione.nuovaFase).label}" dalla board`, autore: azione.autore, dataOra: ora() },
         ],
       }))
     }
@@ -210,15 +234,20 @@ function reducer(state: AppState, azione: Azione): AppState {
       }))
 
     case 'GENERA_REPORT':
-      return aggiornaPratica(state, azione.praticaId, (p) => ({
-        ...p,
-        faseCorrente: 'revisione-carlo',
-        versioni: [
-          ...p.versioni,
-          { id: `v-${uid()}`, fase: 'generazione', autore: 'Sistema (batteria 20 prompt)', dataOra: ora(), contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
-        ],
-        storico: [...p.storico, { fase: 'generazione', azione: 'Report generato con la batteria di 20 prompt', autore: 'Sistema', dataOra: ora() }],
-      }))
+      return aggiornaPratica(state, azione.praticaId, (p) => {
+        const etichettaBatteria = p.tipoLavoro
+          ? `batteria ${ETICHETTA_TIPO[p.tipoLavoro].label} (${batteriaPerTipo(p.tipoLavoro).length} prompt)`
+          : 'batteria di prompt'
+        return {
+          ...p,
+          faseCorrente: 'revisione-carlo',
+          versioni: [
+            ...p.versioni,
+            { id: `v-${uid()}`, fase: 'generazione', autore: `Sistema (${etichettaBatteria})`, dataOra: ora(), contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
+          ],
+          storico: [...p.storico, { fase: 'generazione', azione: `Report generato con la ${etichettaBatteria}`, autore: 'Sistema', dataOra: ora() }],
+        }
+      })
 
     case 'ACCETTA_DOCUMENTO': {
       const pratica = state.pratiche.find((p) => p.id === azione.praticaId)
@@ -327,8 +356,10 @@ interface StoreContextValue {
   creaPratica: (dati: { azienda: string; cliente: string; email: string; dipendenti: string[] }) => void
   inviaAssessment: (praticaId: string) => void
   caricaQuestionarioTrascrizione: (praticaId: string) => void
+  confermaDocumenti: (praticaId: string) => void
   caricaAssessFirst: (praticaId: string, dipendenti: string[]) => void
   generaReportIrene: (praticaId: string) => void
+  aggiornaReportIrene: (praticaId: string, contenuto: string) => void
   passaAErogazione: (praticaId: string) => void
   impostaTipoLavoro: (praticaId: string, tipo: TipoLavoro) => void
   spostaFase: (praticaId: string, nuovaFase: FaseId, autore: string) => void
@@ -362,8 +393,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPronto(true)
   }, [])
 
+  // Il primo run di questo effect avviene nello stesso commit dell'idratazione,
+  // quando state è ancora il seed: va saltato per non sovrascrivere il salvataggio.
+  const primoSalvataggio = useRef(true)
   useEffect(() => {
     if (!idratato.current) return
+    if (primoSalvataggio.current) {
+      primoSalvataggio.current = false
+      return
+    }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     } catch {
@@ -377,8 +415,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     creaPratica: (dati) => dispatch({ type: 'CREA_PRATICA', ...dati }),
     inviaAssessment: (praticaId) => dispatch({ type: 'INVIA_ASSESSMENT', praticaId }),
     caricaQuestionarioTrascrizione: (praticaId) => dispatch({ type: 'CARICA_QUESTIONARIO_TRASCRIZIONE', praticaId }),
+    confermaDocumenti: (praticaId) => dispatch({ type: 'CONFERMA_DOCUMENTI', praticaId }),
     caricaAssessFirst: (praticaId, dipendenti) => dispatch({ type: 'CARICA_ASSESSFIRST', praticaId, dipendenti }),
     generaReportIrene: (praticaId) => dispatch({ type: 'GENERA_REPORT_IRENE', praticaId }),
+    aggiornaReportIrene: (praticaId, contenuto) => dispatch({ type: 'AGGIORNA_REPORT_IRENE', praticaId, contenuto }),
     passaAErogazione: (praticaId) => dispatch({ type: 'PASSA_A_EROGAZIONE', praticaId }),
     impostaTipoLavoro: (praticaId, tipo) => dispatch({ type: 'IMPOSTA_TIPO_LAVORO', praticaId, tipo }),
     spostaFase: (praticaId, nuovaFase, autore) => dispatch({ type: 'SPOSTA_FASE', praticaId, nuovaFase, autore }),
@@ -405,26 +445,13 @@ export function useApp(): StoreContextValue {
 /** Conteggio notifiche per ruolo (badge in testata). */
 export function contaNotifiche(state: AppState, ruolo: string): number {
   const inFase = (fasi: FaseId[]) => state.pratiche.filter((p) => fasi.includes(p.faseCorrente)).length
-  const inRaccolta = state.pratiche.filter((p) => p.faseCorrente === 'raccolta-documenti')
   switch (ruolo) {
-    case 'venditore':
-      return inFase(['vendita'])
     case 'tutor':
-      // pratiche in raccolta a cui mancano questionario o trascrizione
-      return inRaccolta.filter((p) => !p.allegati.some((a) => a.tipo === 'questionario') || !p.allegati.some((a) => a.tipo === 'trascrizione')).length
-    case 'elisa':
-      // pratiche con assessfirst mancanti + cartelle complete da passare
-      return inRaccolta.filter(
-        (p) => p.dipendenti.some((d) => !p.allegati.some((a) => a.tipo === 'assessfirst' && a.dipendente === d)) || statoCartella(p).completa
-      ).length
+      // vendite da inviare + cartelle in raccolta documenti
+      return inFase(['vendita', 'raccolta-documenti'])
     case 'irene':
-      // pratiche con tutti gli assessfirst ma senza il suo report
-      return inRaccolta.filter(
-        (p) =>
-          p.dipendenti.length > 0 &&
-          p.dipendenti.every((d) => p.allegati.some((a) => a.tipo === 'assessfirst' && a.dipendente === d)) &&
-          !p.allegati.some((a) => a.tipo === 'report-irene')
-      ).length
+      // blocchi cliente confermati dal tutor, in attesa della sua preparazione
+      return inFase(['report-irene'])
     case 'erogazione':
       return inFase(['generazione', 'revisione-carlo', 'revisione-1', 'revisione-2', 'visual', 'leggibilita', 'grafica'])
     case 'carlo':

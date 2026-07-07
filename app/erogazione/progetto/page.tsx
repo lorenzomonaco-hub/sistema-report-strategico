@@ -105,15 +105,17 @@ function CartellaCliente({ pratica }: { pratica: Pratica }) {
   }
 
   return (
-    <aside className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto">
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 className="flex items-center gap-2 font-semibold text-slate-900">📁 Cartella cliente</h3>
-        <p className="mt-1 text-xs text-slate-400">
+    <aside className="anima anima-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto">
+      <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
+        <h3 className="font-display flex items-center gap-2 text-lg font-bold tracking-tight text-inchiostro">
+          📁 Cartella cliente
+        </h3>
+        <p className="mt-1 text-xs text-inchiostro/40">
           Tutti i documenti del cliente, sempre a portata di mano anche durante le call.
         </p>
 
         {voci.length === 0 ? (
-          <p className="mt-4 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-xs text-slate-400">
+          <p className="mt-4 rounded-xl border border-dashed border-linea bg-inchiostro/[0.03] px-3 py-4 text-center text-xs text-inchiostro/40">
             Nessun documento ancora presente in cartella.
           </p>
         ) : (
@@ -121,25 +123,25 @@ function CartellaCliente({ pratica }: { pratica: Pratica }) {
             {voci.map((voce) => {
               const aperto = docApertoId === voce.id
               return (
-                <li key={voce.id} className={`rounded-lg border ${aperto ? 'border-slate-300' : 'border-slate-100'}`}>
+                <li key={voce.id} className={`rounded-xl border ${aperto ? 'border-petrolio/40' : 'border-linea/70'}`}>
                   <button
                     onClick={() => setDocApertoId(aperto ? null : voce.id)}
-                    className="w-full rounded-lg px-3 py-2.5 text-left transition hover:bg-slate-50"
+                    className="w-full rounded-xl px-3 py-2.5 text-left transition hover:bg-inchiostro/[0.03]"
                   >
                     <div className="flex items-start gap-2.5">
                       <span className="text-base leading-5">{voce.icona}</span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-slate-700">{voce.etichetta}</p>
-                        <p className="mt-0.5 text-xs text-slate-400">
+                        <p className="truncate text-sm font-medium text-inchiostro/80">{voce.etichetta}</p>
+                        <p className="mt-0.5 text-xs text-inchiostro/40">
                           {voce.caricatoDa} · {dataIt(voce.data)}
                         </p>
                       </div>
-                      <span className="text-xs text-slate-300">{aperto ? '▲' : '▼'}</span>
+                      <span className="text-xs text-inchiostro/30">{aperto ? '▲' : '▼'}</span>
                     </div>
                   </button>
                   {aperto && (
-                    <div className="border-t border-slate-100 p-2">
-                      <div className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                    <div className="border-t border-linea p-2">
+                      <div className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-xl bg-inchiostro/[0.04] p-3 text-xs leading-5 text-inchiostro/70">
                         {voce.contenuto ?? 'Anteprima non disponibile per questo documento.'}
                       </div>
                     </div>
@@ -189,10 +191,12 @@ function PannelloGenerazione({ pratica }: { pratica: Pratica }) {
 
   return (
     <div className="space-y-4">
-      <h3 className="font-semibold text-slate-900">Da lavorare — preparazione del report</h3>
+      <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">
+        Da lavorare — preparazione del report
+      </h3>
 
       {/* Passo 1 — Tipo di lavoro (determina la batteria di prompt) */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
         <div className="flex items-start gap-3">
           <span
             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
@@ -202,8 +206,8 @@ function PannelloGenerazione({ pratica }: { pratica: Pratica }) {
             {tipo ? '✓' : '1'}
           </span>
           <div className="min-w-0 flex-1">
-            <h4 className="font-semibold text-slate-800">Passo 1 — Che tipo di lavoro è?</h4>
-            <p className="mt-1 text-sm text-slate-500">
+            <h4 className="font-display font-bold tracking-tight text-inchiostro">Passo 1 — Che tipo di lavoro è?</h4>
+            <p className="mt-1 text-sm text-inchiostro/50">
               La scelta aggiorna automaticamente la batteria di prompt usata per generare il documento.
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -218,13 +222,13 @@ function PannelloGenerazione({ pratica }: { pratica: Pratica }) {
                     className={`rounded-xl border-2 p-4 text-left transition ${
                       selezionato
                         ? 'border-emerald-500 bg-emerald-50'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                        : 'border-linea bg-carta hover:border-petrolio/40 hover:bg-inchiostro/[0.02]'
                     }`}
                   >
-                    <span className="flex items-center gap-2 font-semibold text-slate-900">
+                    <span className="flex items-center gap-2 font-semibold text-inchiostro">
                       {selezionato ? '●' : '○'} {et.label}
                     </span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-500">{et.descrizione}</span>
+                    <span className="mt-1 block text-xs leading-5 text-inchiostro/50">{et.descrizione}</span>
                     <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${et.badge}`}>
                       Batteria: {batteriaPerTipo(t).length} prompt
                     </span>
@@ -242,32 +246,32 @@ function PannelloGenerazione({ pratica }: { pratica: Pratica }) {
       </div>
 
       {/* Passo 2 */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
         <div className="flex items-start gap-3">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
             2
           </span>
           <div className="min-w-0 flex-1">
-            <h4 className="font-semibold text-slate-800">Passo 2 — Unifica i documenti</h4>
-            <p className="mt-1 text-sm text-slate-500">
+            <h4 className="font-display font-bold tracking-tight text-inchiostro">Passo 2 — Unifica i documenti</h4>
+            <p className="mt-1 text-sm text-inchiostro/50">
               Questionario, trascrizione, AssessFirst e report del team vengono uniti in un unico documento di lavoro.
             </p>
             {unificato ? (
               <div className="mt-3 space-y-3">
                 <button
                   disabled
-                  className="cursor-not-allowed rounded-lg bg-emerald-100 px-4 py-2 text-sm font-semibold text-emerald-700"
+                  className="cursor-not-allowed rounded-xl bg-emerald-100 px-4 py-2.5 text-sm font-semibold text-emerald-700"
                 >
                   ✓ Documenti unificati
                 </button>
-                <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-xl bg-inchiostro/[0.04] p-3 text-xs leading-5 text-inchiostro/70">
                   {unificato.contenuto}
                 </div>
               </div>
             ) : (
               <button
                 onClick={() => unisciDocumenti(pratica.id)}
-                className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                className="mt-3 rounded-xl bg-petrolio px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-petrolio-scuro"
               >
                 Unifica i documenti
               </button>
@@ -277,20 +281,24 @@ function PannelloGenerazione({ pratica }: { pratica: Pratica }) {
       </div>
 
       {/* Passo 3 — Generazione con la batteria del tipo scelto */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
         <div className="flex items-start gap-3">
           <span
             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-              unificato && tipo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'
+              unificato && tipo ? 'bg-emerald-100 text-emerald-700' : 'bg-inchiostro/10 text-inchiostro/40'
             }`}
           >
             3
           </span>
           <div className="min-w-0 flex-1">
-            <h4 className={`font-semibold ${unificato && tipo ? 'text-slate-800' : 'text-slate-400'}`}>
+            <h4
+              className={`font-display font-bold tracking-tight ${
+                unificato && tipo ? 'text-inchiostro' : 'text-inchiostro/40'
+              }`}
+            >
               Passo 3 — Genera il documento
             </h4>
-            <p className={`mt-1 text-sm ${unificato && tipo ? 'text-slate-500' : 'text-slate-400'}`}>
+            <p className={`mt-1 text-sm ${unificato && tipo ? 'text-inchiostro/50' : 'text-inchiostro/40'}`}>
               {tipo
                 ? `Batteria ${ETICHETTA_TIPO[tipo].label} (${totalePrompt} prompt): dalle regole di scrittura alle lettere finali${
                     tipo === 'branding' ? ', inclusa la Fase 3.3 — funnel (Dot Com Secrets)' : ''
@@ -316,7 +324,7 @@ function PannelloGenerazione({ pratica }: { pratica: Pratica }) {
                     style={{ width: `${(promptN / totalePrompt) * 100}%` }}
                   />
                 </div>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-inchiostro/40">
                   Al termine la pratica passerà automaticamente alla revisione di Carlo.
                 </p>
               </div>
@@ -324,10 +332,10 @@ function PannelloGenerazione({ pratica }: { pratica: Pratica }) {
               <button
                 onClick={avviaGenerazione}
                 disabled={!unificato || !tipo}
-                className={`mt-3 rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition ${
+                className={`mt-3 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition ${
                   unificato && tipo
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                    : 'cursor-not-allowed bg-slate-100 text-slate-400'
+                    ? 'bg-ambra text-white hover:bg-amber-700'
+                    : 'cursor-not-allowed bg-inchiostro/10 text-inchiostro/35'
                 }`}
               >
                 {tipo
@@ -336,10 +344,10 @@ function PannelloGenerazione({ pratica }: { pratica: Pratica }) {
               </button>
             )}
             {!tipo && !generando && (
-              <p className="mt-2 text-xs text-slate-400">Scegli prima il tipo di lavoro (Passo 1).</p>
+              <p className="mt-2 text-xs text-inchiostro/40">Scegli prima il tipo di lavoro (Passo 1).</p>
             )}
             {tipo && !unificato && !generando && (
-              <p className="mt-2 text-xs text-slate-400">Completa prima il Passo 2 per abilitare la generazione.</p>
+              <p className="mt-2 text-xs text-inchiostro/40">Completa prima il Passo 2 per abilitare la generazione.</p>
             )}
           </div>
         </div>
@@ -356,7 +364,7 @@ function BoxRimandaIndietro({ praticaId }: { praticaId: string }) {
   const [motivo, setMotivo] = useState('')
 
   return (
-    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+    <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
       <p className="text-xs text-rose-700">
         💡 Promemoria: usa <strong>«Confronta versioni»</strong> nel riquadro del documento per controllare le
         modifiche fatte dal Revisore 1. Se il lavoro non è adeguato, rimandalo indietro con una motivazione.
@@ -368,7 +376,7 @@ function BoxRimandaIndietro({ praticaId }: { praticaId: string }) {
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
             placeholder="Es. la voce narrante non è uniforme nei capitoli 2 e 3…"
-            className="w-full rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm focus:border-rose-500 focus:outline-none"
+            className="w-full rounded-xl border border-rose-300 bg-white px-3 py-2 text-sm focus:border-rose-500 focus:outline-none"
           />
           <div className="flex gap-2">
             <button
@@ -376,7 +384,7 @@ function BoxRimandaIndietro({ praticaId }: { praticaId: string }) {
                 if (motivo.trim()) rimandaIndietro(praticaId, 'Revisore 2', motivo.trim())
               }}
               disabled={!motivo.trim()}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
                 motivo.trim()
                   ? 'bg-rose-600 text-white hover:bg-rose-700'
                   : 'cursor-not-allowed bg-rose-200 text-rose-400'
@@ -389,7 +397,7 @@ function BoxRimandaIndietro({ praticaId }: { praticaId: string }) {
                 setFormAperto(false)
                 setMotivo('')
               }}
-              className="rounded-lg border border-rose-300 px-4 py-2 text-sm text-rose-700 transition hover:bg-rose-100"
+              className="rounded-xl border border-rose-300 px-4 py-2 text-sm text-rose-700 transition hover:bg-rose-100"
             >
               Annulla
             </button>
@@ -398,7 +406,7 @@ function BoxRimandaIndietro({ praticaId }: { praticaId: string }) {
       ) : (
         <button
           onClick={() => setFormAperto(true)}
-          className="mt-3 rounded-lg border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+          className="mt-3 rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
         >
           ⟲ Rimanda al Revisore 1
         </button>
@@ -429,9 +437,11 @@ function PannelloVisual({ pratica }: { pratica: Pratica }) {
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="font-semibold text-slate-900">🤖 Agente Visual — elaborazione automatica</h3>
-      <p className="mt-1 text-sm text-slate-500">
+    <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
+      <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">
+        🤖 Agente Visual — elaborazione automatica
+      </h3>
+      <p className="mt-1 text-sm text-inchiostro/50">
         L&rsquo;agente analizza il report e inserisce automaticamente tabelle e diagrammi dove migliorano la
         comprensione del testo. Al termine la pratica passa al controllo di leggibilità.
       </p>
@@ -439,7 +449,7 @@ function PannelloVisual({ pratica }: { pratica: Pratica }) {
       {passo === 0 ? (
         <button
           onClick={avvia}
-          className="mt-4 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-700"
+          className="mt-4 rounded-xl bg-petrolio px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-petrolio-scuro"
         >
           ▶ Esegui elaborazione visual
         </button>
@@ -458,7 +468,7 @@ function PannelloVisual({ pratica }: { pratica: Pratica }) {
         </div>
       )}
 
-      <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-400">
+      <p className="mt-4 rounded-xl bg-inchiostro/[0.04] px-3 py-2 text-xs text-inchiostro/45">
         Nota: nel sistema reale questa elaborazione partirà in automatico all&rsquo;arrivo della pratica in questa
         fase, senza bisogno di alcun clic.
       </p>
@@ -473,22 +483,22 @@ function PannelloGrafica({ pratica }: { pratica: Pratica }) {
 
   return (
     <div className="space-y-4">
-      <h3 className="font-semibold text-slate-900">Impaginazione professionale</h3>
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <p className="text-sm text-slate-500">
+      <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Impaginazione professionale</h3>
+      <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
+        <p className="text-sm text-inchiostro/50">
           Scarica il documento approvato per impaginarlo con gli strumenti grafici. Al termine, accetta il documento
           per consegnare il report al cliente.
         </p>
         <button
           onClick={() => setScaricato(true)}
-          className="mt-3 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          className="mt-3 rounded-xl border border-linea bg-carta px-4 py-2.5 text-sm font-medium text-inchiostro/70 transition hover:border-petrolio/40 hover:text-petrolio"
         >
           ⬇ Scarica per impaginazione (.docx)
         </button>
         {scaricato && (
           <p className="mt-2 text-xs text-green-600">✓ File pronto — in questa demo il download è simulato.</p>
         )}
-        <p className="mt-2 text-xs text-slate-400">Nota: download simulato, nessun file viene realmente generato.</p>
+        <p className="mt-2 text-xs text-inchiostro/40">Nota: download simulato, nessun file viene realmente generato.</p>
       </div>
       <ReviewPanel praticaId={pratica.id} autore="Collega Grafica" />
     </div>
@@ -511,24 +521,24 @@ function Lavorazione({ pratica }: { pratica: Pratica }) {
   const fase = pratica.faseCorrente
 
   // Fasi ancora in area commerciale: qui si guarda soltanto.
-  if (fase === 'vendita' || fase === 'raccolta-documenti') {
+  if (fase === 'vendita' || fase === 'raccolta-documenti' || fase === 'report-irene') {
     const cartella = statoCartella(pratica)
     return (
       <div className="space-y-4">
-        <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+        <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
           Questo progetto è ancora in <strong>area commerciale</strong>: la lavorazione in Erogazione Copy inizierà
-          quando Elisa passerà la cartella completa.
+          quando Irene invierà il blocco cliente completo.
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="font-semibold text-slate-900">Stato della cartella cliente</h3>
+        <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
+          <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Stato della cartella cliente</h3>
           <ul className="mt-3 space-y-2">
             {cartella.voci.map((v) => (
               <li key={v.chiave} className="flex items-center justify-between gap-3 text-sm">
-                <span className={`flex items-center gap-2 ${v.fatto ? 'text-slate-700' : 'text-slate-400'}`}>
-                  {v.fatto ? <span className="text-green-600">✓</span> : <span className="text-slate-300">○</span>}
+                <span className={`flex items-center gap-2 ${v.fatto ? 'text-inchiostro/80' : 'text-inchiostro/40'}`}>
+                  {v.fatto ? <span className="text-green-600">✓</span> : <span className="text-inchiostro/25">○</span>}
                   {v.label}
                 </span>
-                <span className="shrink-0 text-xs text-slate-400">{v.responsabile}</span>
+                <span className="shrink-0 text-xs text-inchiostro/40">{v.responsabile}</span>
               </li>
             ))}
           </ul>
@@ -544,7 +554,7 @@ function Lavorazione({ pratica }: { pratica: Pratica }) {
   if (fase === 'revisione-carlo') {
     return (
       <div className="space-y-4">
-        <h3 className="font-semibold text-slate-900">Revisione di Carlo</h3>
+        <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Revisione di Carlo</h3>
         <ReviewPanel praticaId={pratica.id} autore="Carlo" />
       </div>
     )
@@ -556,13 +566,15 @@ function Lavorazione({ pratica }: { pratica: Pratica }) {
     const motivoRimando = rimandato ? ultimaVoce.azione.slice(PREFISSO_RIMANDO.length).replace(/^:\s*/, '') : ''
     return (
       <div className="space-y-4">
-        <h3 className="font-semibold text-slate-900">Revisione editoriale — Revisore 1</h3>
+        <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">
+          Revisione editoriale — Revisore 1
+        </h3>
         {rimandato && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
             <strong>⟲ Rimandato indietro dal Revisore 2.</strong> Motivo: {motivoRimando || 'non specificato'}
           </div>
         )}
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
           <p className="text-xs font-semibold text-amber-800">Promemoria — le 5 fasi editoriali del Metodo:</p>
           <ol className="mt-1.5 space-y-0.5 text-xs text-amber-700">
             {FASI_EDITORIALI.map((f, i) => (
@@ -580,7 +592,7 @@ function Lavorazione({ pratica }: { pratica: Pratica }) {
   if (fase === 'revisione-2') {
     return (
       <div className="space-y-4">
-        <h3 className="font-semibold text-slate-900">Controllo qualità — Revisore 2</h3>
+        <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Controllo qualità — Revisore 2</h3>
         <ReviewPanel praticaId={pratica.id} autore="Revisore 2" azioniExtra={<BoxRimandaIndietro praticaId={pratica.id} />} />
       </div>
     )
@@ -593,8 +605,8 @@ function Lavorazione({ pratica }: { pratica: Pratica }) {
   if (fase === 'leggibilita') {
     return (
       <div className="space-y-4">
-        <h3 className="font-semibold text-slate-900">Controllo di leggibilità</h3>
-        <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+        <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Controllo di leggibilità</h3>
+        <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3">
           <p className="text-xs font-semibold text-violet-800">Criteri di verifica:</p>
           <ul className="mt-1.5 space-y-0.5 text-xs text-violet-700">
             <li>• I visual inseriti devono migliorare la comprensione del testo, non decorarlo.</li>
@@ -613,7 +625,7 @@ function Lavorazione({ pratica }: { pratica: Pratica }) {
   // completata
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+      <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
         🎉 <strong>Report consegnato al cliente.</strong> Il progetto è completato: il documento resta consultabile in
         sola lettura.
       </div>
@@ -626,22 +638,22 @@ function Lavorazione({ pratica }: { pratica: Pratica }) {
 
 function TimelineStorico({ pratica }: { pratica: Pratica }) {
   return (
-    <section className="mt-8">
-      <h3 className="font-semibold text-slate-900">Storico attività</h3>
-      <div className="mt-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="anima anima-4 mt-10">
+      <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Storico attività</h3>
+      <div className="mt-3 rounded-2xl border border-linea bg-carta p-5 shadow-sm">
         {pratica.storico.length === 0 ? (
-          <p className="text-sm text-slate-400">Nessuna attività registrata.</p>
+          <p className="text-sm text-inchiostro/40">Nessuna attività registrata.</p>
         ) : (
           <ol>
             {pratica.storico.map((voce, i) => (
               <li key={`${voce.dataOra}-${i}`} className="relative flex gap-3 pb-5 last:pb-0">
                 {i < pratica.storico.length - 1 && (
-                  <span className="absolute top-3 left-[5px] h-full w-px bg-slate-200" />
+                  <span className="absolute top-3 left-[5px] h-full w-px bg-linea" />
                 )}
                 <span className={`relative mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${faseById(voce.fase).dot}`} />
                 <div className="min-w-0">
-                  <p className="text-sm text-slate-700">{voce.azione}</p>
-                  <p className="mt-0.5 text-xs text-slate-400">
+                  <p className="text-sm text-inchiostro/80">{voce.azione}</p>
+                  <p className="mt-0.5 text-xs text-inchiostro/40">
                     {voce.autore} · {dataOraIt(voce.dataOra)} · fase: {faseById(voce.fase).label}
                   </p>
                 </div>
@@ -659,7 +671,7 @@ function TimelineStorico({ pratica }: { pratica: Pratica }) {
 export default function PaginaProgettoErogazione() {
   return (
     <Suspense
-      fallback={<p className="py-12 text-center text-sm text-slate-400">Caricamento della scheda progetto…</p>}
+      fallback={<p className="py-12 text-center text-sm text-inchiostro/40">Caricamento della scheda progetto…</p>}
     >
       <SchedaProgetto />
     </Suspense>
@@ -693,7 +705,7 @@ function SchedaProgetto() {
   if (!pronto) {
     return (
       <RoleShell ruolo="Erogazione Copy" colore="bg-emerald-500" sottotitolo="Scheda progetto" notifiche={notifiche}>
-        <p className="py-12 text-center text-sm text-slate-400">Caricamento della scheda progetto…</p>
+        <p className="py-12 text-center text-sm text-inchiostro/40">Caricamento della scheda progetto…</p>
       </RoleShell>
     )
   }
@@ -709,7 +721,7 @@ function SchedaProgetto() {
         <div className="mt-4 text-center">
           <Link
             href="/erogazione"
-            className="inline-block rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            className="inline-block rounded-xl border border-linea bg-carta px-4 py-2 text-sm font-medium text-inchiostro/70 transition hover:border-petrolio/40 hover:text-petrolio"
           >
             ← Torna alla board
           </Link>
@@ -721,12 +733,12 @@ function SchedaProgetto() {
   return (
     <RoleShell ruolo="Erogazione Copy" colore="bg-emerald-500" sottotitolo="Scheda progetto" notifiche={notifiche}>
       {/* Intestazione progetto */}
-      <div className="mb-6">
-        <Link href="/erogazione" className="text-sm text-slate-400 transition hover:text-slate-600">
+      <div className="anima anima-1 mb-8">
+        <Link href="/erogazione" className="text-sm text-inchiostro/40 transition hover:text-petrolio">
           ← Torna alla board
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h2 className="text-2xl font-bold text-slate-900">{pratica.azienda}</h2>
+          <h2 className="font-display text-3xl font-bold tracking-tight text-inchiostro">{pratica.azienda}</h2>
           <StatusBadge fase={pratica.faseCorrente} />
           {pratica.tipoLavoro && (
             <span
@@ -736,10 +748,10 @@ function SchedaProgetto() {
             </span>
           )}
         </div>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-inchiostro/50">
           {pratica.cliente} · {pratica.email}
         </p>
-        <div className="mt-4">
+        <div className="mt-5">
           <PipelineStepper faseCorrente={pratica.faseCorrente} />
         </div>
       </div>
@@ -747,7 +759,7 @@ function SchedaProgetto() {
       {/* Conferma del cambio fase avvenuto in questa scheda */}
       {avanzamento && (
         <div
-          className={`mb-6 flex items-start justify-between gap-3 rounded-xl border px-4 py-3 ${
+          className={`anima mb-6 flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 ${
             indiceFase(avanzamento.a) > indiceFase(avanzamento.da)
               ? 'border-green-200 bg-green-50'
               : 'border-rose-200 bg-rose-50'
@@ -766,7 +778,7 @@ function SchedaProgetto() {
           )}
           <button
             onClick={() => setAvanzamento(null)}
-            className="shrink-0 text-xs text-slate-400 transition hover:text-slate-600"
+            className="shrink-0 text-xs text-inchiostro/40 transition hover:text-inchiostro/70"
             aria-label="Chiudi conferma"
           >
             ✕
@@ -776,7 +788,7 @@ function SchedaProgetto() {
 
       {/* Lavorazione + cartella cliente */}
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        <div className="anima anima-2 lg:col-span-2">
           <Lavorazione pratica={pratica} />
         </div>
         <CartellaCliente pratica={pratica} />

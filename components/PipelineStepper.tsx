@@ -13,18 +13,18 @@ export default function PipelineStepper({ faseCorrente }: { faseCorrente: FaseId
           const attiva = i === corrente
           return (
             <div key={f.id} className="flex items-center">
-              {i > 0 && <div className={`h-px w-5 ${passata || attiva ? 'bg-slate-400' : 'bg-slate-200'}`} />}
+              {i > 0 && <div className={`h-px w-6 ${passata || attiva ? 'bg-petrolio/30' : 'bg-linea'}`} />}
               <div
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs whitespace-nowrap ${
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs ${
                   attiva
-                    ? `${f.badge} border-transparent font-semibold ring-2 ring-offset-1 ring-slate-400`
+                    ? `${f.badge} border-transparent font-semibold shadow-sm ring-2 ring-petrolio/20`
                     : passata
-                      ? 'border-slate-200 bg-white text-slate-600'
-                      : 'border-slate-100 bg-white text-slate-300'
+                      ? 'border-linea bg-carta text-inchiostro/60'
+                      : 'border-linea/60 bg-carta text-inchiostro/30'
                 }`}
                 title={`${f.label} — ${f.descrizione}`}
               >
-                {passata ? <span className="text-green-600">✓</span> : <span className={`h-1.5 w-1.5 rounded-full ${attiva ? f.dot : 'bg-slate-200'}`} />}
+                {passata ? <span className="text-green-600">✓</span> : <span className={`h-1.5 w-1.5 rounded-full ${attiva ? f.dot : 'bg-linea'}`} />}
                 {f.label}
               </div>
             </div>

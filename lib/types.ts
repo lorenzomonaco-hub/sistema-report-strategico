@@ -3,6 +3,7 @@
 export type FaseId =
   | 'vendita'
   | 'raccolta-documenti'
+  | 'report-irene'
   | 'generazione'
   | 'revisione-carlo'
   | 'revisione-1'
@@ -68,7 +69,6 @@ export interface Pratica {
   azienda: string
   cliente: string
   email: string
-  venditore: string
   tutor: string
   /** dipendenti del cliente per cui servono gli AssessFirst */
   dipendenti: string[]

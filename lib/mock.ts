@@ -143,7 +143,7 @@ const alTrascrizione = (data: string): DocumentoAllegato => ({
   id: `al-t-${data}`, nome: 'Trascrizione analisi.pdf', tipo: 'trascrizione', caricatoDa: 'Giulia T. (Tutor)', dataCaricamento: data, contenuto: TRASCRIZIONE_MOCK,
 })
 const alAssess = (dip: string, data: string): DocumentoAllegato => ({
-  id: `al-a-${dip}-${data}`, nome: `AssessFirst - ${dip}.pdf`, tipo: 'assessfirst', caricatoDa: 'Elisa', dataCaricamento: data, dipendente: dip, contenuto: ASSESSFIRST_MOCK(dip),
+  id: `al-a-${dip}-${data}`, nome: `AssessFirst - ${dip}.pdf`, tipo: 'assessfirst', caricatoDa: 'Irene', dataCaricamento: data, dipendente: dip, contenuto: ASSESSFIRST_MOCK(dip),
 })
 const alReportIrene = (data: string): DocumentoAllegato => ({
   id: `al-r-${data}`, nome: 'Report AssessFirst del team.pdf', tipo: 'report-irene', caricatoDa: 'Irene', dataCaricamento: data, contenuto: REPORT_IRENE_MOCK,
@@ -165,7 +165,6 @@ const p = (
   azienda,
   cliente,
   email,
-  venditore: 'Marco V.',
   tutor: 'Giulia T.',
   dipendenti,
   tipoLavoro: null,
@@ -173,7 +172,7 @@ const p = (
   dataCreazione,
   allegati: [],
   versioni: [],
-  storico: [{ fase: 'vendita', azione: 'Pratica creata dal venditore', autore: 'Marco V.', dataOra: dataCreazione }],
+  storico: [{ fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: dataCreazione }],
   ...extra,
 })
 
@@ -192,13 +191,13 @@ export const SEED_STATE: AppState = {
       // solo il questionario: mancano trascrizione, assessfirst e report Irene
       allegati: [alQuestionario('2026-07-04T10:00:00.000Z')],
       storico: [
-        { fase: 'vendita', azione: 'Pratica creata dal venditore', autore: 'Marco V.', dataOra: '2026-06-28T11:00:00.000Z' },
-        { fase: 'vendita', azione: 'Assessment e questionario inviati al cliente', autore: 'Marco V.', dataOra: '2026-06-28T11:30:00.000Z' },
+        { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-06-28T11:00:00.000Z' },
+        { fase: 'vendita', azione: 'Assessment e questionario inviati al cliente', autore: 'Giulia T. (Tutor)', dataOra: '2026-06-28T11:30:00.000Z' },
         { fase: 'raccolta-documenti', azione: 'Questionario caricato', autore: 'Giulia T. (Tutor)', dataOra: '2026-07-04T10:00:00.000Z' },
       ],
     }),
 
-    p('pr-003', 'Bella Napoli Ristoranti', 'Ciro Esposito', 'ciro@bellanapoli.it', ['Ciro Esposito', 'Anna Russo'], 'raccolta-documenti', '2026-06-20T10:00:00.000Z', {
+    p('pr-003', 'Bella Napoli Ristoranti', 'Ciro Esposito', 'ciro@bellanapoli.it', ['Ciro Esposito', 'Anna Russo'], 'report-irene', '2026-06-20T10:00:00.000Z', {
       // manca solo il report di Irene
       allegati: [
         alQuestionario('2026-07-01T09:00:00.000Z'),
@@ -207,9 +206,9 @@ export const SEED_STATE: AppState = {
         alAssess('Anna Russo', '2026-07-03T15:05:00.000Z'),
       ],
       storico: [
-        { fase: 'vendita', azione: 'Pratica creata dal venditore', autore: 'Marco V.', dataOra: '2026-06-20T10:00:00.000Z' },
+        { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-06-20T10:00:00.000Z' },
         { fase: 'raccolta-documenti', azione: 'Questionario e trascrizione caricati', autore: 'Giulia T. (Tutor)', dataOra: '2026-07-01T09:05:00.000Z' },
-        { fase: 'raccolta-documenti', azione: 'AssessFirst caricati per 2 dipendenti', autore: 'Elisa', dataOra: '2026-07-03T15:05:00.000Z' },
+        { fase: 'report-irene', azione: 'AssessFirst caricati nel blocco cliente (2 dipendenti)', autore: 'Irene', dataOra: '2026-07-03T15:05:00.000Z' },
       ],
     }),
 
@@ -221,9 +220,9 @@ export const SEED_STATE: AppState = {
         { id: 'v-2', fase: 'generazione', autore: 'Sistema (batteria 20 prompt)', dataOra: '2026-07-05T10:25:00.000Z', contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
       ],
       storico: [
-        { fase: 'vendita', azione: 'Pratica creata dal venditore', autore: 'Marco V.', dataOra: '2026-06-10T09:00:00.000Z' },
-        { fase: 'raccolta-documenti', azione: 'Cartella cliente completata', autore: 'Elisa', dataOra: '2026-06-15T14:35:00.000Z' },
-        { fase: 'raccolta-documenti', azione: 'Passata a Erogazione Copy — Carlo notificato', autore: 'Elisa', dataOra: '2026-06-15T14:36:00.000Z' },
+        { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-06-10T09:00:00.000Z' },
+        { fase: 'report-irene', azione: 'Blocco cliente completato', autore: 'Irene', dataOra: '2026-06-15T14:35:00.000Z' },
+        { fase: 'report-irene', azione: 'Inviato a Erogazione Copy — Carlo notificato', autore: 'Irene', dataOra: '2026-06-15T14:36:00.000Z' },
         { fase: 'generazione', azione: 'Documenti unificati in un documento unico', autore: 'Carlo', dataOra: '2026-07-05T10:00:00.000Z' },
         { fase: 'generazione', azione: 'Report generato con la batteria di 20 prompt', autore: 'Sistema', dataOra: '2026-07-05T10:25:00.000Z' },
       ],
@@ -237,7 +236,7 @@ export const SEED_STATE: AppState = {
         { id: 'v-4', fase: 'revisione-carlo', autore: 'Carlo', dataOra: '2026-07-01T09:30:00.000Z', contenuto: REPORT_AI_MOCK.replace('RIASSUNTO ESECUTIVO', 'RIASSUNTO ESECUTIVO (rivisto da Carlo)'), tipo: 'umano', etichetta: 'Revisione di Carlo' },
       ],
       storico: [
-        { fase: 'vendita', azione: 'Pratica creata dal venditore', autore: 'Marco V.', dataOra: '2026-06-05T09:00:00.000Z' },
+        { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-06-05T09:00:00.000Z' },
         { fase: 'generazione', azione: 'Report generato con la batteria di 20 prompt', autore: 'Sistema', dataOra: '2026-06-30T11:00:00.000Z' },
         { fase: 'revisione-carlo', azione: 'Documento revisionato e accettato', autore: 'Carlo', dataOra: '2026-07-01T09:35:00.000Z' },
       ],
@@ -251,7 +250,7 @@ export const SEED_STATE: AppState = {
         { id: 'v-6', fase: 'visual', autore: 'Agente Visual', dataOra: '2026-07-02T15:00:00.000Z', contenuto: REPORT_VISUAL_MOCK, tipo: 'ai', etichetta: 'Report con elementi visual' },
       ],
       storico: [
-        { fase: 'vendita', azione: 'Pratica creata dal venditore', autore: 'Marco V.', dataOra: '2026-05-25T09:00:00.000Z' },
+        { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-05-25T09:00:00.000Z' },
         { fase: 'revisione-2', azione: 'Documento accettato', autore: 'Revisore 2', dataOra: '2026-07-02T14:00:00.000Z' },
         { fase: 'visual', azione: 'Elementi visual inseriti automaticamente', autore: 'Agente Visual', dataOra: '2026-07-02T15:00:00.000Z' },
       ],
@@ -264,7 +263,7 @@ export const SEED_STATE: AppState = {
         { id: 'v-7', fase: 'grafica', autore: 'Collega Grafica', dataOra: '2026-06-18T12:00:00.000Z', contenuto: REPORT_VISUAL_MOCK, tipo: 'umano', etichetta: 'Versione finale impaginata' },
       ],
       storico: [
-        { fase: 'vendita', azione: 'Pratica creata dal venditore', autore: 'Marco V.', dataOra: '2026-05-02T09:00:00.000Z' },
+        { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-05-02T09:00:00.000Z' },
         { fase: 'grafica', azione: 'Impaginazione completata — report consegnato', autore: 'Collega Grafica', dataOra: '2026-06-18T12:00:00.000Z' },
       ],
     }),

@@ -1,36 +1,38 @@
 'use client'
 
-// ─── Laboratorio · Compartimento n°4 — Revisore 1 (Editor 5 fasi) ───
-// Banco di prova isolato: documento in ingresso → API Claude col prompt
-// vero del Revisore 1 → documento revisionato in uscita, scaricabile.
+// ─── Laboratorio · Compartimento n°5 — Revisore 2 (Supervisore Qualità) ───
+// Banco di prova isolato: ORIGINALE + REVISIONATO in ingresso → verdetto
+// APPROVATO/RIMANDATO, problemi puntuali e lezioni per il trajectory learning.
 
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import RoleShell from '@/components/RoleShell'
-import DiffView from '@/components/DiffView'
-import { CHIAVE_STORAGE_API, eseguiRevisione, MODELLI_LAB } from '@/lib/laboratorio'
+import { CHIAVE_STORAGE_API, eseguiSupervisione, MODELLI_LAB } from '@/lib/laboratorio'
 
 type Stato = 'pronto' | 'in-esecuzione' | 'completato' | 'errore'
 
-export default function BancoRevisore1() {
+/** Chiave localStorage dove il banco n°4 salva l'ultima revisione completata. */
+const CHIAVE_ULTIMA_REVISIONE = 'laboratorio-ultima-revisione'
+
+export default function BancoRevisore2() {
   const [chiaveApi, setChiaveApi] = useState('')
   const [modello, setModello] = useState<string>(MODELLI_LAB[0].id)
-  const [destinatario, setDestinatario] = useState('')
-  const [documento, setDocumento] = useState('')
+  const [originale, setOriginale] = useState('')
+  const [revisionato, setRevisionato] = useState('')
   const [stato, setStato] = useState<Stato>('pronto')
   const [risultato, setRisultato] = useState('')
   const [errore, setErrore] = useState('')
   const [token, setToken] = useState<{ input: number; output: number } | null>(null)
-  const [mostraDiff, setMostraDiff] = useState(false)
+  const [importDisponibile, setImportDisponibile] = useState(false)
 
   const abortRef = useRef<AbortController | null>(null)
   const areaRisultatoRef = useRef<HTMLDivElement | null>(null)
 
-  // la chiave resta solo nel browser dell'utente
   useEffect(() => {
     try {
       const salvata = localStorage.getItem(CHIAVE_STORAGE_API)
       if (salvata) setChiaveApi(salvata)
+      setImportDisponibile(localStorage.getItem(CHIAVE_ULTIMA_REVISIONE) !== null)
     } catch {
       // storage non disponibile
     }
@@ -50,9 +52,25 @@ export default function BancoRevisore1() {
     }
   }
 
-  const caricaFile = (file: File) => {
+  const importaDalBanco4 = () => {
+    try {
+      const dati = localStorage.getItem(CHIAVE_ULTIMA_REVISIONE)
+      if (!dati) return
+      const { documento, risultato: revisione } = JSON.parse(dati) as { documento: string; risultato: string }
+      setOriginale(documento ?? '')
+      setRevisionato(revisione ?? '')
+    } catch {
+      // dati corrotti: ignora
+    }
+  }
+
+  const caricaFile = (file: File, dove: 'originale' | 'revisionato') => {
     const lettore = new FileReader()
-    lettore.onload = () => setDocumento(String(lettore.result ?? ''))
+    lettore.onload = () => {
+      const testo = String(lettore.result ?? '')
+      if (dove === 'originale') setOriginale(testo)
+      else setRevisionato(testo)
+    }
     lettore.readAsText(file)
   }
 
@@ -61,14 +79,13 @@ export default function BancoRevisore1() {
     setRisultato('')
     setErrore('')
     setToken(null)
-    setMostraDiff(false)
     abortRef.current = new AbortController()
     try {
-      const esito = await eseguiRevisione({
+      const esito = await eseguiSupervisione({
         chiaveApi: chiaveApi.trim(),
         modello,
-        destinatario: destinatario.trim(),
-        documento,
+        originale,
+        revisionato,
         segnale: abortRef.current.signal,
         onTesto: (frammento) => {
           setRisultato((prev) => prev + frammento)
@@ -77,15 +94,6 @@ export default function BancoRevisore1() {
       })
       setToken({ input: esito.tokenInput, output: esito.tokenOutput })
       setStato('completato')
-      // rende la corsa disponibile al banco n°5 (Supervisore): originale + revisione
-      try {
-        localStorage.setItem(
-          'laboratorio-ultima-revisione',
-          JSON.stringify({ documento, risultato: esito.testo })
-        )
-      } catch {
-        // quota piena: il passaggio di mano è facoltativo
-      }
     } catch (e) {
       if ((e as Error).name === 'AbortError') {
         setStato('pronto')
@@ -106,25 +114,31 @@ export default function BancoRevisore1() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'documento-revisionato.md'
+    a.download = 'verdetto-supervisore.md'
     a.click()
     URL.revokeObjectURL(url)
   }
 
-  const prontoAllAvvio = chiaveApi.trim().length > 10 && destinatario.trim().length > 1 && documento.trim().length > 50
+  const prontoAllAvvio =
+    chiaveApi.trim().length > 10 && originale.trim().length > 50 && revisionato.trim().length > 50
+
+  const verdetto = /VERDETTO:\s*(APPROVATO|RIMANDATO)/i.exec(risultato)?.[1]?.toUpperCase() ?? null
 
   return (
     <RoleShell
-      ruolo="Compartimento n°4 — Revisore 1"
-      colore="bg-amber-500"
-      sottotitolo="Editor Metodo in 5 fasi: documento dentro, documento revisionato fuori"
+      ruolo="Compartimento n°5 — Revisore 2"
+      colore="bg-rose-500"
+      sottotitolo="Supervisore Qualità: confronta prima/dopo, emette il verdetto e le lezioni per l'Editor"
     >
       <div className="space-y-5">
-        <Link href="/laboratorio" className="anima anima-1 inline-block text-sm text-inchiostro/40 transition hover:text-petrolio">
+        <Link
+          href="/laboratorio"
+          className="anima anima-1 inline-block text-sm text-inchiostro/40 transition hover:text-petrolio"
+        >
           ← Tutti i compartimenti
         </Link>
 
-        {/* Impostazioni */}
+        {/* Collegamento */}
         <section className="anima anima-1 rounded-2xl border border-linea bg-carta p-5 shadow-sm">
           <h2 className="font-display text-lg font-bold tracking-tight text-inchiostro">1 · Collegamento</h2>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -138,7 +152,7 @@ export default function BancoRevisore1() {
                 className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none"
               />
               <p className="mt-1 text-xs text-inchiostro/40">
-                Resta solo in questo browser e viaggia esclusivamente verso Anthropic. Non inserirla su computer condivisi.
+                È la stessa del banco n°4: resta solo in questo browser.
               </p>
             </div>
             <div>
@@ -158,49 +172,63 @@ export default function BancoRevisore1() {
           </div>
         </section>
 
-        {/* Documento in ingresso */}
+        {/* Le due versioni */}
         <section className="anima anima-2 rounded-2xl border border-linea bg-carta p-5 shadow-sm">
-          <h2 className="font-display text-lg font-bold tracking-tight text-inchiostro">2 · Documento da revisionare</h2>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-display text-lg font-bold tracking-tight text-inchiostro">
+              2 · Le due versioni del documento
+            </h2>
+            {importDisponibile && (
+              <button
+                onClick={importaDalBanco4}
+                className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
+              >
+                ↩ Importa l&apos;ultima corsa del banco n°4
+              </button>
+            )}
+          </div>
+          <div className="mt-3 grid gap-4 lg:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-semibold text-inchiostro/60">
-                Destinatario del report (la FASE 0 del prompt)
-              </label>
-              <input
-                value={destinatario}
-                onChange={(e) => setDestinatario(e.target.value)}
-                placeholder="Es. Giuseppe Di Guida — GRUPPO EGS"
-                className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-inchiostro/60">
-                Carica un file (.txt / .md) — oppure incolla sotto
+                ORIGINALE — prima dell&apos;Editor
               </label>
               <input
                 type="file"
                 accept=".txt,.md,.markdown,text/plain,text/markdown"
-                onChange={(e) => e.target.files?.[0] && caricaFile(e.target.files[0])}
-                className="w-full rounded-xl border border-dashed border-linea px-3 py-1.5 text-sm text-inchiostro/60 file:mr-3 file:rounded-lg file:border-0 file:bg-petrolio file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
+                onChange={(e) => e.target.files?.[0] && caricaFile(e.target.files[0], 'originale')}
+                className="mb-2 w-full rounded-xl border border-dashed border-linea px-3 py-1.5 text-xs text-inchiostro/60 file:mr-3 file:rounded-lg file:border-0 file:bg-petrolio file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
               />
-              <p className="mt-1 text-xs text-inchiostro/40">Da Word: copia il testo e incollalo nel riquadro.</p>
+              <textarea
+                value={originale}
+                onChange={(e) => setOriginale(e.target.value)}
+                placeholder="Incolla il documento PRIMA della revisione..."
+                className="h-48 w-full rounded-xl border border-linea bg-carta p-3 font-mono text-xs leading-5 focus:border-petrolio focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-inchiostro/60">
+                REVISIONATO — dopo l&apos;Editor
+              </label>
+              <input
+                type="file"
+                accept=".txt,.md,.markdown,text/plain,text/markdown"
+                onChange={(e) => e.target.files?.[0] && caricaFile(e.target.files[0], 'revisionato')}
+                className="mb-2 w-full rounded-xl border border-dashed border-linea px-3 py-1.5 text-xs text-inchiostro/60 file:mr-3 file:rounded-lg file:border-0 file:bg-petrolio file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
+              />
+              <textarea
+                value={revisionato}
+                onChange={(e) => setRevisionato(e.target.value)}
+                placeholder="Incolla il documento DOPO la revisione..."
+                className="h-48 w-full rounded-xl border border-linea bg-carta p-3 font-mono text-xs leading-5 focus:border-petrolio focus:outline-none"
+              />
             </div>
           </div>
-          <textarea
-            value={documento}
-            onChange={(e) => setDocumento(e.target.value)}
-            placeholder="Incolla qui il documento da revisionare..."
-            className="mt-3 h-56 w-full rounded-xl border border-linea bg-carta p-3 font-mono text-xs leading-5 focus:border-petrolio focus:outline-none"
-          />
-          <p className="mt-1 text-right text-xs text-inchiostro/40">
-            {documento.trim() ? `${documento.trim().split(/\s+/).length.toLocaleString('it-IT')} parole` : 'nessun documento'}
-          </p>
         </section>
 
         {/* Esecuzione */}
         <section className="anima anima-3 rounded-2xl border border-linea bg-carta p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-lg font-bold tracking-tight text-inchiostro">3 · Revisione</h2>
+            <h2 className="font-display text-lg font-bold tracking-tight text-inchiostro">3 · Supervisione</h2>
             {stato === 'in-esecuzione' ? (
               <button
                 onClick={annulla}
@@ -214,24 +242,22 @@ export default function BancoRevisore1() {
                 disabled={!prontoAllAvvio}
                 className={`rounded-xl px-5 py-2.5 text-sm font-semibold shadow-sm transition ${
                   prontoAllAvvio
-                    ? 'bg-ambra text-white hover:bg-amber-700'
+                    ? 'bg-rose-600 text-white hover:bg-rose-700'
                     : 'cursor-not-allowed bg-inchiostro/10 text-inchiostro/40'
                 }`}
               >
-                ⚡ Avvia il Revisore 1
+                ⚖ Avvia il Supervisore
               </button>
             )}
           </div>
           {!prontoAllAvvio && stato === 'pronto' && (
-            <p className="mt-2 text-xs text-inchiostro/40">
-              Servono: chiave API, destinatario e un documento di almeno qualche riga.
-            </p>
+            <p className="mt-2 text-xs text-inchiostro/40">Servono: chiave API e le due versioni del documento.</p>
           )}
 
           {stato === 'in-esecuzione' && (
-            <p className="mt-3 flex items-center gap-2 text-sm text-amber-700">
-              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-500" />
-              Il Revisore 1 sta lavorando — il testo appare man mano che viene riscritto...
+            <p className="mt-3 flex items-center gap-2 text-sm text-rose-700">
+              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-rose-500" />
+              Il Supervisore sta confrontando le due versioni...
             </p>
           )}
           {stato === 'errore' && (
@@ -240,11 +266,32 @@ export default function BancoRevisore1() {
             </p>
           )}
 
+          {stato === 'completato' && verdetto && (
+            <div
+              className={`mt-4 rounded-xl border px-5 py-4 text-center ${
+                verdetto === 'APPROVATO' ? 'border-green-200 bg-green-50' : 'border-rose-200 bg-rose-50'
+              }`}
+            >
+              <p
+                className={`font-display text-2xl font-bold tracking-tight ${
+                  verdetto === 'APPROVATO' ? 'text-green-700' : 'text-rose-700'
+                }`}
+              >
+                {verdetto === 'APPROVATO' ? '✓ APPROVATO' : '⟲ RIMANDATO'}
+              </p>
+              <p className={`mt-1 text-sm ${verdetto === 'APPROVATO' ? 'text-green-700' : 'text-rose-700'}`}>
+                {verdetto === 'APPROVATO'
+                  ? 'Il lavoro dell’Editor supera il controllo: il documento può proseguire.'
+                  : 'Il documento torna all’Editor: i problemi sono elencati sotto.'}
+              </p>
+            </div>
+          )}
+
           {(risultato || stato === 'in-esecuzione') && (
             <div className="mt-4 overflow-hidden rounded-xl border border-linea">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-linea bg-linea/30 px-4 py-2">
                 <span className="text-xs font-semibold text-inchiostro/60">
-                  Documento revisionato {stato === 'completato' && '· ✓ completato'}
+                  Rapporto del Supervisore {stato === 'completato' && '· ✓ completato'}
                 </span>
                 {stato === 'completato' && (
                   <div className="flex items-center gap-2">
@@ -270,33 +317,18 @@ export default function BancoRevisore1() {
               </div>
               <div
                 ref={areaRisultatoRef}
-                className="max-h-[28rem] overflow-y-auto bg-carta p-4 text-sm leading-6 whitespace-pre-wrap text-inchiostro/80"
+                className="max-h-[26rem] overflow-y-auto bg-carta p-4 text-sm leading-6 whitespace-pre-wrap text-inchiostro/80"
               >
                 {risultato || '...'}
               </div>
             </div>
           )}
-
-          {stato === 'completato' && (
-            <div className="mt-4">
-              <button
-                onClick={() => setMostraDiff((v) => !v)}
-                className="text-sm font-semibold text-petrolio transition hover:text-petrolio-scuro"
-              >
-                {mostraDiff ? '▲ Nascondi confronto prima/dopo' : '▼ Confronta prima/dopo'}
-              </button>
-              {mostraDiff && (
-                <div className="mt-3">
-                  <DiffView prima={documento} dopo={risultato} />
-                </div>
-              )}
-            </div>
-          )}
         </section>
 
         <p className="anima anima-4 text-center text-xs text-inchiostro/35">
-          Compartimento stagno: quello che succede qui non tocca la pipeline. Quando il prompt sarà a punto, lo
-          stesso motore verrà collegato al checkpoint Revisore 1 della piattaforma.
+          Le &laquo;LEZIONI PER L&apos;EDITOR&raquo; sono il carburante del trajectory learning: quando il backend
+          sarà collegato, ogni lezione diventerà una proposta di miglioramento del prompt del Revisore 1 nel Centro
+          Apprendimento.
         </p>
       </div>
     </RoleShell>

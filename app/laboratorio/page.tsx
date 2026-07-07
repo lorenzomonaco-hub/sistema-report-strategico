@@ -19,10 +19,10 @@ const COMPARTIMENTI = [
   {
     numero: 5,
     titolo: 'Revisore 2 — Supervisore',
-    descrizione: 'Controlla il lavoro del Revisore 1. Il prompt va ancora creato.',
-    href: '',
+    descrizione: 'Confronta prima/dopo, giudica il lavoro del Revisore 1: verdetto, problemi e lezioni.',
+    href: '/laboratorio/revisore-2',
     accento: 'bg-rose-500',
-    attivo: false,
+    attivo: true,
   },
   {
     numero: 6,

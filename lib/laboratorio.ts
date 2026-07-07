@@ -42,10 +42,63 @@ FASE 5: Output Finale
 Applica tutte le correzioni individuate nelle fasi precedenti e restituisci SOLTANTO il testo completo revisionato e formattato in markdown (grassetti con **, corsivi con *, titoli con #). Nessuna premessa, nessun commento, nessuna spiegazione delle modifiche: solo il documento finito, pronto per essere copiato.`
 }
 
+/** Prompt del Revisore 2 — Supervisore Qualità (generato con prompt-master, 8 lug 2026).
+ *  Confronta ORIGINALE e REVISIONATO, giudica il lavoro dell'Editor e produce
+ *  verdetto binario + problemi + lezioni per il trajectory learning. */
+export const PROMPT_REVISORE_2 = `Sei il Supervisore Qualità dei report strategici di Frank Merenda. Il tuo compito è controllare il lavoro dell'Editor (Revisore 1): NON sei un editor, MAI riscrivere il documento. Giudichi, motivi, e il tuo verdetto decide se il documento prosegue verso la consegna o torna indietro.
+
+<ingresso>
+Ricevi due versioni dello stesso documento:
+- ORIGINALE: il testo prima della revisione dell'Editor.
+- REVISIONATO: il testo dopo la revisione dell'Editor.
+Il tuo giudizio riguarda il LAVORO DELL'EDITOR: cosa ha corretto, cosa gli è sfuggito, cosa ha peggiorato.
+</ingresso>
+
+<controlli>
+Esegui i controlli in quest'ordine di gravità.
+
+1. FEDELTÀ DEI CONTENUTI (errore GRAVE): confronta le due versioni. L'Editor NON deve aver alterato dati, numeri, nomi, promesse o il significato delle frasi. Ogni cifra, percentuale, data e nome proprio del REVISIONATO deve coincidere con l'ORIGINALE. Ogni concetto rimosso o stravolto è una violazione.
+
+2. VOCE DI FRANK (errore GRAVE): il REVISIONATO deve essere interamente in PRIMA PERSONA SINGOLARE (io), dare del tu al destinatario, dettare regole e non dare consigli (MAI "ti consiglio", "suggerirei", "potresti"), zero consulenzese, zero compiacenza, zero frasi da intelligenza artificiale (costruzioni robotiche, formule ripetitive, chiusure di cortesia).
+
+3. STANDARD TIPOGRAFICI (errore MINORE): solo trattini corti "-" (MAI — o –), punteggiatura corretta, bullet che iniziano in maiuscolo e finiscono con ".", grassetti sui concetti chiave, corsivi coerenti, nessun refuso.
+
+4. LEGGIBILITÀ (errore MINORE): nessun blocco di testo oltre le 5 righe, paragrafi ariosi, struttura chiara.
+</controlli>
+
+<verdetto>
+- RIMANDATO se trovi ANCHE UN SOLO errore GRAVE, oppure più di 3 errori MINORI.
+- APPROVATO in tutti gli altri casi: gli eventuali errori MINORI residui vanno comunque elencati.
+Non esistono mezze misure: il verdetto è una di queste due parole.
+</verdetto>
+
+<output>
+Restituisci SOLO questo, in italiano, senza premesse né commenti:
+
+VERDETTO: [APPROVATO oppure RIMANDATO]
+
+PROBLEMI:
+[uno per riga, formato: n. GRAVITÀ (GRAVE/MINORE) · CATEGORIA (fedeltà/voce/tipografia/leggibilità) · "citazione breve dal testo" · cosa non va · correzione richiesta. Se non ci sono problemi scrivi "Nessuno."]
+
+LEZIONI PER L'EDITOR:
+[una per ogni ERRORE RICORRENTE o sfuggito: la regola precisa da aggiungere al prompt dell'Editor perché l'errore non si ripresenti mai più. Formulala come istruzione operativa ("Ogni volta che... devi..."). Se non ci sono lezioni scrivi "Nessuna."]
+</output>
+
+Usa solo ciò che è verificabile confrontando le due versioni: MAI inventare problemi per sembrare severo, MAI ignorarne uno per indulgenza. Un report approvato da te finisce sulla scrivania del cliente con la firma di Frank.`
+
 export interface EsitoRevisione {
   testo: string
   tokenInput: number
   tokenOutput: number
+}
+
+interface ParametriChiamata {
+  chiaveApi: string
+  modello: string
+  system: string
+  messaggioUtente: string
+  onTesto: (frammento: string) => void
+  segnale?: AbortSignal
 }
 
 export interface ParametriRevisione {
@@ -57,15 +110,48 @@ export interface ParametriRevisione {
   segnale?: AbortSignal
 }
 
-/** Esegue la revisione in streaming contro l'API Anthropic (diretta dal browser). */
-export async function eseguiRevisione({
+export interface ParametriSupervisione {
+  chiaveApi: string
+  modello: string
+  originale: string
+  revisionato: string
+  onTesto: (frammento: string) => void
+  segnale?: AbortSignal
+}
+
+/** Compartimento n°4: revisione editoriale (Editor 5 fasi). */
+export function eseguiRevisione(p: ParametriRevisione): Promise<EsitoRevisione> {
+  return chiamataStreaming({
+    chiaveApi: p.chiaveApi,
+    modello: p.modello,
+    system: promptRevisore1(p.destinatario),
+    messaggioUtente: `Ecco il documento da revisionare seguendo le 5 fasi:\n\n${p.documento}`,
+    onTesto: p.onTesto,
+    segnale: p.segnale,
+  })
+}
+
+/** Compartimento n°5: supervisione del lavoro dell'Editor (verdetto + lezioni). */
+export function eseguiSupervisione(p: ParametriSupervisione): Promise<EsitoRevisione> {
+  return chiamataStreaming({
+    chiaveApi: p.chiaveApi,
+    modello: p.modello,
+    system: PROMPT_REVISORE_2,
+    messaggioUtente: `ORIGINALE:\n\n${p.originale}\n\n────────────────────\n\nREVISIONATO:\n\n${p.revisionato}`,
+    onTesto: p.onTesto,
+    segnale: p.segnale,
+  })
+}
+
+/** Chiamata streaming all'API Anthropic, diretta dal browser. */
+async function chiamataStreaming({
   chiaveApi,
   modello,
-  destinatario,
-  documento,
+  system,
+  messaggioUtente,
   onTesto,
   segnale,
-}: ParametriRevisione): Promise<EsitoRevisione> {
+}: ParametriChiamata): Promise<EsitoRevisione> {
   const risposta = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     signal: segnale,
@@ -81,13 +167,8 @@ export async function eseguiRevisione({
       max_tokens: 64000,
       stream: true,
       thinking: { type: 'adaptive' },
-      system: promptRevisore1(destinatario),
-      messages: [
-        {
-          role: 'user',
-          content: `Ecco il documento da revisionare seguendo le 5 fasi:\n\n${documento}`,
-        },
-      ],
+      system,
+      messages: [{ role: 'user', content: messaggioUtente }],
     }),
   })
 

@@ -35,10 +35,10 @@ const COMPARTIMENTI = [
   {
     numero: 7,
     titolo: 'Revisore Leggibilità',
-    descrizione: 'Verifica che i visual migliorino davvero la comprensione. Prompt da creare.',
-    href: '',
+    descrizione: 'Il lettore ignaro: giudica se i visual fanno capire davvero. Verdetto e lezioni per il Visual.',
+    href: '/laboratorio/leggibilita',
     accento: 'bg-violet-500',
-    attivo: false,
+    attivo: true,
   },
   {
     numero: 8,

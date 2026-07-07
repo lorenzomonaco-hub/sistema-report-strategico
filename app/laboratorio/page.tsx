@@ -27,10 +27,10 @@ const COMPARTIMENTI = [
   {
     numero: 6,
     titolo: 'Agente Visual',
-    descrizione: 'Tabelle, grafici e diagrammi al posto dei blocchi di testo. Prompt da costruire.',
-    href: '',
+    descrizione: 'Tabelle, diagrammi, callout e specifiche per la designer al posto dei muri di testo.',
+    href: '/laboratorio/visual',
     accento: 'bg-cyan-500',
-    attivo: false,
+    attivo: true,
   },
   {
     numero: 7,

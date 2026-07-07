@@ -86,6 +86,46 @@ LEZIONI PER L'EDITOR:
 
 Usa solo ciò che è verificabile confrontando le due versioni: MAI inventare problemi per sembrare severo, MAI ignorarne uno per indulgenza. Un report approvato da te finisce sulla scrivania del cliente con la firma di Frank.`
 
+/** Prompt dell'Agente Visual — Compartimento n°6 (8 lug 2026).
+ *  Trasforma il report approvato in una versione visivamente digeribile:
+ *  tabelle, diagrammi, callout — senza toccare i contenuti. */
+export const PROMPT_VISUAL = `Sei l'Architetto Visivo dei report strategici di Frank Merenda. Ricevi un report già revisionato e approvato: il tuo compito è renderlo comprensibile A CHIUNQUE — anche a chi non sa nulla dell'argomento e legge di fretta — trasformando i blocchi di testo in elementi visivi. Chi guarda una pagina deve capire il punto in 5 secondi.
+
+REGOLA ASSOLUTA — FEDELTÀ: MAI riscrivere, riassumere o aggiungere contenuti. Le parole del report restano quelle. Puoi SOLO: spezzare paragrafi, riorganizzare frasi esistenti in tabelle ed elenchi, aggiungere didascalie ed etichette agli elementi visivi che crei. Ogni dato, numero, nome e promessa deve restare identico. Un supervisore confronterà la tua uscita con l'ingresso: ogni alterazione di sostanza è una violazione.
+
+<trasformazioni>
+Applica queste trasformazioni, nell'ordine in cui incontri le occasioni nel testo:
+
+1. TABELLE (markdown): ogni passaggio con numeri, confronti, sequenze temporali, elenchi di azioni con scadenze o responsabili diventa una tabella. Colonne chiare, una riga di didascalia in corsivo sotto ogni tabella.
+
+2. DIAGRAMMI DI FLUSSO (testuali): ogni processo, sequenza o catena causa-effetto diventa un diagramma in un blocco di codice, con blocchi e frecce, ad esempio:
+[Contatto] → [Sopralluogo] → [Relazione] → [Firma]
+Massimo 6 blocchi per diagramma; se servono più passaggi, spezzalo in due diagrammi.
+
+3. CALLOUT: i concetti chiave del testo (la frase più importante di ogni sezione) vanno evidenziati in un blocco citazione con 📌, usando le PAROLE ESATTE del report.
+
+4. BLOCCHI SPEZZATI: nessun paragrafo oltre le 4 righe. Spezza, aggiungi spazio, trasforma le enumerazioni annegate nel testo in elenchi puntati (prima parola maiuscola, punto finale).
+
+5. VISUAL PER LA DESIGNER: dove il punto merita un vero grafico (andamenti, proporzioni, mappe di posizionamento) inserisci un blocco così, con i dati ESATTI presi dal testo:
+[VISUAL DA REALIZZARE]
+Tipo: (barre / linea / torta / mappa di posizionamento / timeline)
+Dati: (i valori esatti, con etichette)
+Messaggio: (cosa deve capire il lettore in un colpo d'occhio)
+[/VISUAL]
+Usa questi blocchi con criterio: solo dove un grafico dice più di mille parole. Massimo uno ogni 2-3 sezioni.
+</trasformazioni>
+
+<limiti>
+- Ogni sezione del report deve avere ALMENO un elemento visivo (tabella, diagramma, callout o elenco).
+- MAI più di 4 righe di testo consecutive senza un elemento che spezzi.
+- MAI inventare dati per riempire una tabella o un grafico: se un valore non c'è nel testo, non esiste.
+- I titoli e la struttura dei capitoli restano invariati.
+</limiti>
+
+<output>
+Restituisci SOLO il documento completo arricchito, in markdown (titoli con #, tabelle con |, diagrammi in blocchi di codice, callout con > 📌). Nessuna premessa, nessun commento, nessuna spiegazione delle scelte: solo il documento finito.
+</output>`
+
 export interface EsitoRevisione {
   testo: string
   tokenInput: number
@@ -138,6 +178,26 @@ export function eseguiSupervisione(p: ParametriSupervisione): Promise<EsitoRevis
     modello: p.modello,
     system: PROMPT_REVISORE_2,
     messaggioUtente: `ORIGINALE:\n\n${p.originale}\n\n────────────────────\n\nREVISIONATO:\n\n${p.revisionato}`,
+    onTesto: p.onTesto,
+    segnale: p.segnale,
+  })
+}
+
+export interface ParametriVisual {
+  chiaveApi: string
+  modello: string
+  documento: string
+  onTesto: (frammento: string) => void
+  segnale?: AbortSignal
+}
+
+/** Compartimento n°6: arricchimento visivo del report approvato. */
+export function eseguiVisual(p: ParametriVisual): Promise<EsitoRevisione> {
+  return chiamataStreaming({
+    chiaveApi: p.chiaveApi,
+    modello: p.modello,
+    system: PROMPT_VISUAL,
+    messaggioUtente: `Ecco il report approvato da arricchire visivamente:\n\n${p.documento}`,
     onTesto: p.onTesto,
     segnale: p.segnale,
   })

@@ -5,8 +5,8 @@ export const FASI: Fase[] = [
   { id: 'vendita', label: 'Vendita', owner: 'Tutor', descrizione: 'Il tutor registra la vendita e invia assessment e questionario al cliente', badge: 'bg-sky-100 text-sky-800', dot: 'bg-sky-500' },
   { id: 'raccolta-documenti', label: 'Raccolta documenti', owner: 'Tutor', descrizione: 'Il tutor carica questionario e trascrizione e conferma quando tutto è presente', badge: 'bg-indigo-100 text-indigo-800', dot: 'bg-indigo-500' },
   { id: 'report-irene', label: 'Preparazione Irene', owner: 'Irene', descrizione: 'Irene carica gli AssessFirst, verifica la cartella e genera il report del team', badge: 'bg-violet-100 text-violet-800', dot: 'bg-violet-500' },
-  { id: 'generazione', label: 'Da lavorare', owner: 'Carlo', descrizione: 'Cartella completa: scelta del tipo, unificazione e generazione report', badge: 'bg-emerald-100 text-emerald-800', dot: 'bg-emerald-500' },
-  { id: 'revisione-carlo', label: 'Revisione Carlo', owner: 'Carlo', descrizione: 'Prima revisione umana del report generato', badge: 'bg-emerald-100 text-emerald-800', dot: 'bg-emerald-600' },
+  { id: 'generazione', label: 'Da lavorare', owner: 'Team Copy', descrizione: 'Cartella completa: scelta del tipo, unificazione e generazione report', badge: 'bg-emerald-100 text-emerald-800', dot: 'bg-emerald-500' },
+  { id: 'revisione-team-copy', label: 'Revisione Team Copy', owner: 'Team Copy', descrizione: 'Prima revisione umana del report generato', badge: 'bg-emerald-100 text-emerald-800', dot: 'bg-emerald-600' },
   { id: 'revisione-1', label: 'Revisore 1', owner: 'Revisore 1', descrizione: 'Revisione editoriale — Editor Metodo (5 fasi)', badge: 'bg-amber-100 text-amber-800', dot: 'bg-amber-500' },
   { id: 'revisione-2', label: 'Revisore 2', owner: 'Revisore 2', descrizione: 'Controllo qualità sul lavoro del Revisore 1', badge: 'bg-rose-100 text-rose-800', dot: 'bg-rose-500' },
   { id: 'visual', label: 'Visual', owner: 'Sistema', descrizione: 'Inserimento automatico di tabelle e diagrammi', badge: 'bg-cyan-100 text-cyan-800', dot: 'bg-cyan-500' },
@@ -17,7 +17,7 @@ export const FASI: Fase[] = [
 
 /** Le colonne della board di Erogazione Copy (dalla presa in carico alla consegna). */
 export const FASI_EROGAZIONE: Fase[] = FASI.filter((f) =>
-  ['generazione', 'revisione-carlo', 'revisione-1', 'revisione-2', 'visual', 'leggibilita', 'grafica', 'completata'].includes(f.id)
+  ['generazione', 'revisione-team-copy', 'revisione-1', 'revisione-2', 'visual', 'leggibilita', 'grafica', 'completata'].includes(f.id)
 )
 
 export const faseById = (id: FaseId): Fase => FASI.find((f) => f.id === id)!

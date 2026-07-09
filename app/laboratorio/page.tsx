@@ -42,11 +42,11 @@ const COMPARTIMENTI = [
   },
   {
     numero: 8,
-    titolo: 'Grafica finale',
-    descrizione: 'Impaginazione professionale — processo esterno della collega.',
-    href: '',
+    titolo: 'Grafica — impaginazione automatica',
+    descrizione: 'Carichi il PDF del cliente: il worker su Railway lo impagina nel modello Macheda con controlli e verdetto.',
+    href: '/laboratorio/grafica',
     accento: 'bg-stone-500',
-    attivo: false,
+    attivo: true,
   },
 ]
 

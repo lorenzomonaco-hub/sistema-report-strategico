@@ -2,7 +2,7 @@
 
 // ─── Centro Apprendimento — il cuore del sistema che si auto-migliora ───
 // Ogni revisione umana genera una proposta di miglioramento dei prompt.
-// Nulla diventa attivo senza l'approvazione esplicita di Carlo.
+// Nulla diventa attivo senza l'approvazione esplicita del Team Copy.
 
 import { useState } from 'react'
 import { useApp } from '@/lib/store'
@@ -22,7 +22,7 @@ const PASSI_CICLO = [
   { icona: '🔍', titolo: 'Confronto prima/dopo', dettaglio: 'Il sistema analizza la differenza' },
   { icona: '💡', titolo: 'Lezione estratta', dettaglio: 'La correzione diventa una regola' },
   { icona: '📝', titolo: 'Proposta miglioramento prompt', dettaglio: 'Il prompt a monte viene rivisto' },
-  { icona: '✅', titolo: 'Approvazione di Carlo', dettaglio: 'Il prompt viene aggiornato e versionato' },
+  { icona: '✅', titolo: 'Approvazione del Team Copy', dettaglio: 'Il prompt viene aggiornato e versionato' },
 ]
 
 export default function PaginaCentroApprendimento() {
@@ -41,7 +41,7 @@ export default function PaginaCentroApprendimento() {
     <RoleShell
       ruolo="Centro Apprendimento"
       colore="bg-purple-600"
-      sottotitolo="Ogni revisione umana migliora i prompt — nulla diventa attivo senza l'approvazione di Carlo"
+      sottotitolo="Ogni revisione umana migliora i prompt — nulla diventa attivo senza l'approvazione del Team Copy"
       notifiche={inAttesa.length}
     >
       <div className="space-y-8">

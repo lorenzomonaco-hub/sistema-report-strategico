@@ -1,7 +1,7 @@
 'use client'
 
 // ─── Pannello di revisione documento ───
-// Usato in OGNI checkpoint umano della pipeline: Carlo, Revisore 1, Revisore 2,
+// Usato in OGNI checkpoint umano della pipeline: Team Copy, Revisore 1, Revisore 2,
 // Leggibilità, Grafica. Garantisce che l'esperienza "Accetta / Revisiona e modifica"
 // sia identica ovunque e che ogni revisione alimenti il sistema di apprendimento.
 
@@ -16,7 +16,7 @@ const dataOraIt = (iso: string) =>
 
 interface Props {
   praticaId: string
-  /** nome mostrato come autore delle azioni, es. "Carlo", "Revisore 1" */
+  /** nome mostrato come autore delle azioni, es. "Team Copy", "Revisore 1" */
   autore: string
   /** contenuto extra da mostrare sopra i bottoni (es. bottone "Rimanda indietro" del Revisore 2) */
   azioniExtra?: React.ReactNode
@@ -99,7 +99,7 @@ export default function ReviewPanel({ praticaId, autore, azioniExtra }: Props) {
       {esito === 'revisionato' && (
         <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-800">
           <strong>🧠 Revisione salvata — apprendimento generato.</strong> La tua correzione è stata inviata al Centro
-          Apprendimento: se Carlo la approva, migliorerà i prompt dei passaggi precedenti. Ora puoi accettare il
+          Apprendimento: se il Team Copy la approva, migliorerà i prompt dei passaggi precedenti. Ora puoi accettare il
           documento per farlo proseguire.
         </div>
       )}
@@ -204,7 +204,7 @@ export default function ReviewPanel({ praticaId, autore, azioniExtra }: Props) {
               </div>
               <div className="rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-700">
                 🧠 Al salvataggio verrà creata una proposta di miglioramento per i prompt dei passaggi precedenti.
-                Nessuna modifica ai prompt diventa attiva senza l&apos;approvazione di Carlo nel Centro Apprendimento.
+                Nessuna modifica ai prompt diventa attiva senza l&apos;approvazione del Team Copy nel Centro Apprendimento.
               </div>
             </div>
             <div className="flex justify-end gap-2 border-t border-linea px-5 py-3">

@@ -5,7 +5,7 @@ export type FaseId =
   | 'raccolta-documenti'
   | 'report-irene'
   | 'generazione'
-  | 'revisione-carlo'
+  | 'revisione-team-copy'
   | 'revisione-1'
   | 'revisione-2'
   | 'visual'
@@ -72,7 +72,7 @@ export interface Pratica {
   tutor: string
   /** dipendenti del cliente per cui servono gli AssessFirst */
   dipendenti: string[]
-  /** scelto da Carlo quando la cartella arriva in Erogazione Copy; null = da scegliere */
+  /** scelto dal Team Copy quando la cartella arriva in Erogazione Copy; null = da scegliere */
   tipoLavoro: TipoLavoro | null
   faseCorrente: FaseId
   dataCreazione: string

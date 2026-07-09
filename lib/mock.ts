@@ -212,18 +212,18 @@ export const SEED_STATE: AppState = {
       ],
     }),
 
-    p('pr-004', 'Orizzonte Games', 'Andrea Conti', 'a.conti@orizzontegames.it', ['Andrea Conti', 'Fabio Landi'], 'revisione-carlo', '2026-06-10T09:00:00.000Z', {
+    p('pr-004', 'Orizzonte Games', 'Andrea Conti', 'a.conti@orizzontegames.it', ['Andrea Conti', 'Fabio Landi'], 'revisione-team-copy', '2026-06-10T09:00:00.000Z', {
       tipoLavoro: 'consulenza',
       allegati: cartellaCompleta(['Andrea Conti', 'Fabio Landi'], '2026-06-15T14:30:00.000Z'),
       versioni: [
-        { id: 'v-1', fase: 'generazione', autore: 'Carlo', dataOra: '2026-07-05T10:00:00.000Z', contenuto: DOC_UNIFICATO_MOCK, tipo: 'umano', etichetta: 'Documento unificato' },
+        { id: 'v-1', fase: 'generazione', autore: 'Team Copy', dataOra: '2026-07-05T10:00:00.000Z', contenuto: DOC_UNIFICATO_MOCK, tipo: 'umano', etichetta: 'Documento unificato' },
         { id: 'v-2', fase: 'generazione', autore: 'Sistema (batteria 20 prompt)', dataOra: '2026-07-05T10:25:00.000Z', contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
       ],
       storico: [
         { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-06-10T09:00:00.000Z' },
         { fase: 'report-irene', azione: 'Blocco cliente completato', autore: 'Irene', dataOra: '2026-06-15T14:35:00.000Z' },
-        { fase: 'report-irene', azione: 'Inviato a Erogazione Copy — Carlo notificato', autore: 'Irene', dataOra: '2026-06-15T14:36:00.000Z' },
-        { fase: 'generazione', azione: 'Documenti unificati in un documento unico', autore: 'Carlo', dataOra: '2026-07-05T10:00:00.000Z' },
+        { fase: 'report-irene', azione: 'Inviato a Erogazione Copy — Team Copy notificato', autore: 'Irene', dataOra: '2026-06-15T14:36:00.000Z' },
+        { fase: 'generazione', azione: 'Documenti unificati in un documento unico', autore: 'Team Copy', dataOra: '2026-07-05T10:00:00.000Z' },
         { fase: 'generazione', azione: 'Report generato con la batteria di 20 prompt', autore: 'Sistema', dataOra: '2026-07-05T10:25:00.000Z' },
       ],
     }),
@@ -233,12 +233,12 @@ export const SEED_STATE: AppState = {
       allegati: cartellaCompleta(['Andrea Conti'], '2026-06-12T10:00:00.000Z'),
       versioni: [
         { id: 'v-3', fase: 'generazione', autore: 'Sistema (batteria 20 prompt)', dataOra: '2026-06-30T11:00:00.000Z', contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
-        { id: 'v-4', fase: 'revisione-carlo', autore: 'Carlo', dataOra: '2026-07-01T09:30:00.000Z', contenuto: REPORT_AI_MOCK.replace('RIASSUNTO ESECUTIVO', 'RIASSUNTO ESECUTIVO (rivisto da Carlo)'), tipo: 'umano', etichetta: 'Revisione di Carlo' },
+        { id: 'v-4', fase: 'revisione-team-copy', autore: 'Team Copy', dataOra: '2026-07-01T09:30:00.000Z', contenuto: REPORT_AI_MOCK.replace('RIASSUNTO ESECUTIVO', 'RIASSUNTO ESECUTIVO (rivisto dal Team Copy)'), tipo: 'umano', etichetta: 'Revisione del Team Copy' },
       ],
       storico: [
         { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-06-05T09:00:00.000Z' },
         { fase: 'generazione', azione: 'Report generato con la batteria di 20 prompt', autore: 'Sistema', dataOra: '2026-06-30T11:00:00.000Z' },
-        { fase: 'revisione-carlo', azione: 'Documento revisionato e accettato', autore: 'Carlo', dataOra: '2026-07-01T09:35:00.000Z' },
+        { fase: 'revisione-team-copy', azione: 'Documento revisionato e accettato', autore: 'Team Copy', dataOra: '2026-07-01T09:35:00.000Z' },
       ],
     }),
 
@@ -274,9 +274,9 @@ export const SEED_STATE: AppState = {
       id: 'ap-001',
       praticaId: 'pr-005',
       praticaNome: 'Conti Consulting',
-      fase: 'revisione-carlo',
+      fase: 'revisione-team-copy',
       dataOra: '2026-07-01T09:35:00.000Z',
-      autoreRevisione: 'Carlo',
+      autoreRevisione: 'Team Copy',
       lezione: 'Il report generato usava la seconda persona plurale in alcune sezioni. Lo standard richiede la prima persona singolare (voce del consulente).',
       promptTargetId: 'batteria-consulenza',
       promptTargetNome: 'Batteria Consulenza — Report Strategico (20 prompt)',

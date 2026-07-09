@@ -4,7 +4,7 @@
 // Irene riceve i blocchi cliente confermati dal tutor: scarica questionario e
 // trascrizione, carica gli AssessFirst dei dipendenti, verifica la cartella,
 // genera il report del team col prompt dedicato, lo ricontrolla e — quando il
-// blocco è completo — lo invia a Erogazione Copy (Carlo viene notificato).
+// blocco è completo — lo invia a Erogazione Copy (il Team Copy viene notificato).
 
 import { useEffect, useRef, useState } from 'react'
 import { useApp, contaNotifiche } from '@/lib/store'
@@ -415,7 +415,7 @@ export default function PaginaIrene() {
         {aziendaInviata && (
           <div className="anima anima-1 flex items-center justify-between gap-3 rounded-2xl border border-green-200 bg-green-50 px-5 py-4">
             <p className="text-sm font-semibold text-green-800">
-              ✓ <strong>{aziendaInviata}</strong>: blocco cliente inviato — Carlo è stato notificato.
+              ✓ <strong>{aziendaInviata}</strong>: blocco cliente inviato — il Team Copy è stato notificato.
             </p>
             <button
               onClick={() => setAziendaInviata(null)}

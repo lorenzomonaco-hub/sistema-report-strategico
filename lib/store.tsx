@@ -26,7 +26,7 @@ const STORAGE_KEY = 'sistema-report-strategico-v3'
 // Per le revisioni sul report generato, la batteria target dipende dal tipo di lavoro della pratica.
 function targetApprendimento(pratica: Pratica): { id: string; nome: string } {
   switch (pratica.faseCorrente) {
-    case 'revisione-carlo':
+    case 'revisione-team-copy':
     case 'revisione-1': {
       const id = batteriaIdPerTipo(pratica.tipoLavoro)
       return id === 'batteria-branding'
@@ -190,7 +190,7 @@ function reducer(state: AppState, azione: Azione): AppState {
         faseCorrente: 'generazione',
         storico: [
           ...p.storico,
-          { fase: 'report-irene', azione: 'Blocco cliente completo — inviato a Erogazione Copy (Carlo notificato)', autore: 'Irene', dataOra: ora() },
+          { fase: 'report-irene', azione: 'Blocco cliente completo — inviato a Erogazione Copy (Team Copy notificato)', autore: 'Irene', dataOra: ora() },
         ],
       }))
     }
@@ -204,7 +204,7 @@ function reducer(state: AppState, azione: Azione): AppState {
           {
             fase: p.faseCorrente,
             azione: `Tipo di lavoro impostato: ${ETICHETTA_TIPO[azione.tipo].label} — la batteria di prompt si è aggiornata automaticamente`,
-            autore: 'Carlo',
+            autore: 'Team Copy',
             dataOra: ora(),
           },
         ],
@@ -228,9 +228,9 @@ function reducer(state: AppState, azione: Azione): AppState {
         ...p,
         versioni: [
           ...p.versioni,
-          { id: `v-${uid()}`, fase: 'generazione', autore: 'Carlo', dataOra: ora(), contenuto: DOC_UNIFICATO_MOCK, tipo: 'umano', etichetta: 'Documento unificato' },
+          { id: `v-${uid()}`, fase: 'generazione', autore: 'Team Copy', dataOra: ora(), contenuto: DOC_UNIFICATO_MOCK, tipo: 'umano', etichetta: 'Documento unificato' },
         ],
-        storico: [...p.storico, { fase: 'generazione', azione: 'Documenti unificati in un documento unico', autore: 'Carlo', dataOra: ora() }],
+        storico: [...p.storico, { fase: 'generazione', azione: 'Documenti unificati in un documento unico', autore: 'Team Copy', dataOra: ora() }],
       }))
 
     case 'GENERA_REPORT':
@@ -240,7 +240,7 @@ function reducer(state: AppState, azione: Azione): AppState {
           : 'batteria di prompt'
         return {
           ...p,
-          faseCorrente: 'revisione-carlo',
+          faseCorrente: 'revisione-team-copy',
           versioni: [
             ...p.versioni,
             { id: `v-${uid()}`, fase: 'generazione', autore: `Sistema (${etichettaBatteria})`, dataOra: ora(), contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
@@ -453,9 +453,9 @@ export function contaNotifiche(state: AppState, ruolo: string): number {
       // blocchi cliente confermati dal tutor, in attesa della sua preparazione
       return inFase(['report-irene'])
     case 'erogazione':
-      return inFase(['generazione', 'revisione-carlo', 'revisione-1', 'revisione-2', 'visual', 'leggibilita', 'grafica'])
-    case 'carlo':
-      return inFase(['generazione', 'revisione-carlo']) + state.apprendimenti.filter((a) => a.stato === 'in_attesa').length
+      return inFase(['generazione', 'revisione-team-copy', 'revisione-1', 'revisione-2', 'visual', 'leggibilita', 'grafica'])
+    case 'team-copy':
+      return inFase(['generazione', 'revisione-team-copy']) + state.apprendimenti.filter((a) => a.stato === 'in_attesa').length
     default:
       return 0
   }

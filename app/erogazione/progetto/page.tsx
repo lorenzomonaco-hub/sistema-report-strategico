@@ -3,7 +3,7 @@
 // ─── Scheda progetto (Erogazione Copy) ───
 // Pagina stile Notion: tutto il lavoro su una pratica avviene qui.
 // A sinistra la lavorazione della fase corrente, a destra la cartella cliente
-// sempre visibile (durante le call Carlo deve vedere subito tutti i documenti).
+// sempre visibile (durante le call il Team Copy deve vedere subito tutti i documenti).
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -11,6 +11,17 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useApp, contaNotifiche } from '@/lib/store'
 import { faseById, indiceFase, statoCartella } from '@/lib/fasi'
 import { batteriaPerTipo, ETICHETTA_TIPO } from '@/lib/batterie'
+import {
+  CHIAVE_TOKEN_WORKER,
+  ETICHETTA_CHECK,
+  ETICHETTA_PASSO,
+  StatoJobGrafica,
+  creaJobGrafica,
+  leggiControlloGrafica,
+  meseCorrente,
+  scaricaPdfGrafica,
+  statoJobGrafica,
+} from '@/lib/grafica'
 import { DocumentoAllegato, FaseId, Pratica, TipoDocumento, TipoLavoro } from '@/lib/types'
 import RoleShell from '@/components/RoleShell'
 import StatusBadge from '@/components/StatusBadge'
@@ -90,7 +101,7 @@ function CartellaCliente({ pratica }: { pratica: Pratica }) {
     contenuto: a.contenuto,
   }))
 
-  // Il documento unificato prodotto da Carlo vive tra le versioni: va mostrato
+  // Il documento unificato prodotto dal Team Copy vive tra le versioni: va mostrato
   // in cartella perché durante le call serve avere tutto sotto mano.
   const unificato = pratica.versioni.find((v) => v.etichetta === 'Documento unificato')
   if (unificato && !pratica.allegati.some((a) => a.tipo === 'unificato')) {
@@ -325,7 +336,7 @@ function PannelloGenerazione({ pratica }: { pratica: Pratica }) {
                   />
                 </div>
                 <p className="text-xs text-inchiostro/40">
-                  Al termine la pratica passerà automaticamente alla revisione di Carlo.
+                  Al termine la pratica passerà automaticamente alla revisione del Team Copy.
                 </p>
               </div>
             ) : (
@@ -476,30 +487,248 @@ function PannelloVisual({ pratica }: { pratica: Pratica }) {
   )
 }
 
-// ─── Fase "grafica": scarico per impaginazione ───
+// ─── Fase "grafica": impaginazione automatica sul worker Railway ───
+
+const VERDETTO_STILE: Record<string, string> = {
+  APPROVATO: 'border-green-200 bg-green-50 text-green-800',
+  RIMANDATO: 'border-rose-200 bg-rose-50 text-rose-800',
+  DA_CONTROLLARE_A_MANO: 'border-amber-200 bg-amber-50 text-amber-800',
+}
 
 function PannelloGrafica({ pratica }: { pratica: Pratica }) {
-  const [scaricato, setScaricato] = useState(false)
+  const chiaveJob = `grafica-job-${pratica.id}`
+  const [token, setToken] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [cliente, setCliente] = useState(pratica.cliente)
+  const [tipo, setTipo] = useState(pratica.tipoLavoro === 'branding' ? 'Piano Marketing' : 'Report Strategico')
+  const [dataReport, setDataReport] = useState(meseCorrente())
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [stato, setStato] = useState<StatoJobGrafica | null>(null)
+  const [errore, setErrore] = useState('')
+  const [avvioInCorso, setAvvioInCorso] = useState(false)
+  const [controllo, setControllo] = useState('')
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lettura iniziale da localStorage
+    setToken(localStorage.getItem(CHIAVE_TOKEN_WORKER) ?? '')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- ripresa job in corso
+    setJobId(localStorage.getItem(chiaveJob))
+  }, [chiaveJob])
+
+  const salvaToken = (v: string) => {
+    setToken(v)
+    localStorage.setItem(CHIAVE_TOKEN_WORKER, v)
+  }
+
+  const finale = stato?.fase === 'completato' || stato?.fase === 'errore'
+
+  useEffect(() => {
+    if (!jobId || !token) return
+    let fermo = false
+    const aggiorna = async () => {
+      try {
+        const s = await statoJobGrafica(token, jobId)
+        if (!fermo) setStato(s)
+        if (s.fase === 'completato' || s.fase === 'errore') return true
+      } catch (e) {
+        if (!fermo) setErrore(e instanceof Error ? e.message : 'errore di collegamento')
+        return true
+      }
+      return false
+    }
+    aggiorna()
+    const intervallo = window.setInterval(async () => {
+      if (await aggiorna()) window.clearInterval(intervallo)
+    }, 5000)
+    return () => {
+      fermo = true
+      window.clearInterval(intervallo)
+    }
+  }, [jobId, token])
+
+  const avvia = async () => {
+    if (!file || !token) return
+    setErrore('')
+    setAvvioInCorso(true)
+    try {
+      const id = await creaJobGrafica({ token, file, cliente, tipo, data: dataReport })
+      localStorage.setItem(chiaveJob, id)
+      setStato(null)
+      setControllo('')
+      setJobId(id)
+    } catch (e) {
+      setErrore(e instanceof Error ? e.message : 'avvio fallito')
+    } finally {
+      setAvvioInCorso(false)
+    }
+  }
+
+  const azzera = () => {
+    localStorage.removeItem(chiaveJob)
+    setJobId(null)
+    setStato(null)
+    setControllo('')
+    setErrore('')
+  }
+
+  const mostraControllo = async () => {
+    if (!jobId || !token) return
+    try {
+      setControllo(await leggiControlloGrafica(token, jobId))
+    } catch (e) {
+      setErrore(e instanceof Error ? e.message : 'report non disponibile')
+    }
+  }
 
   return (
     <div className="space-y-4">
-      <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Impaginazione professionale</h3>
+      <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">
+        Impaginazione automatica — Compartimento n°8
+      </h3>
+
+      {/* Collegamento */}
       <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
-        <p className="text-sm text-inchiostro/50">
-          Scarica il documento approvato per impaginarlo con gli strumenti grafici. Al termine, accetta il documento
-          per consegnare il report al cliente.
+        <label className="mb-1 block text-xs font-medium text-inchiostro/60">Token del motore di impaginazione</label>
+        <input
+          type="password"
+          value={token}
+          onChange={(e) => salvaToken(e.target.value)}
+          placeholder="incolla il WORKER_TOKEN (Railway → worker-grafica → Variables)"
+          className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none"
+        />
+        <p className="mt-1.5 text-xs text-inchiostro/40">
+          Resta solo in questo browser e viaggia esclusivamente verso il worker su Railway.
         </p>
-        <button
-          onClick={() => setScaricato(true)}
-          className="mt-3 rounded-xl border border-linea bg-carta px-4 py-2.5 text-sm font-medium text-inchiostro/70 transition hover:border-petrolio/40 hover:text-petrolio"
-        >
-          ⬇ Scarica per impaginazione (.docx)
-        </button>
-        {scaricato && (
-          <p className="mt-2 text-xs text-green-600">✓ File pronto — in questa demo il download è simulato.</p>
-        )}
-        <p className="mt-2 text-xs text-inchiostro/40">Nota: download simulato, nessun file viene realmente generato.</p>
       </div>
+
+      {/* Avvio */}
+      {!jobId && (
+        <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
+          <p className="text-sm text-inchiostro/60">
+            Carica il PDF operativo del cliente: il server esegue l&apos;intera procedura di impaginazione
+            (modello Macheda) con i controlli automatici e il controllo visivo agentico.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-inchiostro/60">Cliente (Cognome Nome)</label>
+              <input value={cliente} onChange={(e) => setCliente(e.target.value)}
+                className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-inchiostro/60">Tipo consulenza</label>
+              <input value={tipo} onChange={(e) => setTipo(e.target.value)}
+                className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-inchiostro/60">Data (AAAA-MM)</label>
+              <input value={dataReport} onChange={(e) => setDataReport(e.target.value)}
+                className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none" />
+            </div>
+          </div>
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="mt-3 block w-full text-sm text-inchiostro/60 file:mr-3 file:rounded-xl file:border-0 file:bg-petrolio file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-petrolio-scuro"
+          />
+          <button
+            onClick={avvia}
+            disabled={!token || !file || avvioInCorso}
+            className="mt-4 w-full rounded-xl bg-ambra px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {avvioInCorso ? 'Invio al server…' : '🚀 Avvia graficazione sul server'}
+          </button>
+        </div>
+      )}
+
+      {/* Lavorazione */}
+      {jobId && (
+        <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="font-display text-base font-bold tracking-tight text-inchiostro">
+              Lavorazione sul server {!finale && <span className="ml-2 inline-block animate-pulse text-ambra">●</span>}
+            </h4>
+            <button onClick={azzera} className="text-xs font-medium text-inchiostro/40 transition hover:text-petrolio">
+              Nuovo job
+            </button>
+          </div>
+          <ul className="mt-3 space-y-1.5">
+            {(stato?.passi ?? []).map((p, i) => (
+              <li key={i} className="flex items-center gap-2 text-sm text-inchiostro/70">
+                <span className="text-green-600">✓</span>
+                {ETICHETTA_PASSO[p.passo] ?? p.passo}
+                <span className="ml-auto text-xs text-inchiostro/35">{p.ora.slice(11, 19)}</span>
+              </li>
+            ))}
+            {!finale && stato && (
+              <li className="flex items-center gap-2 text-sm text-inchiostro/40">
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ambra border-t-transparent" />
+                {ETICHETTA_PASSO[stato.fase] ?? stato.fase}…
+              </li>
+            )}
+          </ul>
+
+          {stato?.qa && (
+            <div className="mt-4 grid gap-1.5 sm:grid-cols-2">
+              {Object.entries(stato.qa.esiti).map(([k, ok]) => (
+                <div key={k} className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs ${ok ? 'bg-green-50 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
+                  {ok ? '✓' : '✗'} {ETICHETTA_CHECK[k] ?? k}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {stato?.fase === 'errore' && (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              <strong>Errore del server:</strong> {stato.errore}
+            </div>
+          )}
+
+          {stato?.verdetto && (
+            <div className={`mt-4 rounded-xl border px-4 py-3 text-sm ${VERDETTO_STILE[stato.verdetto] ?? 'border-linea bg-carta'}`}>
+              <strong>Verdetto: {stato.verdetto.replaceAll('_', ' ')}</strong>
+              {stato.pagine ? ` — ${stato.pagine} pagine` : ''}
+              {stato.verdetto === 'DA_CONTROLLARE_A_MANO' && (
+                <p className="mt-1 text-xs opacity-80">
+                  Il controllo visivo agentico è stato saltato (chiave API non configurata sul worker): i check
+                  automatici sono passati, ma serve un&apos;occhiata umana in più.
+                </p>
+              )}
+              {(stato.controllo_visivo?.problemi ?? []).slice(0, 6).map((p, i) => (
+                <p key={i} className="mt-1 text-xs opacity-80">{p}</p>
+              ))}
+            </div>
+          )}
+
+          {stato?.fase === 'completato' && (
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <button
+                onClick={() => scaricaPdfGrafica(token, jobId, stato.pdf ?? 'report.pdf').catch((e) => setErrore(String(e)))}
+                className="flex-1 rounded-xl bg-petrolio px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-petrolio-scuro"
+              >
+                ⬇ Scarica il PDF impaginato
+              </button>
+              <button
+                onClick={mostraControllo}
+                className="flex-1 rounded-xl border border-linea bg-carta px-4 py-2.5 text-sm font-medium text-inchiostro/70 transition hover:border-petrolio/40 hover:text-petrolio"
+              >
+                📋 Report del controllo visivo
+              </button>
+            </div>
+          )}
+
+          {controllo && (
+            <pre className="mt-3 max-h-80 overflow-y-auto rounded-xl bg-linea/30 p-4 text-xs leading-5 whitespace-pre-wrap text-inchiostro/80">
+              {controllo}
+            </pre>
+          )}
+        </div>
+      )}
+
+      {errore && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{errore}</div>
+      )}
+
       <ReviewPanel praticaId={pratica.id} autore="Collega Grafica" />
     </div>
   )
@@ -551,11 +780,11 @@ function Lavorazione({ pratica }: { pratica: Pratica }) {
     return <PannelloGenerazione pratica={pratica} />
   }
 
-  if (fase === 'revisione-carlo') {
+  if (fase === 'revisione-team-copy') {
     return (
       <div className="space-y-4">
-        <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Revisione di Carlo</h3>
-        <ReviewPanel praticaId={pratica.id} autore="Carlo" />
+        <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Revisione del Team Copy</h3>
+        <ReviewPanel praticaId={pratica.id} autore="Team Copy" />
       </div>
     )
   }

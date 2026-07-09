@@ -1,7 +1,7 @@
 import { TipoLavoro } from './types'
 
 // ─── Batterie di prompt (dalla "Guida per Creazione Report Strategiche e Piani Marketing") ───
-// La scelta Branding / Consulenza fatta da Carlo determina quali prompt vengono usati:
+// La scelta Branding / Consulenza fatta dal Team Copy determina quali prompt vengono usati:
 // la Fase 3.3 (funnel, richiede lo studio di "Dot Com Secrets") è SOLO per i Piani Marketing (Branding).
 
 export interface PromptBatteria {

@@ -123,7 +123,7 @@ export default function BancoGrafica() {
             type="password"
             value={token}
             onChange={(e) => salvaToken(e.target.value)}
-            placeholder="incolla il WORKER_TOKEN (Railway → worker-grafica → Variables)"
+            placeholder="incolla il WORKER_TOKEN (Railway → blocco-impaginazione → Variables)"
             className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none"
           />
           <p className="mt-1.5 text-xs text-inchiostro/40">

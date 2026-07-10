@@ -4,7 +4,7 @@
 // Il token di accesso resta nel browser (come la chiave API dei banchi) e
 // viaggia solo verso il worker.
 
-export const URL_WORKER = 'https://worker-grafica-production.up.railway.app'
+export const URL_WORKER = 'https://blocco-impaginazione-production.up.railway.app'
 export const CHIAVE_TOKEN_WORKER = 'worker-grafica-token'
 
 export interface PassoJob {

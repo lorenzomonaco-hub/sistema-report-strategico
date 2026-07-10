@@ -46,13 +46,13 @@ const dataOraIt = (iso: string) =>
 
 // ─── Cartella cliente (colonna destra) ───
 
-const ORDINE_TIPI: TipoDocumento[] = ['questionario', 'trascrizione', 'assessfirst', 'report-irene', 'unificato', 'report']
+const ORDINE_TIPI: TipoDocumento[] = ['questionario', 'trascrizione', 'assessfirst', 'report-af', 'unificato', 'report']
 
 const ICONE: Record<TipoDocumento, string> = {
   questionario: '📋',
   trascrizione: '🎙',
   assessfirst: '👤',
-  'report-irene': '📊',
+  'report-af': '📊',
   unificato: '📄',
   report: '📑',
 }
@@ -65,8 +65,8 @@ function etichettaDocumento(a: DocumentoAllegato): string {
       return 'Trascrizione analisi'
     case 'assessfirst':
       return `AssessFirst — ${a.dipendente ?? a.nome}`
-    case 'report-irene':
-      return 'Report AssessFirst del team'
+    case 'report-af':
+      return `Report AssessFirst — ${a.dipendente ?? a.nome}`
     case 'unificato':
       return 'Documento unificato'
     case 'report':
@@ -167,327 +167,136 @@ function CartellaCliente({ pratica }: { pratica: Pratica }) {
   )
 }
 
-// ─── Fase "generazione": scelta tipo di lavoro + unificazione + batteria prompt ───
+// ─── Step autonomi: nessuna azione umana, solo avanzamento della pipeline ───
 
-function PannelloGenerazione({ pratica }: { pratica: Pratica }) {
-  const { unisciDocumenti, generaReport, impostaTipoLavoro } = useApp()
-  const [generando, setGenerando] = useState(false)
-  const [promptN, setPromptN] = useState(0)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+const DESCRIZIONE_STEP: Partial<Record<FaseId, { titolo: string; punti: string[] }>> = {
+  generazione: {
+    titolo: 'Generazione — sistema di Christian',
+    punti: [
+      'Il sistema determina il tipo di lavoro (Consulenza / Branding) e genera il documento con la batteria di prompt.',
+      'In parallelo parte lo step 4a: un report AssessFirst per ogni dipendente + email al tutor (Irene supervisiona).',
+    ],
+  },
+  revisione: {
+    titolo: 'Revisione — sistema di Christian',
+    punti: ['Il revisore integrato dal GitHub di Christian revisiona il documento generato e lo passa avanti.'],
+  },
+  visual: {
+    titolo: 'Diagrammi e tabelle — Agente Visual',
+    punti: ['L\'agente inserisce tabelle, diagrammi e grafici (17 famiglie) dove migliorano la comprensione.'],
+  },
+  'revisione-diagrammi': {
+    titolo: 'Revisione diagrammi — loop automatico',
+    punti: [
+      'Il revisore controlla ogni diagramma e RIMANDA al Visual finché non è perfetto.',
+      'Ogni rimando produce una lezione: il sistema impara da solo (registro apprendimenti).',
+    ],
+  },
+  impaginazione: {
+    titolo: 'Impaginazione — motore fase 8',
+    punti: ['Il worker su Railway impagina il documento nel modello grafico e produce il PDF.'],
+  },
+  'revisione-impaginazione': {
+    titolo: 'Revisione impaginazione',
+    punti: ['Il revisore confronta il PDF con tutta la knowledge base a caccia di discrepanze.'],
+  },
+}
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
-    }
-  }, [])
-
-  const unificato = pratica.versioni.find((v) => v.etichetta === 'Documento unificato')
-  const tipo = pratica.tipoLavoro
-  const batteria = tipo ? batteriaPerTipo(tipo) : null
-  const totalePrompt = batteria?.length ?? 0
-
-  const avviaGenerazione = () => {
-    if (generando || !unificato || !batteria) return
-    setGenerando(true)
-    let n = 0
-    timerRef.current = setInterval(() => {
-      n += 1
-      setPromptN(n)
-      if (n >= batteria.length) {
-        if (timerRef.current) clearInterval(timerRef.current)
-        generaReport(pratica.id)
-      }
-    }, 2500 / batteria.length)
-  }
-
+function PannelloStepAutonomo({ pratica }: { pratica: Pratica }) {
+  const { avanzaStepAutonomo } = useApp()
+  const info = DESCRIZIONE_STEP[pratica.faseCorrente]
+  if (!info) return null
   return (
     <div className="space-y-4">
-      <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">
-        Da lavorare — preparazione del report
-      </h3>
-
-      {/* Passo 1 — Tipo di lavoro (determina la batteria di prompt) */}
       <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
-        <div className="flex items-start gap-3">
-          <span
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-              tipo ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500 text-white'
-            }`}
-          >
-            {tipo ? '✓' : '1'}
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+            🤖 Step autonomo
           </span>
-          <div className="min-w-0 flex-1">
-            <h4 className="font-display font-bold tracking-tight text-inchiostro">Passo 1 — Che tipo di lavoro è?</h4>
-            <p className="mt-1 text-sm text-inchiostro/50">
-              La scelta aggiorna automaticamente la batteria di prompt usata per generare il documento.
-            </p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {(['consulenza', 'branding'] as TipoLavoro[]).map((t) => {
-                const et = ETICHETTA_TIPO[t]
-                const selezionato = tipo === t
-                return (
-                  <button
-                    key={t}
-                    onClick={() => !generando && impostaTipoLavoro(pratica.id, t)}
-                    disabled={generando}
-                    className={`rounded-xl border-2 p-4 text-left transition ${
-                      selezionato
-                        ? 'border-emerald-500 bg-emerald-50'
-                        : 'border-linea bg-carta hover:border-petrolio/40 hover:bg-inchiostro/[0.02]'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2 font-semibold text-inchiostro">
-                      {selezionato ? '●' : '○'} {et.label}
-                    </span>
-                    <span className="mt-1 block text-xs leading-5 text-inchiostro/50">{et.descrizione}</span>
-                    <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${et.badge}`}>
-                      Batteria: {batteriaPerTipo(t).length} prompt
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-            {!tipo && (
-              <p className="mt-2 text-xs text-amber-600">
-                ⚠ Scegli il tipo di lavoro prima di generare: le batterie usano prompt diversi.
-              </p>
-            )}
-          </div>
         </div>
-      </div>
-
-      {/* Passo 2 */}
-      <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
-        <div className="flex items-start gap-3">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
-            2
-          </span>
-          <div className="min-w-0 flex-1">
-            <h4 className="font-display font-bold tracking-tight text-inchiostro">Passo 2 — Unifica i documenti</h4>
-            <p className="mt-1 text-sm text-inchiostro/50">
-              Questionario, trascrizione, AssessFirst e report del team vengono uniti in un unico documento di lavoro.
-            </p>
-            {unificato ? (
-              <div className="mt-3 space-y-3">
-                <button
-                  disabled
-                  className="cursor-not-allowed rounded-xl bg-emerald-100 px-4 py-2.5 text-sm font-semibold text-emerald-700"
-                >
-                  ✓ Documenti unificati
-                </button>
-                <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-xl bg-inchiostro/[0.04] p-3 text-xs leading-5 text-inchiostro/70">
-                  {unificato.contenuto}
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => unisciDocumenti(pratica.id)}
-                className="mt-3 rounded-xl bg-petrolio px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-petrolio-scuro"
-              >
-                Unifica i documenti
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Passo 3 — Generazione con la batteria del tipo scelto */}
-      <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
-        <div className="flex items-start gap-3">
-          <span
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-              unificato && tipo ? 'bg-emerald-100 text-emerald-700' : 'bg-inchiostro/10 text-inchiostro/40'
-            }`}
-          >
-            3
-          </span>
-          <div className="min-w-0 flex-1">
-            <h4
-              className={`font-display font-bold tracking-tight ${
-                unificato && tipo ? 'text-inchiostro' : 'text-inchiostro/40'
-              }`}
-            >
-              Passo 3 — Genera il documento
-            </h4>
-            <p className={`mt-1 text-sm ${unificato && tipo ? 'text-inchiostro/50' : 'text-inchiostro/40'}`}>
-              {tipo
-                ? `Batteria ${ETICHETTA_TIPO[tipo].label} (${totalePrompt} prompt): dalle regole di scrittura alle lettere finali${
-                    tipo === 'branding' ? ', inclusa la Fase 3.3 — funnel (Dot Com Secrets)' : ''
-                  }.`
-                : 'La batteria di prompt elabora il documento unificato e produce la prima bozza.'}
-            </p>
-
-            {generando && batteria ? (
-              <div className="mt-3 space-y-2">
-                <div className="flex items-center justify-between text-xs font-medium text-emerald-700">
-                  <span className="truncate">
-                    {batteria[Math.min(promptN, totalePrompt) - 1]
-                      ? `${batteria[Math.min(promptN, totalePrompt) - 1].codice} — ${batteria[Math.min(promptN, totalePrompt) - 1].titolo}`
-                      : 'Generazione in corso…'}
-                  </span>
-                  <span className="shrink-0 pl-2">
-                    {promptN}/{totalePrompt}
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-emerald-100">
-                  <div
-                    className="h-full rounded-full bg-emerald-500 transition-all"
-                    style={{ width: `${(promptN / totalePrompt) * 100}%` }}
-                  />
-                </div>
-                <p className="text-xs text-inchiostro/40">
-                  Al termine la pratica passerà automaticamente alla revisione del Team Copy.
-                </p>
-              </div>
-            ) : (
-              <button
-                onClick={avviaGenerazione}
-                disabled={!unificato || !tipo}
-                className={`mt-3 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition ${
-                  unificato && tipo
-                    ? 'bg-ambra text-white hover:bg-amber-700'
-                    : 'cursor-not-allowed bg-inchiostro/10 text-inchiostro/35'
-                }`}
-              >
-                {tipo
-                  ? `Avvia generazione — Batteria ${ETICHETTA_TIPO[tipo].label} (${totalePrompt} prompt)`
-                  : 'Avvia generazione'}
-              </button>
-            )}
-            {!tipo && !generando && (
-              <p className="mt-2 text-xs text-inchiostro/40">Scegli prima il tipo di lavoro (Passo 1).</p>
-            )}
-            {tipo && !unificato && !generando && (
-              <p className="mt-2 text-xs text-inchiostro/40">Completa prima il Passo 2 per abilitare la generazione.</p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Fase "revisione-2": azioni extra per rimandare al Revisore 1 ───
-
-function BoxRimandaIndietro({ praticaId }: { praticaId: string }) {
-  const { rimandaIndietro } = useApp()
-  const [formAperto, setFormAperto] = useState(false)
-  const [motivo, setMotivo] = useState('')
-
-  return (
-    <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-      <p className="text-xs text-rose-700">
-        💡 Promemoria: usa <strong>«Confronta versioni»</strong> nel riquadro del documento per controllare le
-        modifiche fatte dal Revisore 1. Se il lavoro non è adeguato, rimandalo indietro con una motivazione.
-      </p>
-      {formAperto ? (
-        <div className="mt-3 space-y-2">
-          <label className="block text-xs font-medium text-rose-800">Motivo del rimando (obbligatorio)</label>
-          <input
-            value={motivo}
-            onChange={(e) => setMotivo(e.target.value)}
-            placeholder="Es. la voce narrante non è uniforme nei capitoli 2 e 3…"
-            className="w-full rounded-xl border border-rose-300 bg-white px-3 py-2 text-sm focus:border-rose-500 focus:outline-none"
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                if (motivo.trim()) rimandaIndietro(praticaId, 'Revisore 2', motivo.trim())
-              }}
-              disabled={!motivo.trim()}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                motivo.trim()
-                  ? 'bg-rose-600 text-white hover:bg-rose-700'
-                  : 'cursor-not-allowed bg-rose-200 text-rose-400'
-              }`}
-            >
-              Conferma rimando
-            </button>
-            <button
-              onClick={() => {
-                setFormAperto(false)
-                setMotivo('')
-              }}
-              className="rounded-xl border border-rose-300 px-4 py-2 text-sm text-rose-700 transition hover:bg-rose-100"
-            >
-              Annulla
-            </button>
-          </div>
-        </div>
-      ) : (
+        <h3 className="font-display mt-2 text-lg font-bold tracking-tight text-inchiostro">{info.titolo}</h3>
+        <ul className="mt-2 space-y-1.5">
+          {info.punti.map((punto, i) => (
+            <li key={i} className="text-sm leading-6 text-inchiostro/60">
+              • {punto}
+            </li>
+          ))}
+        </ul>
         <button
-          onClick={() => setFormAperto(true)}
-          className="mt-3 rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
-        >
-          ⟲ Rimanda al Revisore 1
-        </button>
-      )}
-    </div>
-  )
-}
-
-// ─── Fase "visual": agente automatico ───
-
-function PannelloVisual({ pratica }: { pratica: Pratica }) {
-  const { completaVisual } = useApp()
-  const [passo, setPasso] = useState(0)
-  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
-
-  useEffect(() => {
-    const timers = timersRef.current
-    return () => {
-      timers.forEach((t) => clearTimeout(t))
-    }
-  }, [])
-
-  const avvia = () => {
-    if (passo > 0) return
-    setPasso(1)
-    timersRef.current.push(setTimeout(() => setPasso(2), 1000))
-    timersRef.current.push(setTimeout(() => completaVisual(pratica.id), 2000))
-  }
-
-  return (
-    <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
-      <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">
-        🤖 Agente Visual — elaborazione automatica
-      </h3>
-      <p className="mt-1 text-sm text-inchiostro/50">
-        L&rsquo;agente analizza il report e inserisce automaticamente tabelle e diagrammi dove migliorano la
-        comprensione del testo. Al termine la pratica passa al controllo di leggibilità.
-      </p>
-
-      {passo === 0 ? (
-        <button
-          onClick={avvia}
+          onClick={() => avanzaStepAutonomo(pratica.id)}
           className="mt-4 rounded-xl bg-petrolio px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-petrolio-scuro"
         >
-          ▶ Esegui elaborazione visual
+          ▶ Simula il completamento dello step
         </button>
-      ) : (
-        <div className="mt-4 space-y-2">
-          <p className="flex items-center gap-2 text-sm text-cyan-700">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-500" />
-            Analisi dei blocchi di testo e individuazione dei punti visual…
-          </p>
-          {passo >= 2 && (
-            <p className="flex items-center gap-2 text-sm text-cyan-700">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-500" />
-              Inserimento di tabelle e diagrammi nel documento…
-            </p>
-          )}
-        </div>
-      )}
-
-      <p className="mt-4 rounded-xl bg-inchiostro/[0.04] px-3 py-2 text-xs text-inchiostro/45">
-        Nota: nel sistema reale questa elaborazione partirà in automatico all&rsquo;arrivo della pratica in questa
-        fase, senza bisogno di alcun clic.
-      </p>
+        <p className="mt-3 rounded-xl bg-inchiostro/[0.04] px-3 py-2 text-xs text-inchiostro/45">
+          Nel sistema reale questo passaggio parte e si completa da solo, senza alcun clic: il bottone serve solo a
+          provare il flusso finché il backend non è collegato.
+        </p>
+      </div>
     </div>
   )
 }
 
-// ─── Fase "grafica": impaginazione automatica sul worker Railway ───
+// ─── Chat dedicata del checkpoint copy ───
+
+function ChatCopy({ pratica }: { pratica: Pratica }) {
+  const { inviaChatCopy } = useApp()
+  const [testo, setTesto] = useState('')
+  const messaggi = pratica.chatCopy ?? []
+
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+      <h4 className="font-display text-sm font-bold tracking-tight text-amber-900">💬 Chat delle modifiche</h4>
+      <p className="mt-0.5 text-xs text-amber-800/70">
+        Scrivi cosa va cambiato: l&apos;agente applica le modifiche e ripresenta il documento.
+      </p>
+      {messaggi.length > 0 && (
+        <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+          {messaggi.map((m, i) => (
+            <div
+              key={i}
+              className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                m.autore === 'copy'
+                  ? 'ml-auto bg-amber-200/70 text-amber-900'
+                  : 'bg-white text-inchiostro/80 shadow-sm'
+              }`}
+            >
+              {m.testo}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="mt-3 flex gap-2">
+        <input
+          value={testo}
+          onChange={(e) => setTesto(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && testo.trim()) {
+              inviaChatCopy(pratica.id, testo)
+              setTesto('')
+            }
+          }}
+          placeholder="Es. accorcia l\'introduzione del capitolo 2…"
+          className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm focus:border-amber-400 focus:outline-none"
+        />
+        <button
+          onClick={() => {
+            if (testo.trim()) {
+              inviaChatCopy(pratica.id, testo)
+              setTesto('')
+            }
+          }}
+          disabled={!testo.trim()}
+          className="shrink-0 rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Invia
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Fase "impaginazione": worker Railway (fase 8) ───
 
 const VERDETTO_STILE: Record<string, string> = {
   APPROVATO: 'border-green-200 bg-green-50 text-green-800',
@@ -736,27 +545,17 @@ function PannelloGrafica({ pratica }: { pratica: Pratica }) {
 
 // ─── Colonna sinistra: lavorazione in base alla fase corrente ───
 
-const PREFISSO_RIMANDO = 'Rimandato al Revisore 1'
-
-const FASI_EDITORIALI = [
-  { nome: 'Struttura', dettaglio: 'ordine dei capitoli e completezza dei contenuti' },
-  { nome: 'Metodo', dettaglio: 'coerenza con il metodo e i riferimenti aziendali' },
-  { nome: 'Voce', dettaglio: 'voce narrante e tono uniformi in tutto il report' },
-  { nome: 'Chiarezza', dettaglio: 'frasi brevi, niente gergo, esempi concreti' },
-  { nome: 'Forma', dettaglio: 'refusi, punteggiatura e formattazione finale' },
-]
-
 function Lavorazione({ pratica }: { pratica: Pratica }) {
   const fase = pratica.faseCorrente
 
   // Fasi ancora in area commerciale: qui si guarda soltanto.
-  if (fase === 'vendita' || fase === 'raccolta-documenti' || fase === 'report-irene') {
+  if (fase === 'vendita' || fase === 'raccolta-documenti') {
     const cartella = statoCartella(pratica)
     return (
       <div className="space-y-4">
         <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
-          Questo progetto è ancora in <strong>area commerciale</strong>: la lavorazione in Erogazione Copy inizierà
-          quando Irene invierà il blocco cliente completo.
+          Questo progetto è ancora in <strong>area commerciale</strong>: la pipeline automatica parte quando il tutor
+          preme «Cliente pronto».
         </div>
         <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
           <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Stato della cartella cliente</h3>
@@ -776,89 +575,46 @@ function Lavorazione({ pratica }: { pratica: Pratica }) {
     )
   }
 
-  if (fase === 'generazione') {
-    return <PannelloGenerazione pratica={pratica} />
+  // Step autonomi: pannello unico con descrizione + simulazione
+  if (fase === 'generazione' || fase === 'revisione' || fase === 'visual' || fase === 'revisione-diagrammi' || fase === 'revisione-impaginazione') {
+    return <PannelloStepAutonomo pratica={pratica} />
   }
 
-  if (fase === 'revisione-team-copy') {
+  if (fase === 'checkpoint-copy') {
     return (
       <div className="space-y-4">
-        <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Revisione del Team Copy</h3>
-        <ReviewPanel praticaId={pratica.id} autore="Team Copy" />
+        <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Checkpoint del Copy</h3>
+        <ChatCopy pratica={pratica} />
+        <ReviewPanel praticaId={pratica.id} autore="Copy" />
       </div>
     )
   }
 
-  if (fase === 'revisione-1') {
-    const ultimaVoce = pratica.storico[pratica.storico.length - 1]
-    const rimandato = !!ultimaVoce && ultimaVoce.azione.startsWith(PREFISSO_RIMANDO)
-    const motivoRimando = rimandato ? ultimaVoce.azione.slice(PREFISSO_RIMANDO.length).replace(/^:\s*/, '') : ''
-    return (
-      <div className="space-y-4">
-        <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">
-          Revisione editoriale — Revisore 1
-        </h3>
-        {rimandato && (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-            <strong>⟲ Rimandato indietro dal Revisore 2.</strong> Motivo: {motivoRimando || 'non specificato'}
-          </div>
-        )}
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <p className="text-xs font-semibold text-amber-800">Promemoria — le 5 fasi editoriali del Metodo:</p>
-          <ol className="mt-1.5 space-y-0.5 text-xs text-amber-700">
-            {FASI_EDITORIALI.map((f, i) => (
-              <li key={f.nome}>
-                {i + 1}. <strong>{f.nome}</strong> — {f.dettaglio}
-              </li>
-            ))}
-          </ol>
-        </div>
-        <ReviewPanel praticaId={pratica.id} autore="Revisore 1" />
-      </div>
-    )
-  }
-
-  if (fase === 'revisione-2') {
-    return (
-      <div className="space-y-4">
-        <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Controllo qualità — Revisore 2</h3>
-        <ReviewPanel praticaId={pratica.id} autore="Revisore 2" azioniExtra={<BoxRimandaIndietro praticaId={pratica.id} />} />
-      </div>
-    )
-  }
-
-  if (fase === 'visual') {
-    return <PannelloVisual pratica={pratica} />
-  }
-
-  if (fase === 'leggibilita') {
-    return (
-      <div className="space-y-4">
-        <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Controllo di leggibilità</h3>
-        <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3">
-          <p className="text-xs font-semibold text-violet-800">Criteri di verifica:</p>
-          <ul className="mt-1.5 space-y-0.5 text-xs text-violet-700">
-            <li>• I visual inseriti devono migliorare la comprensione del testo, non decorarlo.</li>
-            <li>• Nessun blocco di testo deve superare le 5 righe consecutive.</li>
-          </ul>
-        </div>
-        <ReviewPanel praticaId={pratica.id} autore="Revisore Leggibilità" />
-      </div>
-    )
-  }
-
-  if (fase === 'grafica') {
+  if (fase === 'impaginazione') {
     return <PannelloGrafica pratica={pratica} />
+  }
+
+  if (fase === 'approvazione-finale') {
+    return (
+      <div className="space-y-4">
+        <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Approvazione finale</h3>
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+          Ultimo passaggio umano: con «Accetta documento» il progetto si chiude e parte l&apos;email al tutor col PDF
+          da girare al cliente.
+        </div>
+        <ReviewPanel praticaId={pratica.id} autore="Copy" />
+      </div>
+    )
   }
 
   // completata
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-        🎉 <strong>Report consegnato al cliente.</strong> Il progetto è completato: il documento resta consultabile in
-        sola lettura.
+        🎉 <strong>PDF consegnato al tutor via email.</strong> Il progetto è completato: il documento resta
+        consultabile in sola lettura.
       </div>
-      <ReviewPanel praticaId={pratica.id} autore="Erogazione Copy" />
+      <ReviewPanel praticaId={pratica.id} autore="Copy" />
     </div>
   )
 }

@@ -29,12 +29,12 @@ const PERSONE: CardPersona[] = [
   {
     href: '/commerciale/tutor',
     nome: 'Tutor',
-    compito: 'Apre la pratica alla vendita e raccoglie i documenti del cliente.',
+    compito: 'Apre la pratica, raccoglie tutti i documenti e avvia la pipeline automatica.',
     passi: [
       'Registra la vendita con i dipendenti coinvolti',
       'Invia assessment e questionario al cliente',
-      'Carica questionario e trascrizione',
-      'Conferma con «Dati completi» quando è tutto presente',
+      'Carica questionario, trascrizione e AssessFirst',
+      'Preme «Cliente pronto» quando è tutto presente',
     ],
     anima: 'anima-2',
     barra: 'bg-indigo-500',
@@ -46,12 +46,12 @@ const PERSONE: CardPersona[] = [
   {
     href: '/commerciale/irene',
     nome: 'Irene',
-    compito: 'Completa la pratica con gli AssessFirst e il report del team.',
+    compito: 'Supervisiona lo step autonomo: report AssessFirst ed email ai tutor.',
     passi: [
-      'Riceve i blocchi confermati dal Tutor',
-      'Scarica i documenti e carica gli AssessFirst',
-      'Verifica la lista di controllo e genera il report',
-      'Con «Completo» il blocco passa a Erogazione Copy',
+      'Vede le generazioni in corso in tempo reale',
+      'Controlla che i report AF escano formattati correttamente',
+      'Verifica che le email ai tutor partano',
+      'Interviene solo se qualcosa va storto',
     ],
     anima: 'anima-3',
     barra: 'bg-violet-500',

@@ -1,15 +1,15 @@
 'use client'
 
 // ─── Store globale del Sistema Report Strategico (client-side, persistito in localStorage) ───
-// Il backend non esiste ancora: questo store simula tutto il comportamento della piattaforma.
+// Il backend non esiste ancora: questo store simula il comportamento della
+// pipeline v2 — ogni step autonomo qui è un'azione "simula avanzamento".
 
 import React, { createContext, useContext, useEffect, useReducer, useRef } from 'react'
-import { AppState, Apprendimento, FaseId, Pratica, TipoLavoro, VersioneDocumento } from './types'
-import { documentiTutorPronti, faseById, faseSuccessiva, statoCartella } from './fasi'
+import { AppState, Apprendimento, FaseId, Pratica, VersioneDocumento } from './types'
+import { documentiTutorPronti, faseSuccessiva, faseById } from './fasi'
 import { batteriaIdPerTipo, batteriaPerTipo, ETICHETTA_TIPO } from './batterie'
 import {
   ASSESSFIRST_MOCK,
-  DOC_UNIFICATO_MOCK,
   QUESTIONARIO_MOCK,
   REPORT_AI_MOCK,
   REPORT_IRENE_MOCK,
@@ -18,29 +18,25 @@ import {
   TRASCRIZIONE_MOCK,
 } from './mock'
 
-// v3: area commerciale a due persone (Tutor + Irene) con fase dedicata report-irene
-const STORAGE_KEY = 'sistema-report-strategico-v3'
+// v4: pipeline v2 — eliminati i compartimenti 4/5, tutor carica tutto,
+// report AF autonomo, revisione = sistema di Christian, chat del copy
+const STORAGE_KEY = 'sistema-report-strategico-v4'
 
-// Quando un revisore modifica un documento nella fase X, l'apprendimento
-// migliora i passaggi PRECEDENTI (chi ha prodotto il documento che è stato corretto).
-// Per le revisioni sul report generato, la batteria target dipende dal tipo di lavoro della pratica.
+// Quando qualcuno corregge un documento nella fase X, l'apprendimento
+// migliora il passaggio che ha PRODOTTO quel documento.
 function targetApprendimento(pratica: Pratica): { id: string; nome: string } {
   switch (pratica.faseCorrente) {
-    case 'revisione-team-copy':
-    case 'revisione-1': {
+    case 'revisione-diagrammi':
+      return { id: 'agente-visual', nome: 'Agente Visual — Tabelle e Diagrammi' }
+    case 'revisione-impaginazione':
+    case 'approvazione-finale':
+      return { id: 'specifica-impaginazione', nome: 'Specifica di impaginazione (fase 8)' }
+    default: {
       const id = batteriaIdPerTipo(pratica.tipoLavoro)
       return id === 'batteria-branding'
         ? { id, nome: 'Batteria Branding — Piano Marketing (21 prompt)' }
         : { id, nome: 'Batteria Consulenza — Report Strategico (20 prompt)' }
     }
-    case 'revisione-2':
-      return { id: 'revisore-1', nome: 'Revisore 1 — Editor Metodo (5 Fasi)' }
-    case 'leggibilita':
-      return { id: 'agente-visual', nome: 'Agente Visual — Tabelle e Diagrammi' }
-    case 'grafica':
-      return { id: 'revisore-leggibilita', nome: 'Revisore Leggibilità' }
-    default:
-      return { id: batteriaIdPerTipo(pratica.tipoLavoro), nome: 'Batteria di Generazione' }
   }
 }
 
@@ -50,19 +46,13 @@ type Azione =
   | { type: 'CREA_PRATICA'; azienda: string; cliente: string; email: string; dipendenti: string[] }
   | { type: 'INVIA_ASSESSMENT'; praticaId: string }
   | { type: 'CARICA_QUESTIONARIO_TRASCRIZIONE'; praticaId: string }
-  | { type: 'CONFERMA_DOCUMENTI'; praticaId: string }
   | { type: 'CARICA_ASSESSFIRST'; praticaId: string; dipendenti: string[] }
-  | { type: 'GENERA_REPORT_IRENE'; praticaId: string }
-  | { type: 'AGGIORNA_REPORT_IRENE'; praticaId: string; contenuto: string }
-  | { type: 'PASSA_A_EROGAZIONE'; praticaId: string }
-  | { type: 'IMPOSTA_TIPO_LAVORO'; praticaId: string; tipo: TipoLavoro }
+  | { type: 'CLIENTE_PRONTO'; praticaId: string }
+  | { type: 'AVANZA_STEP_AUTONOMO'; praticaId: string }
+  | { type: 'INVIA_CHAT_COPY'; praticaId: string; testo: string }
   | { type: 'SPOSTA_FASE'; praticaId: string; nuovaFase: FaseId; autore: string }
-  | { type: 'UNISCI_DOCUMENTI'; praticaId: string }
-  | { type: 'GENERA_REPORT'; praticaId: string }
   | { type: 'ACCETTA_DOCUMENTO'; praticaId: string; autore: string }
   | { type: 'SALVA_REVISIONE'; praticaId: string; autore: string; testoDopo: string; note: string }
-  | { type: 'RIMANDA_INDIETRO'; praticaId: string; autore: string; motivo: string }
-  | { type: 'COMPLETA_VISUAL'; praticaId: string }
   | { type: 'APPROVA_APPRENDIMENTO'; apprendimentoId: string }
   | { type: 'SCARTA_APPRENDIMENTO'; apprendimentoId: string }
 
@@ -76,6 +66,90 @@ const aggiornaPratica = (state: AppState, praticaId: string, fn: (p: Pratica) =>
 
 const ultimaVersione = (p: Pratica): VersioneDocumento | undefined => p.versioni[p.versioni.length - 1]
 
+/** Simula il completamento dello step autonomo della fase corrente. */
+function avanzaStepAutonomo(p: Pratica): Pratica {
+  const adesso = ora()
+  switch (p.faseCorrente) {
+    case 'generazione': {
+      // il sistema di Christian sceglie il tipo e genera; in parallelo parte
+      // lo step 4a: report AF per dipendente + email al tutor (Irene supervisiona)
+      const tipo = p.tipoLavoro ?? 'consulenza'
+      const etichettaBatteria = `batteria ${ETICHETTA_TIPO[tipo].label} (${batteriaPerTipo(tipo).length} prompt)`
+      return {
+        ...p,
+        tipoLavoro: tipo,
+        faseCorrente: 'revisione',
+        versioni: [
+          ...p.versioni,
+          { id: `v-${uid()}`, fase: 'generazione', autore: 'Sistema di generazione (Christian)', dataOra: adesso, contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
+        ],
+        allegati: [
+          ...p.allegati.filter((a) => a.tipo !== 'report-af'),
+          ...p.dipendenti.map((d) => ({
+            id: `al-${uid()}`,
+            nome: `Report AssessFirst - ${d}.pdf`,
+            tipo: 'report-af' as const,
+            caricatoDa: 'Agente Report AF',
+            dataCaricamento: adesso,
+            dipendente: d,
+            contenuto: REPORT_IRENE_MOCK,
+          })),
+        ],
+        reportAF: { stato: 'email_inviata', dataOra: adesso, dettaglio: `${p.dipendenti.length} report generati e inviati al tutor` },
+        storico: [
+          ...p.storico,
+          { fase: 'generazione', azione: `Tipo di lavoro determinato dal sistema: ${ETICHETTA_TIPO[tipo].label} — report generato con la ${etichettaBatteria}`, autore: 'Sistema (Christian)', dataOra: adesso },
+          { fase: 'generazione', azione: `Report AssessFirst generati in autonomia per ${p.dipendenti.length} dipendenti (step parallelo)`, autore: 'Agente Report AF', dataOra: adesso },
+          { fase: 'generazione', azione: 'Email al tutor con report principale + report AssessFirst (simulata)', autore: 'Sistema', dataOra: adesso },
+        ],
+      }
+    }
+    case 'revisione':
+      return {
+        ...p,
+        faseCorrente: 'visual',
+        versioni: [
+          ...p.versioni,
+          { id: `v-${uid()}`, fase: 'revisione', autore: 'Revisore (sistema Christian)', dataOra: adesso, contenuto: ultimaVersione(p)?.contenuto ?? REPORT_AI_MOCK, tipo: 'ai', etichetta: 'Documento revisionato' },
+        ],
+        storico: [...p.storico, { fase: 'revisione', azione: 'Documento revisionato dal sistema integrato', autore: 'Revisore (Christian)', dataOra: adesso }],
+      }
+    case 'visual':
+      return {
+        ...p,
+        faseCorrente: 'revisione-diagrammi',
+        versioni: [
+          ...p.versioni,
+          { id: `v-${uid()}`, fase: 'visual', autore: 'Agente Visual', dataOra: adesso, contenuto: REPORT_VISUAL_MOCK, tipo: 'ai', etichetta: 'Report con diagrammi e tabelle' },
+        ],
+        storico: [...p.storico, { fase: 'visual', azione: 'Diagrammi, tabelle e grafici inseriti automaticamente', autore: 'Agente Visual', dataOra: adesso }],
+      }
+    case 'revisione-diagrammi':
+      return {
+        ...p,
+        faseCorrente: 'checkpoint-copy',
+        storico: [
+          ...p.storico,
+          { fase: 'revisione-diagrammi', azione: 'Loop automatico: 1 rimando al Visual, poi diagrammi approvati — lezione registrata per l\'apprendimento', autore: 'Revisore diagrammi', dataOra: adesso },
+        ],
+      }
+    case 'impaginazione':
+      return {
+        ...p,
+        faseCorrente: 'revisione-impaginazione',
+        storico: [...p.storico, { fase: 'impaginazione', azione: 'PDF impaginato dal motore (fase 8 sul worker Railway)', autore: 'Motore impaginazione', dataOra: adesso }],
+      }
+    case 'revisione-impaginazione':
+      return {
+        ...p,
+        faseCorrente: 'approvazione-finale',
+        storico: [...p.storico, { fase: 'revisione-impaginazione', azione: 'Confronto con la knowledge base completato: nessuna discrepanza', autore: 'Revisore impaginazione', dataOra: adesso }],
+      }
+    default:
+      return p
+  }
+}
+
 function reducer(state: AppState, azione: Azione): AppState {
   switch (azione.type) {
     case 'HYDRATE':
@@ -85,6 +159,7 @@ function reducer(state: AppState, azione: Azione): AppState {
       return SEED_STATE
 
     case 'CREA_PRATICA': {
+      const adesso = ora()
       const nuova: Pratica = {
         id: `pr-${uid()}`,
         azienda: azione.azienda,
@@ -94,10 +169,13 @@ function reducer(state: AppState, azione: Azione): AppState {
         dipendenti: azione.dipendenti,
         tipoLavoro: null,
         faseCorrente: 'vendita',
-        dataCreazione: ora(),
+        dataCreazione: adesso,
         allegati: [],
         versioni: [],
-        storico: [{ fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: ora() }],
+        storico: [
+          { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: adesso },
+          { fase: 'vendita', azione: 'Email di notifica inviata a tutor e Irene (simulata)', autore: 'Sistema', dataOra: adesso },
+        ],
       }
       return { ...state, pratiche: [nuova, ...state.pratiche] }
     }
@@ -111,19 +189,6 @@ function reducer(state: AppState, azione: Azione): AppState {
           { fase: 'vendita', azione: 'Assessment e questionario inviati al cliente', autore: 'Giulia T. (Tutor)', dataOra: ora() },
         ],
       }))
-
-    case 'CONFERMA_DOCUMENTI': {
-      const pratica = state.pratiche.find((p) => p.id === azione.praticaId)
-      if (!pratica || !documentiTutorPronti(pratica)) return state
-      return aggiornaPratica(state, azione.praticaId, (p) => ({
-        ...p,
-        faseCorrente: 'report-irene',
-        storico: [
-          ...p.storico,
-          { fase: 'raccolta-documenti', azione: 'Il tutor ha confermato che tutti i dati sono presenti — Irene notificata', autore: 'Giulia T. (Tutor)', dataOra: ora() },
-        ],
-      }))
-    }
 
     case 'CARICA_QUESTIONARIO_TRASCRIZIONE':
       return aggiornaPratica(state, azione.praticaId, (p) => ({
@@ -147,7 +212,7 @@ function reducer(state: AppState, azione: Azione): AppState {
               id: `al-${uid()}`,
               nome: `AssessFirst - ${d}.pdf`,
               tipo: 'assessfirst' as const,
-              caricatoDa: 'Irene',
+              caricatoDa: 'Giulia T. (Tutor)',
               dataCaricamento: ora(),
               dipendente: d,
               contenuto: ASSESSFIRST_MOCK(d),
@@ -155,60 +220,46 @@ function reducer(state: AppState, azione: Azione): AppState {
         ],
         storico: [
           ...p.storico,
-          { fase: 'report-irene', azione: `AssessFirst caricati nel blocco cliente (${azione.dipendenti.length} dipendenti)`, autore: 'Irene', dataOra: ora() },
+          { fase: 'raccolta-documenti', azione: `AssessFirst caricati (${azione.dipendenti.length} dipendenti)`, autore: 'Giulia T. (Tutor)', dataOra: ora() },
         ],
       }))
 
-    case 'GENERA_REPORT_IRENE':
-      return aggiornaPratica(state, azione.praticaId, (p) => ({
-        ...p,
-        allegati: [
-          ...p.allegati.filter((a) => a.tipo !== 'report-irene'),
-          { id: `al-${uid()}`, nome: 'Report AssessFirst del team.pdf', tipo: 'report-irene', caricatoDa: 'Irene', dataCaricamento: ora(), contenuto: REPORT_IRENE_MOCK },
-        ],
-        storico: [
-          ...p.storico,
-          { fase: 'report-irene', azione: 'Report AssessFirst del team generato con il prompt dedicato', autore: 'Irene', dataOra: ora() },
-        ],
-      }))
-
-    case 'AGGIORNA_REPORT_IRENE':
-      return aggiornaPratica(state, azione.praticaId, (p) => ({
-        ...p,
-        allegati: p.allegati.map((a) => (a.tipo === 'report-irene' ? { ...a, contenuto: azione.contenuto } : a)),
-        storico: [
-          ...p.storico,
-          { fase: 'report-irene', azione: 'Report AssessFirst ricontrollato e sistemato', autore: 'Irene', dataOra: ora() },
-        ],
-      }))
-
-    case 'PASSA_A_EROGAZIONE': {
+    case 'CLIENTE_PRONTO': {
       const pratica = state.pratiche.find((p) => p.id === azione.praticaId)
-      if (!pratica || !statoCartella(pratica).completa) return state
+      if (!pratica || !documentiTutorPronti(pratica)) return state
       return aggiornaPratica(state, azione.praticaId, (p) => ({
         ...p,
         faseCorrente: 'generazione',
+        reportAF: { stato: 'in_attesa' },
         storico: [
           ...p.storico,
-          { fase: 'report-irene', azione: 'Blocco cliente completo — inviato a Erogazione Copy (Team Copy notificato)', autore: 'Irene', dataOra: ora() },
+          { fase: 'raccolta-documenti', azione: '«Cliente pronto» — la pipeline automatica è partita', autore: 'Giulia T. (Tutor)', dataOra: ora() },
         ],
       }))
     }
 
-    case 'IMPOSTA_TIPO_LAVORO':
+    case 'AVANZA_STEP_AUTONOMO':
+      return aggiornaPratica(state, azione.praticaId, avanzaStepAutonomo)
+
+    case 'INVIA_CHAT_COPY': {
+      const pratica = state.pratiche.find((p) => p.id === azione.praticaId)
+      if (!pratica || !azione.testo.trim()) return state
+      const adesso = ora()
+      const precedente = ultimaVersione(pratica)
       return aggiornaPratica(state, azione.praticaId, (p) => ({
         ...p,
-        tipoLavoro: azione.tipo,
-        storico: [
-          ...p.storico,
-          {
-            fase: p.faseCorrente,
-            azione: `Tipo di lavoro impostato: ${ETICHETTA_TIPO[azione.tipo].label} — la batteria di prompt si è aggiornata automaticamente`,
-            autore: 'Team Copy',
-            dataOra: ora(),
-          },
+        chatCopy: [
+          ...(p.chatCopy ?? []),
+          { autore: 'copy', testo: azione.testo.trim(), dataOra: adesso },
+          { autore: 'agente', testo: 'Modifiche applicate al documento: trovi la nuova versione qui sopra. Se non è come la volevi, scrivimi cosa correggere.', dataOra: adesso },
         ],
+        versioni: [
+          ...p.versioni,
+          { id: `v-${uid()}`, fase: p.faseCorrente, autore: 'Agente (da chat del copy)', dataOra: adesso, contenuto: `${precedente?.contenuto ?? ''}\n\n[Modifica richiesta dal copy in chat: "${azione.testo.trim()}" — applicata]`, tipo: 'ai', etichetta: 'Versione aggiornata dalla chat' },
+        ],
+        storico: [...p.storico, { fase: p.faseCorrente, azione: `Modifica richiesta in chat: "${azione.testo.trim().slice(0, 80)}"`, autore: 'Copy', dataOra: adesso }],
       }))
+    }
 
     case 'SPOSTA_FASE': {
       const pratica = state.pratiche.find((p) => p.id === azione.praticaId)
@@ -223,41 +274,22 @@ function reducer(state: AppState, azione: Azione): AppState {
       }))
     }
 
-    case 'UNISCI_DOCUMENTI':
-      return aggiornaPratica(state, azione.praticaId, (p) => ({
-        ...p,
-        versioni: [
-          ...p.versioni,
-          { id: `v-${uid()}`, fase: 'generazione', autore: 'Team Copy', dataOra: ora(), contenuto: DOC_UNIFICATO_MOCK, tipo: 'umano', etichetta: 'Documento unificato' },
-        ],
-        storico: [...p.storico, { fase: 'generazione', azione: 'Documenti unificati in un documento unico', autore: 'Team Copy', dataOra: ora() }],
-      }))
-
-    case 'GENERA_REPORT':
-      return aggiornaPratica(state, azione.praticaId, (p) => {
-        const etichettaBatteria = p.tipoLavoro
-          ? `batteria ${ETICHETTA_TIPO[p.tipoLavoro].label} (${batteriaPerTipo(p.tipoLavoro).length} prompt)`
-          : 'batteria di prompt'
-        return {
-          ...p,
-          faseCorrente: 'revisione-team-copy',
-          versioni: [
-            ...p.versioni,
-            { id: `v-${uid()}`, fase: 'generazione', autore: `Sistema (${etichettaBatteria})`, dataOra: ora(), contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
-          ],
-          storico: [...p.storico, { fase: 'generazione', azione: `Report generato con la ${etichettaBatteria}`, autore: 'Sistema', dataOra: ora() }],
-        }
-      })
-
     case 'ACCETTA_DOCUMENTO': {
       const pratica = state.pratiche.find((p) => p.id === azione.praticaId)
       if (!pratica) return state
       const prossima = faseSuccessiva(pratica.faseCorrente)
       if (!prossima) return state
+      const finale = pratica.faseCorrente === 'approvazione-finale'
       return aggiornaPratica(state, azione.praticaId, (p) => ({
         ...p,
         faseCorrente: prossima,
-        storico: [...p.storico, { fase: p.faseCorrente, azione: 'Documento accettato', autore: azione.autore, dataOra: ora() }],
+        storico: [
+          ...p.storico,
+          { fase: p.faseCorrente, azione: finale ? 'Approvazione finale del copy' : 'Documento accettato', autore: azione.autore, dataOra: ora() },
+          ...(finale
+            ? [{ fase: prossima, azione: 'Email al tutor col PDF finale da girare al cliente (simulata)', autore: 'Sistema', dataOra: ora() }]
+            : []),
+        ],
       }))
     }
 
@@ -297,24 +329,6 @@ function reducer(state: AppState, azione: Azione): AppState {
 
       return { ...conVersione, apprendimenti: [apprendimento, ...conVersione.apprendimenti] }
     }
-
-    case 'RIMANDA_INDIETRO':
-      return aggiornaPratica(state, azione.praticaId, (p) => ({
-        ...p,
-        faseCorrente: 'revisione-1',
-        storico: [...p.storico, { fase: p.faseCorrente, azione: `Rimandato al Revisore 1: ${azione.motivo}`, autore: azione.autore, dataOra: ora() }],
-      }))
-
-    case 'COMPLETA_VISUAL':
-      return aggiornaPratica(state, azione.praticaId, (p) => ({
-        ...p,
-        faseCorrente: 'leggibilita',
-        versioni: [
-          ...p.versioni,
-          { id: `v-${uid()}`, fase: 'visual', autore: 'Agente Visual', dataOra: ora(), contenuto: REPORT_VISUAL_MOCK, tipo: 'ai', etichetta: 'Report con elementi visual' },
-        ],
-        storico: [...p.storico, { fase: 'visual', azione: 'Elementi visual inseriti automaticamente', autore: 'Agente Visual', dataOra: ora() }],
-      }))
 
     case 'APPROVA_APPRENDIMENTO': {
       const app = state.apprendimenti.find((a) => a.id === azione.apprendimentoId)
@@ -356,19 +370,13 @@ interface StoreContextValue {
   creaPratica: (dati: { azienda: string; cliente: string; email: string; dipendenti: string[] }) => void
   inviaAssessment: (praticaId: string) => void
   caricaQuestionarioTrascrizione: (praticaId: string) => void
-  confermaDocumenti: (praticaId: string) => void
   caricaAssessFirst: (praticaId: string, dipendenti: string[]) => void
-  generaReportIrene: (praticaId: string) => void
-  aggiornaReportIrene: (praticaId: string, contenuto: string) => void
-  passaAErogazione: (praticaId: string) => void
-  impostaTipoLavoro: (praticaId: string, tipo: TipoLavoro) => void
+  clientePronto: (praticaId: string) => void
+  avanzaStepAutonomo: (praticaId: string) => void
+  inviaChatCopy: (praticaId: string, testo: string) => void
   spostaFase: (praticaId: string, nuovaFase: FaseId, autore: string) => void
-  unisciDocumenti: (praticaId: string) => void
-  generaReport: (praticaId: string) => void
   accettaDocumento: (praticaId: string, autore: string) => void
   salvaRevisione: (praticaId: string, dati: { autore: string; testoDopo: string; note: string }) => void
-  rimandaIndietro: (praticaId: string, autore: string, motivo: string) => void
-  completaVisual: (praticaId: string) => void
   approvaApprendimento: (apprendimentoId: string) => void
   scartaApprendimento: (apprendimentoId: string) => void
   resetDemo: () => void
@@ -415,19 +423,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     creaPratica: (dati) => dispatch({ type: 'CREA_PRATICA', ...dati }),
     inviaAssessment: (praticaId) => dispatch({ type: 'INVIA_ASSESSMENT', praticaId }),
     caricaQuestionarioTrascrizione: (praticaId) => dispatch({ type: 'CARICA_QUESTIONARIO_TRASCRIZIONE', praticaId }),
-    confermaDocumenti: (praticaId) => dispatch({ type: 'CONFERMA_DOCUMENTI', praticaId }),
     caricaAssessFirst: (praticaId, dipendenti) => dispatch({ type: 'CARICA_ASSESSFIRST', praticaId, dipendenti }),
-    generaReportIrene: (praticaId) => dispatch({ type: 'GENERA_REPORT_IRENE', praticaId }),
-    aggiornaReportIrene: (praticaId, contenuto) => dispatch({ type: 'AGGIORNA_REPORT_IRENE', praticaId, contenuto }),
-    passaAErogazione: (praticaId) => dispatch({ type: 'PASSA_A_EROGAZIONE', praticaId }),
-    impostaTipoLavoro: (praticaId, tipo) => dispatch({ type: 'IMPOSTA_TIPO_LAVORO', praticaId, tipo }),
+    clientePronto: (praticaId) => dispatch({ type: 'CLIENTE_PRONTO', praticaId }),
+    avanzaStepAutonomo: (praticaId) => dispatch({ type: 'AVANZA_STEP_AUTONOMO', praticaId }),
+    inviaChatCopy: (praticaId, testo) => dispatch({ type: 'INVIA_CHAT_COPY', praticaId, testo }),
     spostaFase: (praticaId, nuovaFase, autore) => dispatch({ type: 'SPOSTA_FASE', praticaId, nuovaFase, autore }),
-    unisciDocumenti: (praticaId) => dispatch({ type: 'UNISCI_DOCUMENTI', praticaId }),
-    generaReport: (praticaId) => dispatch({ type: 'GENERA_REPORT', praticaId }),
     accettaDocumento: (praticaId, autore) => dispatch({ type: 'ACCETTA_DOCUMENTO', praticaId, autore }),
     salvaRevisione: (praticaId, dati) => dispatch({ type: 'SALVA_REVISIONE', praticaId, ...dati }),
-    rimandaIndietro: (praticaId, autore, motivo) => dispatch({ type: 'RIMANDA_INDIETRO', praticaId, autore, motivo }),
-    completaVisual: (praticaId) => dispatch({ type: 'COMPLETA_VISUAL', praticaId }),
     approvaApprendimento: (apprendimentoId) => dispatch({ type: 'APPROVA_APPRENDIMENTO', apprendimentoId }),
     scartaApprendimento: (apprendimentoId) => dispatch({ type: 'SCARTA_APPRENDIMENTO', apprendimentoId }),
     resetDemo: () => dispatch({ type: 'RESET' }),
@@ -447,15 +449,18 @@ export function contaNotifiche(state: AppState, ruolo: string): number {
   const inFase = (fasi: FaseId[]) => state.pratiche.filter((p) => fasi.includes(p.faseCorrente)).length
   switch (ruolo) {
     case 'tutor':
-      // vendite da inviare + cartelle in raccolta documenti
+      // vendite da completare + cartelle in raccolta documenti
       return inFase(['vendita', 'raccolta-documenti'])
     case 'irene':
-      // blocchi cliente confermati dal tutor, in attesa della sua preparazione
-      return inFase(['report-irene'])
+      // supervisione step 4a: generazioni in corso + report AF con problemi
+      return (
+        inFase(['generazione']) +
+        state.pratiche.filter((p) => p.reportAF && p.reportAF.stato === 'errore').length
+      )
     case 'erogazione':
-      return inFase(['generazione', 'revisione-team-copy', 'revisione-1', 'revisione-2', 'visual', 'leggibilita', 'grafica'])
-    case 'team-copy':
-      return inFase(['generazione', 'revisione-team-copy']) + state.apprendimenti.filter((a) => a.stato === 'in_attesa').length
+      return inFase(['generazione', 'revisione', 'visual', 'revisione-diagrammi', 'checkpoint-copy', 'impaginazione', 'revisione-impaginazione', 'approvazione-finale'])
+    case 'copy':
+      return inFase(['checkpoint-copy', 'approvazione-finale']) + state.apprendimenti.filter((a) => a.stato === 'in_attesa').length
     default:
       return 0
   }

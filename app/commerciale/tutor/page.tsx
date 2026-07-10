@@ -3,7 +3,7 @@
 // ─── Area Commerciale — Tutor ───
 // Nuovo flusso a due persone: il Tutor registra la vendita, invia assessment e
 // questionario al cliente, carica questionario e trascrizione e — quando tutto
-// è presente — conferma i dati: la pratica passa a Irene, che viene notificata.
+// è presente — conferma i dati: la pratica Cliente pronto, che viene notificata.
 // Dalle fasi successive in poi il Tutor vede solo i macro-stati commerciali,
 // così può aggiornare il cliente senza entrare nella pipeline del team copy.
 
@@ -235,11 +235,15 @@ function CartaVendita({ pratica, onInviata }: { pratica: Pratica; onInviata: (az
   )
 }
 
-/** Card di raccolta documenti: le due voci del Tutor e la conferma per Irene. */
+/** Card di raccolta documenti: nel flusso v2 il tutor carica TUTTO
+ *  (questionario, trascrizione e AssessFirst) e preme «Cliente pronto». */
 function CartaRaccolta({ pratica, onConfermata }: { pratica: Pratica; onConfermata: (azienda: string) => void }) {
-  const { caricaQuestionarioTrascrizione, confermaDocumenti } = useApp()
-  const vociTutor = statoCartella(pratica).voci.filter((v) => v.responsabile === 'Tutor')
+  const { caricaQuestionarioTrascrizione, caricaAssessFirst, clientePronto } = useApp()
+  const vociTutor = statoCartella(pratica).voci
   const pronti = documentiTutorPronti(pratica)
+  const afMancanti = pratica.dipendenti.filter(
+    (d) => !pratica.allegati.some((a) => a.tipo === 'assessfirst' && a.dipendente === d)
+  )
 
   return (
     <div className="card-sollevabile rounded-2xl border border-linea bg-carta p-5 shadow-sm">
@@ -293,14 +297,7 @@ function CartaRaccolta({ pratica, onConfermata }: { pratica: Pratica; onConferma
       </ul>
 
       <div className="mt-4 space-y-2">
-        {pronti ? (
-          <button
-            disabled
-            className="w-full cursor-default rounded-xl border border-green-200 bg-green-50 px-4 py-2.5 text-sm font-semibold text-green-700"
-          >
-            ✓ Questionario e trascrizione caricati
-          </button>
-        ) : (
+        {!pratica.allegati.some((a) => a.tipo === 'questionario') && (
           <button
             onClick={() => caricaQuestionarioTrascrizione(pratica.id)}
             className="w-full rounded-xl bg-petrolio px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-petrolio-scuro"
@@ -308,9 +305,17 @@ function CartaRaccolta({ pratica, onConfermata }: { pratica: Pratica; onConferma
             Carica questionario + trascrizione
           </button>
         )}
+        {afMancanti.length > 0 && (
+          <button
+            onClick={() => caricaAssessFirst(pratica.id, afMancanti)}
+            className="w-full rounded-xl bg-petrolio px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-petrolio-scuro"
+          >
+            Carica AssessFirst ({afMancanti.length} {afMancanti.length === 1 ? 'dipendente' : 'dipendenti'})
+          </button>
+        )}
         <button
           onClick={() => {
-            confermaDocumenti(pratica.id)
+            clientePronto(pratica.id)
             onConfermata(pratica.azienda)
           }}
           disabled={!pronti}
@@ -320,11 +325,11 @@ function CartaRaccolta({ pratica, onConfermata }: { pratica: Pratica; onConferma
               : 'cursor-not-allowed border border-linea bg-carta text-inchiostro/30'
           }`}
         >
-          ✓ Tutti i dati sono presenti — passa a Irene
+          🚀 Cliente pronto — avvia la pipeline automatica
         </button>
         {!pronti && (
           <p className="text-xs text-inchiostro/40">
-            La conferma si attiva quando questionario e trascrizione sono stati caricati.
+            Il bottone si attiva quando questionario, trascrizione e tutti gli AssessFirst sono caricati.
           </p>
         )}
       </div>
@@ -341,13 +346,13 @@ export default function PaginaTutor() {
 
   const daInviare = state.pratiche.filter((p) => p.faseCorrente === 'vendita')
   const inRaccolta = state.pratiche.filter((p) => p.faseCorrente === 'raccolta-documenti')
-  const inLavorazione = state.pratiche.filter((p) => indiceFase(p.faseCorrente) >= indiceFase('report-irene'))
+  const inLavorazione = state.pratiche.filter((p) => indiceFase(p.faseCorrente) >= indiceFase('generazione'))
 
   return (
     <RoleShell
       ruolo="Tutor"
       colore="bg-indigo-500"
-      sottotitolo="Vendita, documenti del cliente e conferma per Irene"
+      sottotitolo="Vendita, documenti del cliente e avvio della pipeline automatica"
       notifiche={contaNotifiche(state, 'tutor')}
     >
       <div className="space-y-10">
@@ -419,7 +424,7 @@ export default function PaginaTutor() {
         <section className="anima anima-3">
           <TitoloSezione titolo="Raccolta documenti" conteggio={`${inRaccolta.length} in raccolta`} />
           <p className="mt-1 text-xs text-inchiostro/45">
-            Carica questionario e trascrizione: quando tutto è presente, conferma e la pratica passa a Irene.
+            Carica questionario e trascrizione: quando tutto è presente, conferma e la pratica Cliente pronto.
           </p>
           <div className="mt-3 space-y-4">
             {aziendaConfermata && (

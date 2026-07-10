@@ -3,14 +3,14 @@
 export type FaseId =
   | 'vendita'
   | 'raccolta-documenti'
-  | 'report-irene'
   | 'generazione'
-  | 'revisione-team-copy'
-  | 'revisione-1'
-  | 'revisione-2'
+  | 'revisione'
   | 'visual'
-  | 'leggibilita'
-  | 'grafica'
+  | 'revisione-diagrammi'
+  | 'checkpoint-copy'
+  | 'impaginazione'
+  | 'revisione-impaginazione'
+  | 'approvazione-finale'
   | 'completata'
 
 export interface Fase {
@@ -28,7 +28,7 @@ export type TipoDocumento =
   | 'questionario'
   | 'trascrizione'
   | 'assessfirst'
-  | 'report-irene'
+  | 'report-af'
   | 'unificato'
   | 'report'
 
@@ -64,6 +64,21 @@ export interface VoceStorico {
 /** Tipo di lavoro: determina quale batteria di prompt viene usata dalla generazione. */
 export type TipoLavoro = 'branding' | 'consulenza'
 
+/** Stato del passaggio AUTONOMO 4a: report AssessFirst per dipendente + email al tutor.
+ *  Corre in parallelo alla revisione; Irene lo supervisiona. */
+export interface StatoReportAF {
+  stato: 'in_attesa' | 'generati' | 'email_inviata' | 'errore'
+  dataOra?: string
+  dettaglio?: string
+}
+
+/** Messaggio della chat dedicata del checkpoint copy (step 8). */
+export interface MessaggioChat {
+  autore: 'copy' | 'agente'
+  testo: string
+  dataOra: string
+}
+
 export interface Pratica {
   id: string
   azienda: string
@@ -72,13 +87,17 @@ export interface Pratica {
   tutor: string
   /** dipendenti del cliente per cui servono gli AssessFirst */
   dipendenti: string[]
-  /** scelto dal Team Copy quando la cartella arriva in Erogazione Copy; null = da scegliere */
+  /** scelto dal sistema di generazione (Christian); null = non ancora determinato */
   tipoLavoro: TipoLavoro | null
   faseCorrente: FaseId
   dataCreazione: string
   allegati: DocumentoAllegato[]
   versioni: VersioneDocumento[]
   storico: VoceStorico[]
+  /** step autonomo 4a (parallelo alla revisione) */
+  reportAF?: StatoReportAF
+  /** chat del checkpoint copy */
+  chatCopy?: MessaggioChat[]
 }
 
 export interface Apprendimento {

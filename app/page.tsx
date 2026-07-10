@@ -10,11 +10,11 @@ import { contaNotifiche, useApp } from '@/lib/store'
 const PERSONE_COMMERCIALE: { nome: string; compito: string }[] = [
   {
     nome: 'Tutor',
-    compito: 'Registra la vendita, carica i documenti e conferma quando è tutto presente',
+    compito: 'Registra la vendita, carica tutti i documenti e preme «Cliente pronto»',
   },
   {
     nome: 'Irene',
-    compito: 'AssessFirst, report del team e invio a Erogazione Copy',
+    compito: 'Supervisiona i report AssessFirst automatici e le email ai tutor',
   },
 ]
 
@@ -30,17 +30,17 @@ const PASSI: { numero: number; titolo: string; descrizione: string }[] = [
   {
     numero: 1,
     titolo: 'Il Tutor prepara',
-    descrizione: 'Registra la vendita, invia assessment e questionario, carica i documenti del cliente.',
+    descrizione: 'Registra la vendita, invia assessment e questionario, carica documenti e AssessFirst.',
   },
   {
     numero: 2,
-    titolo: 'Irene completa e invia',
-    descrizione: 'Aggiunge gli AssessFirst, genera il report del team e lo passa a Erogazione Copy.',
+    titolo: 'La pipeline lavora da sola',
+    descrizione: 'Generazione, revisione, diagrammi e impaginazione avanzano in autonomia, con lezioni che migliorano i prompt.',
   },
   {
     numero: 3,
-    titolo: 'Il team copy produce e consegna',
-    descrizione: 'Revisioni, visual e grafica fino al report finito, pronto per il cliente.',
+    titolo: 'Il copy approva e consegna',
+    descrizione: "Due soli checkpoint umani: le modifiche via chat e l'approvazione finale, poi l'email al tutor col PDF.",
   },
 ]
 

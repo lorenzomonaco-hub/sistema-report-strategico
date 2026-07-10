@@ -9,20 +9,12 @@ import RoleShell from '@/components/RoleShell'
 
 const COMPARTIMENTI = [
   {
-    numero: 4,
-    titolo: 'Revisore 1 — Editor (5 fasi)',
-    descrizione: 'Carichi il documento, l\'AI lo revisiona con il prompt vero e scarichi il file corretto.',
-    href: '/laboratorio/revisore-1',
-    accento: 'bg-amber-500',
-    attivo: true,
-  },
-  {
-    numero: 5,
-    titolo: 'Revisore 2 — Supervisore',
-    descrizione: 'Confronta prima/dopo, giudica il lavoro del Revisore 1: verdetto, problemi e lezioni.',
-    href: '/laboratorio/revisore-2',
-    accento: 'bg-rose-500',
-    attivo: true,
+    numero: 45,
+    titolo: 'Generazione + Revisione — sistema di Christian',
+    descrizione: 'I compartimenti 4 e 5 sono stati sostituiti: generazione e revisione arrivano dal GitHub di Christian, in integrazione.',
+    href: '',
+    accento: 'bg-teal-500',
+    attivo: false,
   },
   {
     numero: 6,
@@ -77,7 +69,7 @@ export default function PaginaLaboratorio() {
                 <div className="mt-3 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold tracking-wide text-inchiostro/40 uppercase">
-                      Compartimento n°{c.numero}
+                      Compartimento {c.numero === 45 ? 'n°4+5' : `n°${c.numero}`}
                     </p>
                     <h3 className={`font-display mt-0.5 text-lg font-bold tracking-tight ${c.attivo ? 'text-inchiostro' : 'text-inchiostro/40'}`}>
                       {c.titolo}

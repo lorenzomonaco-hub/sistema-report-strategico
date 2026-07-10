@@ -143,10 +143,10 @@ const alTrascrizione = (data: string): DocumentoAllegato => ({
   id: `al-t-${data}`, nome: 'Trascrizione analisi.pdf', tipo: 'trascrizione', caricatoDa: 'Giulia T. (Tutor)', dataCaricamento: data, contenuto: TRASCRIZIONE_MOCK,
 })
 const alAssess = (dip: string, data: string): DocumentoAllegato => ({
-  id: `al-a-${dip}-${data}`, nome: `AssessFirst - ${dip}.pdf`, tipo: 'assessfirst', caricatoDa: 'Irene', dataCaricamento: data, dipendente: dip, contenuto: ASSESSFIRST_MOCK(dip),
+  id: `al-a-${dip}-${data}`, nome: `AssessFirst - ${dip}.pdf`, tipo: 'assessfirst', caricatoDa: 'Giulia T. (Tutor)', dataCaricamento: data, dipendente: dip, contenuto: ASSESSFIRST_MOCK(dip),
 })
-const alReportIrene = (data: string): DocumentoAllegato => ({
-  id: `al-r-${data}`, nome: 'Report AssessFirst del team.pdf', tipo: 'report-irene', caricatoDa: 'Irene', dataCaricamento: data, contenuto: REPORT_IRENE_MOCK,
+const alReportAF = (dip: string, data: string): DocumentoAllegato => ({
+  id: `al-r-${dip}-${data}`, nome: `Report AssessFirst - ${dip}.pdf`, tipo: 'report-af', caricatoDa: 'Agente Report AF', dataCaricamento: data, dipendente: dip, contenuto: REPORT_IRENE_MOCK,
 })
 
 // ─── Pratiche di esempio ───
@@ -180,7 +180,11 @@ const cartellaCompleta = (dipendenti: string[], data: string): DocumentoAllegato
   alQuestionario(data),
   alTrascrizione(data),
   ...dipendenti.map((d) => alAssess(d, data)),
-  alReportIrene(data),
+]
+
+const cartellaConReportAF = (dipendenti: string[], data: string): DocumentoAllegato[] => [
+  ...cartellaCompleta(dipendenti, data),
+  ...dipendenti.map((d) => alReportAF(d, data)),
 ]
 
 export const SEED_STATE: AppState = {
@@ -197,7 +201,7 @@ export const SEED_STATE: AppState = {
       ],
     }),
 
-    p('pr-003', 'Bella Napoli Ristoranti', 'Ciro Esposito', 'ciro@bellanapoli.it', ['Ciro Esposito', 'Anna Russo'], 'report-irene', '2026-06-20T10:00:00.000Z', {
+    p('pr-003', 'Bella Napoli Ristoranti', 'Ciro Esposito', 'ciro@bellanapoli.it', ['Ciro Esposito', 'Anna Russo'], 'raccolta-documenti', '2026-06-20T10:00:00.000Z', {
       // manca solo il report di Irene
       allegati: [
         alQuestionario('2026-07-01T09:00:00.000Z'),
@@ -208,63 +212,67 @@ export const SEED_STATE: AppState = {
       storico: [
         { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-06-20T10:00:00.000Z' },
         { fase: 'raccolta-documenti', azione: 'Questionario e trascrizione caricati', autore: 'Giulia T. (Tutor)', dataOra: '2026-07-01T09:05:00.000Z' },
-        { fase: 'report-irene', azione: 'AssessFirst caricati nel blocco cliente (2 dipendenti)', autore: 'Irene', dataOra: '2026-07-03T15:05:00.000Z' },
+        { fase: 'raccolta-documenti', azione: 'AssessFirst caricati (2 dipendenti)', autore: 'Giulia T. (Tutor)', dataOra: '2026-07-03T15:05:00.000Z' },
       ],
     }),
 
-    p('pr-004', 'Orizzonte Games', 'Andrea Conti', 'a.conti@orizzontegames.it', ['Andrea Conti', 'Fabio Landi'], 'revisione-team-copy', '2026-06-10T09:00:00.000Z', {
+    p('pr-004', 'Orizzonte Games', 'Andrea Conti', 'a.conti@orizzontegames.it', ['Andrea Conti', 'Fabio Landi'], 'revisione', '2026-06-10T09:00:00.000Z', {
       tipoLavoro: 'consulenza',
-      allegati: cartellaCompleta(['Andrea Conti', 'Fabio Landi'], '2026-06-15T14:30:00.000Z'),
+      reportAF: { stato: 'email_inviata', dataOra: '2026-06-15T14:40:00.000Z', dettaglio: '2 report generati e inviati al tutor' },
+      allegati: cartellaConReportAF(['Andrea Conti', 'Fabio Landi'], '2026-06-15T14:30:00.000Z'),
       versioni: [
-        { id: 'v-1', fase: 'generazione', autore: 'Team Copy', dataOra: '2026-07-05T10:00:00.000Z', contenuto: DOC_UNIFICATO_MOCK, tipo: 'umano', etichetta: 'Documento unificato' },
-        { id: 'v-2', fase: 'generazione', autore: 'Sistema (batteria 20 prompt)', dataOra: '2026-07-05T10:25:00.000Z', contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
+        
+        { id: 'v-2', fase: 'generazione', autore: 'Sistema di generazione (Christian)', dataOra: '2026-07-05T10:25:00.000Z', contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
       ],
       storico: [
         { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-06-10T09:00:00.000Z' },
-        { fase: 'report-irene', azione: 'Blocco cliente completato', autore: 'Irene', dataOra: '2026-06-15T14:35:00.000Z' },
-        { fase: 'report-irene', azione: 'Inviato a Erogazione Copy — Team Copy notificato', autore: 'Irene', dataOra: '2026-06-15T14:36:00.000Z' },
-        { fase: 'generazione', azione: 'Documenti unificati in un documento unico', autore: 'Team Copy', dataOra: '2026-07-05T10:00:00.000Z' },
-        { fase: 'generazione', azione: 'Report generato con la batteria di 20 prompt', autore: 'Sistema', dataOra: '2026-07-05T10:25:00.000Z' },
+        { fase: 'raccolta-documenti', azione: '«Cliente pronto» — pipeline automatica partita', autore: 'Giulia T. (Tutor)', dataOra: '2026-06-15T14:35:00.000Z' },
+        { fase: 'generazione', azione: 'Report AssessFirst generati in autonomia ed email inviata al tutor', autore: 'Agente Report AF', dataOra: '2026-06-15T14:40:00.000Z' },
+        
+        { fase: 'generazione', azione: 'Report generato dal sistema di generazione (Christian)', autore: 'Sistema (Christian)', dataOra: '2026-07-05T10:25:00.000Z' },
       ],
     }),
 
-    p('pr-005', 'Conti Consulting', 'Andrea Conti', 'info@conticonsulting.it', ['Andrea Conti'], 'revisione-1', '2026-06-05T09:00:00.000Z', {
+    p('pr-005', 'Conti Consulting', 'Andrea Conti', 'info@conticonsulting.it', ['Andrea Conti'], 'checkpoint-copy', '2026-06-05T09:00:00.000Z', {
       tipoLavoro: 'consulenza',
-      allegati: cartellaCompleta(['Andrea Conti'], '2026-06-12T10:00:00.000Z'),
+      reportAF: { stato: 'email_inviata', dataOra: '2026-06-12T10:30:00.000Z', dettaglio: '1 report generato e inviato al tutor' },
+      allegati: cartellaConReportAF(['Andrea Conti'], '2026-06-12T10:00:00.000Z'),
       versioni: [
-        { id: 'v-3', fase: 'generazione', autore: 'Sistema (batteria 20 prompt)', dataOra: '2026-06-30T11:00:00.000Z', contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
-        { id: 'v-4', fase: 'revisione-team-copy', autore: 'Team Copy', dataOra: '2026-07-01T09:30:00.000Z', contenuto: REPORT_AI_MOCK.replace('RIASSUNTO ESECUTIVO', 'RIASSUNTO ESECUTIVO (rivisto dal Team Copy)'), tipo: 'umano', etichetta: 'Revisione del Team Copy' },
+        { id: 'v-3', fase: 'generazione', autore: 'Sistema di generazione (Christian)', dataOra: '2026-06-30T11:00:00.000Z', contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
+        { id: 'v-4', fase: 'checkpoint-copy', autore: 'Copy', dataOra: '2026-07-01T09:30:00.000Z', contenuto: REPORT_AI_MOCK.replace('RIASSUNTO ESECUTIVO', 'RIASSUNTO ESECUTIVO (rivisto dal Copy)'), tipo: 'umano', etichetta: 'Revisione del Copy' },
       ],
       storico: [
         { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-06-05T09:00:00.000Z' },
-        { fase: 'generazione', azione: 'Report generato con la batteria di 20 prompt', autore: 'Sistema', dataOra: '2026-06-30T11:00:00.000Z' },
-        { fase: 'revisione-team-copy', azione: 'Documento revisionato e accettato', autore: 'Team Copy', dataOra: '2026-07-01T09:35:00.000Z' },
+        { fase: 'generazione', azione: 'Report generato dal sistema di generazione (Christian)', autore: 'Sistema (Christian)', dataOra: '2026-06-30T11:00:00.000Z' },
+        { fase: 'checkpoint-copy', azione: 'Documento revisionato e accettato', autore: 'Copy', dataOra: '2026-07-01T09:35:00.000Z' },
       ],
     }),
 
-    p('pr-006', 'Meccanica Precisione SpA', 'Luca Ferrari', 'l.ferrari@meccanicaprecisione.it', ['Luca Ferrari', 'Paola Conti', 'Dario Riva'], 'leggibilita', '2026-05-25T09:00:00.000Z', {
+    p('pr-006', 'Meccanica Precisione SpA', 'Luca Ferrari', 'l.ferrari@meccanicaprecisione.it', ['Luca Ferrari', 'Paola Conti', 'Dario Riva'], 'revisione-diagrammi', '2026-05-25T09:00:00.000Z', {
       tipoLavoro: 'branding',
-      allegati: cartellaCompleta(['Luca Ferrari', 'Paola Conti', 'Dario Riva'], '2026-06-02T10:00:00.000Z'),
+      reportAF: { stato: 'email_inviata', dataOra: '2026-06-02T10:30:00.000Z', dettaglio: '3 report generati e inviati al tutor' },
+      allegati: cartellaConReportAF(['Luca Ferrari', 'Paola Conti', 'Dario Riva'], '2026-06-02T10:00:00.000Z'),
       versioni: [
-        { id: 'v-5', fase: 'generazione', autore: 'Sistema (batteria 20 prompt)', dataOra: '2026-06-20T10:00:00.000Z', contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
+        { id: 'v-5', fase: 'generazione', autore: 'Sistema di generazione (Christian)', dataOra: '2026-06-20T10:00:00.000Z', contenuto: REPORT_AI_MOCK, tipo: 'ai', etichetta: "Report generato dall'AI" },
         { id: 'v-6', fase: 'visual', autore: 'Agente Visual', dataOra: '2026-07-02T15:00:00.000Z', contenuto: REPORT_VISUAL_MOCK, tipo: 'ai', etichetta: 'Report con elementi visual' },
       ],
       storico: [
         { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-05-25T09:00:00.000Z' },
-        { fase: 'revisione-2', azione: 'Documento accettato', autore: 'Revisore 2', dataOra: '2026-07-02T14:00:00.000Z' },
-        { fase: 'visual', azione: 'Elementi visual inseriti automaticamente', autore: 'Agente Visual', dataOra: '2026-07-02T15:00:00.000Z' },
+        { fase: 'revisione', azione: 'Documento revisionato dal sistema integrato', autore: 'Revisore (Christian)', dataOra: '2026-07-02T14:00:00.000Z' },
+        { fase: 'visual', azione: 'Diagrammi e tabelle inseriti automaticamente', autore: 'Agente Visual', dataOra: '2026-07-02T15:00:00.000Z' },
       ],
     }),
 
     p('pr-007', 'Studio Legale Ferri', 'Elena Ferri', 'e.ferri@studioferri.it', ['Elena Ferri'], 'completata', '2026-05-02T09:00:00.000Z', {
       tipoLavoro: 'consulenza',
-      allegati: cartellaCompleta(['Elena Ferri'], '2026-05-10T10:00:00.000Z'),
+      reportAF: { stato: 'email_inviata', dataOra: '2026-05-10T10:30:00.000Z', dettaglio: '1 report generato e inviato al tutor' },
+      allegati: cartellaConReportAF(['Elena Ferri'], '2026-05-10T10:00:00.000Z'),
       versioni: [
-        { id: 'v-7', fase: 'grafica', autore: 'Collega Grafica', dataOra: '2026-06-18T12:00:00.000Z', contenuto: REPORT_VISUAL_MOCK, tipo: 'umano', etichetta: 'Versione finale impaginata' },
+        { id: 'v-7', fase: 'impaginazione', autore: 'Motore impaginazione', dataOra: '2026-06-18T12:00:00.000Z', contenuto: REPORT_VISUAL_MOCK, tipo: 'ai', etichetta: 'Versione finale impaginata (PDF)' },
       ],
       storico: [
         { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-05-02T09:00:00.000Z' },
-        { fase: 'grafica', azione: 'Impaginazione completata — report consegnato', autore: 'Collega Grafica', dataOra: '2026-06-18T12:00:00.000Z' },
+        { fase: 'approvazione-finale', azione: 'Approvazione finale del copy — email al tutor col PDF (simulata)', autore: 'Copy', dataOra: '2026-06-18T12:00:00.000Z' },
       ],
     }),
   ],
@@ -274,9 +282,9 @@ export const SEED_STATE: AppState = {
       id: 'ap-001',
       praticaId: 'pr-005',
       praticaNome: 'Conti Consulting',
-      fase: 'revisione-team-copy',
+      fase: 'checkpoint-copy',
       dataOra: '2026-07-01T09:35:00.000Z',
-      autoreRevisione: 'Team Copy',
+      autoreRevisione: 'Copy',
       lezione: 'Il report generato usava la seconda persona plurale in alcune sezioni. Lo standard richiede la prima persona singolare (voce del consulente).',
       promptTargetId: 'batteria-consulenza',
       promptTargetNome: 'Batteria Consulenza — Report Strategico (20 prompt)',
@@ -290,9 +298,9 @@ export const SEED_STATE: AppState = {
       id: 'ap-002',
       praticaId: 'pr-007',
       praticaNome: 'Studio Legale Ferri',
-      fase: 'revisione-1',
+      fase: 'checkpoint-copy',
       dataOra: '2026-06-10T10:00:00.000Z',
-      autoreRevisione: 'Revisore 1',
+      autoreRevisione: 'Copy',
       lezione: 'Il report conteneva trattini lunghi (—) invece dei trattini corti (-) richiesti dallo standard editoriale.',
       promptTargetId: 'batteria-consulenza',
       promptTargetNome: 'Batteria Consulenza — Report Strategico (20 prompt)',
@@ -306,16 +314,16 @@ export const SEED_STATE: AppState = {
       id: 'ap-003',
       praticaId: 'pr-006',
       praticaNome: 'Meccanica Precisione SpA',
-      fase: 'revisione-2',
+      fase: 'revisione-diagrammi',
       dataOra: '2026-07-01T16:20:00.000Z',
-      autoreRevisione: 'Revisore 2',
-      lezione: 'Il Revisore 1 ha lasciato passare due blocchi di testo troppo densi (oltre 8 righe senza spazi). Lo standard copy richiede testo arioso.',
-      promptTargetId: 'revisore-1',
-      promptTargetNome: 'Revisore 1 — Editor Metodo (5 Fasi)',
-      miglioramentoProposto: 'Rafforzare la FASE 3 del prompt del Revisore 1: "Nessun paragrafo può superare le 5 righe. Se supera, spezzalo SEMPRE in due paragrafi con una riga vuota."',
-      testoPrima: '[blocco di 10 righe consecutive nella sezione numeri]',
-      testoDopo: '[stesso contenuto spezzato in 3 paragrafi ariosi]',
-      note: 'Blocchi densi sfuggiti alla revisione 1',
+      autoreRevisione: 'Revisore diagrammi',
+      lezione: 'Il Visual ha prodotto una tabella con etichette troppo lunghe che andavano a capo spezzando le parole. Le etichette devono stare su una riga.',
+      promptTargetId: 'agente-visual',
+      promptTargetNome: 'Agente Visual — Tabelle e Diagrammi',
+      miglioramentoProposto: 'Aggiungere al prompt del Visual: "Le etichette di tabelle e diagrammi non superano le 4 parole. Se il concetto è più lungo, va abbreviato senza perdere il senso."',
+      testoPrima: '[tabella con etichette a capo spezzate]',
+      testoDopo: '[stessa tabella con etichette compatte]',
+      note: 'Rimando automatico del loop diagrammi',
       stato: 'in_attesa',
     },
   ],
@@ -345,31 +353,12 @@ export const SEED_STATE: AppState = {
       ],
     },
     {
-      id: 'prompt-irene',
-      nome: 'Prompt Report AssessFirst (Irene)',
-      faseUso: 'Raccolta documenti — sintesi team',
+      id: 'report-af',
+      nome: 'Agente Report AssessFirst (autonomo)',
+      faseUso: 'Step 4a — un report PDF per dipendente + email al tutor (Irene supervisiona)',
       versione: 'v1.0',
-      ultimaModifica: '2026-05-15T09:00:00.000Z',
-      changelog: [{ versione: 'v1.0', data: '2026-05-15', descrizione: 'Prompt usato da Irene per sintetizzare i test AssessFirst in un report del team — da automatizzare' }],
-    },
-    {
-      id: 'revisore-1',
-      nome: 'Revisore 1 — Editor Metodo (5 Fasi)',
-      faseUso: 'Revisione editoriale',
-      versione: 'v1.1',
-      ultimaModifica: '2026-05-28T09:00:00.000Z',
-      changelog: [
-        { versione: 'v1.0', data: '2026-05-01', descrizione: 'Prompt Editor Senior: 5 fasi (logica, grammatica, copy, formattazione, output)' },
-        { versione: 'v1.1', data: '2026-05-28', descrizione: 'Integrata skill humanizer per naturalezza del testo' },
-      ],
-    },
-    {
-      id: 'revisore-2',
-      nome: 'Revisore 2 — Supervisore Qualità',
-      faseUso: 'Controllo del Revisore 1',
-      versione: 'v1.0',
-      ultimaModifica: '2026-05-15T09:00:00.000Z',
-      changelog: [{ versione: 'v1.0', data: '2026-05-15', descrizione: 'Generato con skill prompt-master: verifica standard su tono, coerenza e formattazione' }],
+      ultimaModifica: '2026-07-10T09:00:00.000Z',
+      changelog: [{ versione: 'v1.0', data: '2026-07-10', descrizione: 'Passaggio reso autonomo: genera un report per dipendente dalla knowledge base AssessFirst, zero revisione umana' }],
     },
     {
       id: 'agente-visual',
@@ -380,12 +369,20 @@ export const SEED_STATE: AppState = {
       changelog: [{ versione: 'v1.0', data: '2026-05-15', descrizione: 'Trasforma blocchi di testo in tabelle, grafici e diagrammi comprensibili a chiunque' }],
     },
     {
-      id: 'revisore-leggibilita',
-      nome: 'Revisore Leggibilità',
-      faseUso: 'Verifica leggibilità dei visual',
+      id: 'revisore-diagrammi',
+      nome: 'Revisore Diagrammi (loop automatico)',
+      faseUso: 'Rimanda al Visual finché i diagrammi non sono perfetti — e impara dai rimandi',
       versione: 'v1.0',
-      ultimaModifica: '2026-05-15T09:00:00.000Z',
-      changelog: [{ versione: 'v1.0', data: '2026-05-15', descrizione: 'Generato con skill prompt-master: verifica che ogni visual migliori davvero la comprensione' }],
+      ultimaModifica: '2026-07-10T09:00:00.000Z',
+      changelog: [{ versione: 'v1.0', data: '2026-07-10', descrizione: 'Evoluzione del Revisore Leggibilità: loop automatico con il Visual + lezioni nel registro' }],
+    },
+    {
+      id: 'specifica-impaginazione',
+      nome: 'Specifica di impaginazione (fase 8)',
+      faseUso: 'Impaginazione + revisione finale contro la knowledge base',
+      versione: 'v1.0',
+      ultimaModifica: '2026-07-08T09:00:00.000Z',
+      changelog: [{ versione: 'v1.0', data: '2026-07-08', descrizione: 'Specifica a 29 sezioni derivata dal modello Macheda (repo conoscenza)' }],
     },
   ],
 }

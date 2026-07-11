@@ -64,6 +64,32 @@ export interface VoceStorico {
 /** Tipo di lavoro: determina quale batteria di prompt viene usata dalla generazione. */
 export type TipoLavoro = 'branding' | 'consulenza'
 
+/** Qualifica della persona che fa il test AssessFirst: decide il registro del report 4a. */
+export type Qualifica = 'titolare' | 'socio' | 'dipendente'
+
+/** Persona registrata dal tutor alla vendita: da qui il 4a deriva tutto in automatico. */
+export interface PersonaAF {
+  /** nome e cognome ESATTI (finiscono nell'intestazione del report) */
+  nome: string
+  qualifica: Qualifica
+  /** ruolo operativo reale, es. «Venditore», «Responsabile produzione» */
+  ruolo: string
+}
+
+/** Regola di indirizzo del report AF (casi a/b/c del prompt), derivata dall'anagrafica:
+ *  a = la persona è titolare o socio (report intestato a lei);
+ *  b = dipendente, un solo vertice (report al titolare);
+ *  c = dipendente, più vertici (report a tutte le figure, «voi»). */
+export function relazioneAF(
+  pratica: { dipendenti: PersonaAF[]; cliente: string },
+  persona: PersonaAF
+): { caso: 'a' | 'b' | 'c'; destinatario: string } {
+  if (persona.qualifica !== 'dipendente') return { caso: 'a', destinatario: persona.nome }
+  const vertici = pratica.dipendenti.filter((p) => p.qualifica !== 'dipendente')
+  if (vertici.length <= 1) return { caso: 'b', destinatario: vertici[0]?.nome ?? pratica.cliente }
+  return { caso: 'c', destinatario: vertici.map((v) => v.nome).join(', ') }
+}
+
 /** Stato del passaggio AUTONOMO 4a: report AssessFirst per dipendente + email al tutor.
  *  Corre in parallelo alla revisione; Irene lo supervisiona. */
 export interface StatoReportAF {
@@ -85,8 +111,8 @@ export interface Pratica {
   cliente: string
   email: string
   tutor: string
-  /** dipendenti del cliente per cui servono gli AssessFirst */
-  dipendenti: string[]
+  /** persone (titolari, soci, dipendenti) che fanno il test AssessFirst */
+  dipendenti: PersonaAF[]
   /** scelto dal sistema di generazione (Christian); null = non ancora determinato */
   tipoLavoro: TipoLavoro | null
   faseCorrente: FaseId

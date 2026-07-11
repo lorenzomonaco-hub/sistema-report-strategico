@@ -13,7 +13,7 @@ import { documentiTutorPronti, indiceFase, statoCartella, statoCommerciale } fro
 import RoleShell from '@/components/RoleShell'
 import PraticaCard from '@/components/PraticaCard'
 import EmptyState from '@/components/EmptyState'
-import { Pratica } from '@/lib/types'
+import { PersonaAF, Pratica, relazioneAF } from '@/lib/types'
 
 const dataIt = (iso: string) =>
   new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Rome' })
@@ -53,19 +53,28 @@ function FormNuovaVendita({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
   const [azienda, setAzienda] = useState('')
   const [cliente, setCliente] = useState('')
   const [email, setEmail] = useState('')
-  const [dipendenti, setDipendenti] = useState<string[]>([])
-  const [nuovoDipendente, setNuovoDipendente] = useState('')
+  const [dipendenti, setDipendenti] = useState<PersonaAF[]>([])
+  const [nuovoNome, setNuovoNome] = useState('')
+  const [nuovaQualifica, setNuovaQualifica] = useState<PersonaAF['qualifica']>('dipendente')
+  const [nuovoRuolo, setNuovoRuolo] = useState('')
   const [errore, setErrore] = useState<string | null>(null)
 
   const aggiungiDipendente = () => {
-    const nome = nuovoDipendente.trim()
+    const nome = nuovoNome.trim()
+    const ruolo = nuovoRuolo.trim()
     if (!nome) return
-    if (dipendenti.some((d) => d.toLowerCase() === nome.toLowerCase())) {
-      setErrore('Questo dipendente è già in elenco.')
+    if (!ruolo) {
+      setErrore('Indica anche il ruolo operativo (serve al report AssessFirst).')
       return
     }
-    setDipendenti([...dipendenti, nome])
-    setNuovoDipendente('')
+    if (dipendenti.some((d) => d.nome.toLowerCase() === nome.toLowerCase())) {
+      setErrore('Questa persona è già in elenco.')
+      return
+    }
+    setDipendenti([...dipendenti, { nome, qualifica: nuovaQualifica, ruolo }])
+    setNuovoNome('')
+    setNuovoRuolo('')
+    setNuovaQualifica('dipendente')
     setErrore(null)
   }
 
@@ -79,7 +88,7 @@ function FormNuovaVendita({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
       return
     }
     if (dipendenti.length < 1) {
-      setErrore('Aggiungi almeno un dipendente da valutare con AssessFirst.')
+      setErrore('Aggiungi almeno una persona da valutare con AssessFirst.')
       return
     }
     creaPratica({ azienda: azienda.trim(), cliente: cliente.trim(), email: email.trim(), dipendenti })
@@ -136,21 +145,37 @@ function FormNuovaVendita({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
 
       <div className="mt-4">
         <label htmlFor="nv-dipendente" className="mb-1 block text-xs font-semibold text-inchiostro/60">
-          Dipendenti da valutare con AssessFirst * (almeno uno)
+          Persone da valutare con AssessFirst * (almeno una) — nomi ESATTI: finiscono sui report
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             id="nv-dipendente"
-            value={nuovoDipendente}
-            onChange={(e) => setNuovoDipendente(e.target.value)}
+            value={nuovoNome}
+            onChange={(e) => setNuovoNome(e.target.value)}
+            placeholder="Nome e cognome"
+            className={`${classiInput} min-w-40 flex-1`}
+          />
+          <select
+            value={nuovaQualifica}
+            onChange={(e) => setNuovaQualifica(e.target.value as PersonaAF['qualifica'])}
+            aria-label="Qualifica"
+            className={`${classiInput} w-36 shrink-0`}
+          >
+            <option value="titolare">Titolare</option>
+            <option value="socio">Socio</option>
+            <option value="dipendente">Dipendente</option>
+          </select>
+          <input
+            value={nuovoRuolo}
+            onChange={(e) => setNuovoRuolo(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
                 aggiungiDipendente()
               }
             }}
-            placeholder="Nome del dipendente"
-            className={classiInput}
+            placeholder="Ruolo operativo (es. Venditore)"
+            className={`${classiInput} min-w-44 flex-1`}
           />
           <button
             onClick={aggiungiDipendente}
@@ -160,22 +185,32 @@ function FormNuovaVendita({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
           </button>
         </div>
         {dipendenti.length > 0 && (
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {dipendenti.map((d) => (
-              <li
-                key={d}
-                className="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-sm text-indigo-800"
-              >
-                {d}
-                <button
-                  onClick={() => setDipendenti(dipendenti.filter((x) => x !== d))}
-                  aria-label={`Rimuovi ${d}`}
-                  className="text-indigo-400 transition hover:text-indigo-700"
+          <ul className="mt-2 space-y-1.5">
+            {dipendenti.map((d) => {
+              const rel = relazioneAF({ dipendenti, cliente: cliente || '—' }, d)
+              return (
+                <li
+                  key={d.nome}
+                  className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-900"
                 >
-                  ✕
-                </button>
-              </li>
-            ))}
+                  <span className="font-semibold">{d.nome}</span>
+                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium capitalize text-indigo-700">
+                    {d.qualifica}
+                  </span>
+                  <span className="text-indigo-800/70">{d.ruolo}</span>
+                  <span className="ml-auto text-xs text-indigo-500">
+                    report AF: caso {rel.caso} → {rel.destinatario}
+                  </span>
+                  <button
+                    onClick={() => setDipendenti(dipendenti.filter((x) => x.nome !== d.nome))}
+                    aria-label={`Rimuovi ${d.nome}`}
+                    className="text-indigo-400 transition hover:text-indigo-700"
+                  >
+                    ✕
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>
@@ -242,7 +277,7 @@ function CartaRaccolta({ pratica, onConfermata }: { pratica: Pratica; onConferma
   const vociTutor = statoCartella(pratica).voci
   const pronti = documentiTutorPronti(pratica)
   const afMancanti = pratica.dipendenti.filter(
-    (d) => !pratica.allegati.some((a) => a.tipo === 'assessfirst' && a.dipendente === d)
+    (d) => !pratica.allegati.some((a) => a.tipo === 'assessfirst' && a.dipendente === d.nome)
   )
 
   return (
@@ -307,7 +342,7 @@ function CartaRaccolta({ pratica, onConfermata }: { pratica: Pratica; onConferma
         )}
         {afMancanti.length > 0 && (
           <button
-            onClick={() => caricaAssessFirst(pratica.id, afMancanti)}
+            onClick={() => caricaAssessFirst(pratica.id, afMancanti.map((d) => d.nome))}
             className="w-full rounded-xl bg-petrolio px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-petrolio-scuro"
           >
             Carica AssessFirst ({afMancanti.length} {afMancanti.length === 1 ? 'dipendente' : 'dipendenti'})

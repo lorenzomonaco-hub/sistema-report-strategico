@@ -47,7 +47,7 @@ export const statoCommerciale = (id: FaseId): { label: string; badge: string } =
  *  Nel flusso v2 carica TUTTO il tutor (anche gli AssessFirst). */
 export function statoCartella(p: Pratica) {
   const ha = (tipo: string) => p.allegati.some((a) => a.tipo === tipo)
-  const assessFatti = p.dipendenti.filter((d) => p.allegati.some((a) => a.tipo === 'assessfirst' && a.dipendente === d))
+  const assessFatti = p.dipendenti.filter((d) => p.allegati.some((a) => a.tipo === 'assessfirst' && a.dipendente === d.nome))
   const voci = [
     { chiave: 'questionario', label: 'Questionario compilato', responsabile: 'Tutor', fatto: ha('questionario') },
     { chiave: 'trascrizione', label: 'Trascrizione analisi', responsabile: 'Tutor', fatto: ha('trascrizione') },

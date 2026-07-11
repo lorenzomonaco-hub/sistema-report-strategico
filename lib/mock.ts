@@ -1,4 +1,5 @@
-import { AppState, DocumentoAllegato, Pratica } from './types'
+import {
+  PersonaAF, AppState, DocumentoAllegato, Pratica } from './types'
 
 // ─── Contenuti documento di esempio (demo) ───
 
@@ -151,12 +152,14 @@ const alReportAF = (dip: string, data: string): DocumentoAllegato => ({
 
 // ─── Pratiche di esempio ───
 
+const pers = (nome: string, qualifica: PersonaAF['qualifica'], ruolo: string): PersonaAF => ({ nome, qualifica, ruolo })
+
 const p = (
   id: string,
   azienda: string,
   cliente: string,
   email: string,
-  dipendenti: string[],
+  dipendenti: PersonaAF[],
   faseCorrente: Pratica['faseCorrente'],
   dataCreazione: string,
   extra: Partial<Pratica> = {}
@@ -189,9 +192,9 @@ const cartellaConReportAF = (dipendenti: string[], data: string): DocumentoAlleg
 
 export const SEED_STATE: AppState = {
   pratiche: [
-    p('pr-001', 'TechnoService SRL', 'Paolo Bianchi', 'p.bianchi@technoservice.it', ['Paolo Bianchi', 'Sara Colombo'], 'vendita', '2026-07-03T09:15:00.000Z'),
+    p('pr-001', 'TechnoService SRL', 'Paolo Bianchi', 'p.bianchi@technoservice.it', [pers('Paolo Bianchi', 'titolare', 'Titolare'), pers('Sara Colombo', 'dipendente', 'Responsabile commerciale')], 'vendita', '2026-07-03T09:15:00.000Z'),
 
-    p('pr-002', 'Rossi Costruzioni', 'Andrea Rossi', 'a.rossi@rossicostruzioni.it', ['Andrea Rossi', 'Luca Neri', 'Marta Villa'], 'raccolta-documenti', '2026-06-28T11:00:00.000Z', {
+    p('pr-002', 'Rossi Costruzioni', 'Andrea Rossi', 'a.rossi@rossicostruzioni.it', [pers('Andrea Rossi', 'titolare', 'Titolare'), pers('Luca Neri', 'socio', 'Socio e direttore tecnico'), pers('Marta Villa', 'dipendente', 'Amministrazione')], 'raccolta-documenti', '2026-06-28T11:00:00.000Z', {
       // solo il questionario: mancano trascrizione, assessfirst e report Irene
       allegati: [alQuestionario('2026-07-04T10:00:00.000Z')],
       storico: [
@@ -201,7 +204,7 @@ export const SEED_STATE: AppState = {
       ],
     }),
 
-    p('pr-003', 'Bella Napoli Ristoranti', 'Ciro Esposito', 'ciro@bellanapoli.it', ['Ciro Esposito', 'Anna Russo'], 'raccolta-documenti', '2026-06-20T10:00:00.000Z', {
+    p('pr-003', 'Bella Napoli Ristoranti', 'Ciro Esposito', 'ciro@bellanapoli.it', [pers('Ciro Esposito', 'titolare', 'Titolare'), pers('Anna Russo', 'dipendente', 'Responsabile sala')], 'raccolta-documenti', '2026-06-20T10:00:00.000Z', {
       // manca solo il report di Irene
       allegati: [
         alQuestionario('2026-07-01T09:00:00.000Z'),
@@ -216,7 +219,7 @@ export const SEED_STATE: AppState = {
       ],
     }),
 
-    p('pr-004', 'Orizzonte Games', 'Andrea Conti', 'a.conti@orizzontegames.it', ['Andrea Conti', 'Fabio Landi'], 'revisione', '2026-06-10T09:00:00.000Z', {
+    p('pr-004', 'Orizzonte Games', 'Andrea Conti', 'a.conti@orizzontegames.it', [pers('Andrea Conti', 'titolare', 'Titolare'), pers('Fabio Landi', 'dipendente', 'Responsabile sviluppo')], 'revisione', '2026-06-10T09:00:00.000Z', {
       tipoLavoro: 'consulenza',
       reportAF: { stato: 'email_inviata', dataOra: '2026-06-15T14:40:00.000Z', dettaglio: '2 report generati e inviati al tutor' },
       allegati: cartellaConReportAF(['Andrea Conti', 'Fabio Landi'], '2026-06-15T14:30:00.000Z'),
@@ -233,7 +236,7 @@ export const SEED_STATE: AppState = {
       ],
     }),
 
-    p('pr-005', 'Conti Consulting', 'Andrea Conti', 'info@conticonsulting.it', ['Andrea Conti'], 'checkpoint-copy', '2026-06-05T09:00:00.000Z', {
+    p('pr-005', 'Conti Consulting', 'Andrea Conti', 'info@conticonsulting.it', [pers('Andrea Conti', 'titolare', 'Titolare')], 'checkpoint-copy', '2026-06-05T09:00:00.000Z', {
       tipoLavoro: 'consulenza',
       reportAF: { stato: 'email_inviata', dataOra: '2026-06-12T10:30:00.000Z', dettaglio: '1 report generato e inviato al tutor' },
       allegati: cartellaConReportAF(['Andrea Conti'], '2026-06-12T10:00:00.000Z'),
@@ -248,7 +251,7 @@ export const SEED_STATE: AppState = {
       ],
     }),
 
-    p('pr-006', 'Meccanica Precisione SpA', 'Luca Ferrari', 'l.ferrari@meccanicaprecisione.it', ['Luca Ferrari', 'Paola Conti', 'Dario Riva'], 'revisione-diagrammi', '2026-05-25T09:00:00.000Z', {
+    p('pr-006', 'Meccanica Precisione SpA', 'Luca Ferrari', 'l.ferrari@meccanicaprecisione.it', [pers('Luca Ferrari', 'titolare', 'Titolare'), pers('Paola Conti', 'socio', 'Socio e responsabile amministrativa'), pers('Dario Riva', 'dipendente', 'Responsabile produzione')], 'revisione-diagrammi', '2026-05-25T09:00:00.000Z', {
       tipoLavoro: 'branding',
       reportAF: { stato: 'email_inviata', dataOra: '2026-06-02T10:30:00.000Z', dettaglio: '3 report generati e inviati al tutor' },
       allegati: cartellaConReportAF(['Luca Ferrari', 'Paola Conti', 'Dario Riva'], '2026-06-02T10:00:00.000Z'),
@@ -263,7 +266,7 @@ export const SEED_STATE: AppState = {
       ],
     }),
 
-    p('pr-007', 'Studio Legale Ferri', 'Elena Ferri', 'e.ferri@studioferri.it', ['Elena Ferri'], 'completata', '2026-05-02T09:00:00.000Z', {
+    p('pr-007', 'Studio Legale Ferri', 'Elena Ferri', 'e.ferri@studioferri.it', [pers('Elena Ferri', 'titolare', 'Titolare')], 'completata', '2026-05-02T09:00:00.000Z', {
       tipoLavoro: 'consulenza',
       reportAF: { stato: 'email_inviata', dataOra: '2026-05-10T10:30:00.000Z', dettaglio: '1 report generato e inviato al tutor' },
       allegati: cartellaConReportAF(['Elena Ferri'], '2026-05-10T10:00:00.000Z'),

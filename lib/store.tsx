@@ -5,7 +5,7 @@
 // pipeline v2 — ogni step autonomo qui è un'azione "simula avanzamento".
 
 import React, { createContext, useContext, useEffect, useReducer, useRef } from 'react'
-import { AppState, Apprendimento, FaseId, Pratica, VersioneDocumento } from './types'
+import { AppState, Apprendimento, FaseId, PersonaAF, Pratica, VersioneDocumento, relazioneAF } from './types'
 import { documentiTutorPronti, faseSuccessiva, faseById } from './fasi'
 import { batteriaIdPerTipo, batteriaPerTipo, ETICHETTA_TIPO } from './batterie'
 import {
@@ -20,7 +20,7 @@ import {
 
 // v4: pipeline v2 — eliminati i compartimenti 4/5, tutor carica tutto,
 // report AF autonomo, revisione = sistema di Christian, chat del copy
-const STORAGE_KEY = 'sistema-report-strategico-v4'
+const STORAGE_KEY = 'sistema-report-strategico-v5'
 
 // Quando qualcuno corregge un documento nella fase X, l'apprendimento
 // migliora il passaggio che ha PRODOTTO quel documento.
@@ -43,7 +43,7 @@ function targetApprendimento(pratica: Pratica): { id: string; nome: string } {
 type Azione =
   | { type: 'HYDRATE'; payload: AppState }
   | { type: 'RESET' }
-  | { type: 'CREA_PRATICA'; azienda: string; cliente: string; email: string; dipendenti: string[] }
+  | { type: 'CREA_PRATICA'; azienda: string; cliente: string; email: string; dipendenti: PersonaAF[] }
   | { type: 'INVIA_ASSESSMENT'; praticaId: string }
   | { type: 'CARICA_QUESTIONARIO_TRASCRIZIONE'; praticaId: string }
   | { type: 'CARICA_ASSESSFIRST'; praticaId: string; dipendenti: string[] }
@@ -87,11 +87,11 @@ function avanzaStepAutonomo(p: Pratica): Pratica {
           ...p.allegati.filter((a) => a.tipo !== 'report-af'),
           ...p.dipendenti.map((d) => ({
             id: `al-${uid()}`,
-            nome: `Report AssessFirst - ${d}.pdf`,
+            nome: `Report AssessFirst - ${d.nome} (caso ${relazioneAF(p, d).caso}).pdf`,
             tipo: 'report-af' as const,
             caricatoDa: 'Agente Report AF',
             dataCaricamento: adesso,
-            dipendente: d,
+            dipendente: d.nome,
             contenuto: REPORT_IRENE_MOCK,
           })),
         ],
@@ -99,7 +99,7 @@ function avanzaStepAutonomo(p: Pratica): Pratica {
         storico: [
           ...p.storico,
           { fase: 'generazione', azione: `Tipo di lavoro determinato dal sistema: ${ETICHETTA_TIPO[tipo].label} — report generato con la ${etichettaBatteria}`, autore: 'Sistema (Christian)', dataOra: adesso },
-          { fase: 'generazione', azione: `Report AssessFirst generati in autonomia per ${p.dipendenti.length} dipendenti (step parallelo)`, autore: 'Agente Report AF', dataOra: adesso },
+          { fase: 'generazione', azione: `Report AssessFirst generati in simultanea per ${p.dipendenti.length} persone (casi a/b/c derivati dall'anagrafica)`, autore: 'Agente Report AF', dataOra: adesso },
           { fase: 'generazione', azione: 'Email al tutor con report principale + report AssessFirst (simulata)', autore: 'Sistema', dataOra: adesso },
         ],
       }
@@ -367,7 +367,7 @@ interface StoreContextValue {
   state: AppState
   /** true dopo che lo stato salvato è stato ripristinato da localStorage */
   pronto: boolean
-  creaPratica: (dati: { azienda: string; cliente: string; email: string; dipendenti: string[] }) => void
+  creaPratica: (dati: { azienda: string; cliente: string; email: string; dipendenti: PersonaAF[] }) => void
   inviaAssessment: (praticaId: string) => void
   caricaQuestionarioTrascrizione: (praticaId: string) => void
   caricaAssessFirst: (praticaId: string, dipendenti: string[]) => void

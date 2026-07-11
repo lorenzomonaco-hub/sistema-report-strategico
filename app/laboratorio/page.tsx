@@ -36,6 +36,7 @@ const BLOCCHI: Blocco[] = [
     descrizione: 'Un report AssessFirst per ogni dipendente, in piena autonomia, poi email al tutor.',
     proprietario: 'Lorenzo',
     accento: 'bg-indigo-500',
+    url: 'https://blocco-report-af-production.up.railway.app',
     repo: `${GITHUB}/blocco-report-af`,
   },
   {

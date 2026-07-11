@@ -38,6 +38,7 @@ const BLOCCHI: Blocco[] = [
     accento: 'bg-indigo-500',
     url: 'https://blocco-report-af-production.up.railway.app',
     repo: `${GITHUB}/blocco-report-af`,
+    bench: '/laboratorio/report-af',
   },
   {
     passo: '5',

@@ -1,8 +1,11 @@
 // ─── Server statico con cancello di accesso ───
-// Serve la build statica (out/) SOLO dopo il login: senza il cookie firmato
-// nessun file viene servito. La password sta in ACCESSO_PASSWORD (variabile
-// Railway); cambiandola si invalidano anche le sessioni già aperte.
-// Se ACCESSO_PASSWORD non è impostata (es. in locale) il cancello è spento.
+// Serve la build statica (out/) SOLO dopo il login, ma SOLO quando si entra
+// dagli host elencati in ACCESSO_HOST (es. il dominio custom): sull'URL
+// grezzo di Railway il cancello resta spento. Senza il cookie firmato,
+// sugli host protetti non viene servito nessun file. La password sta in
+// ACCESSO_PASSWORD (variabile Railway); cambiandola si invalidano anche le
+// sessioni già aperte. Se ACCESSO_PASSWORD non è impostata il cancello è
+// spento ovunque (es. in locale).
 
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { createReadStream, existsSync, statSync } from 'node:fs'
@@ -14,6 +17,18 @@ const RADICE = resolve('out')
 const PASSWORD = process.env.ACCESSO_PASSWORD ?? ''
 const COOKIE = 'accesso-report'
 const GIORNI_SESSIONE = 30
+// Elenco separato da virgole degli host da proteggere. Vuoto = protegge
+// qualsiasi host (default sicuro se non configurato esplicitamente).
+const HOST_PROTETTI = (process.env.ACCESSO_HOST ?? '')
+  .split(',')
+  .map((h) => h.trim().toLowerCase())
+  .filter(Boolean)
+
+const hostDaProteggere = (req) => {
+  if (HOST_PROTETTI.length === 0) return true
+  const host = String(req.headers.host ?? '').split(':')[0].toLowerCase()
+  return HOST_PROTETTI.includes(host)
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -178,7 +193,7 @@ const server = createServer(async (req, res) => {
   }
 
   // Login.
-  if (PASSWORD && url.pathname === '/accesso' && req.method === 'POST') {
+  if (PASSWORD && hostDaProteggere(req) && url.pathname === '/accesso' && req.method === 'POST') {
     if (bloccato(ip)) return rispondiLogin(res, '/', 'Troppi tentativi: riprova tra qualche minuto.', 429)
     let dati
     try {
@@ -199,8 +214,8 @@ const server = createServer(async (req, res) => {
     return rispondiLogin(res, dopo, 'Password sbagliata.')
   }
 
-  // Cancello: senza cookie valido si vede solo la pagina di accesso.
-  if (PASSWORD && !cookieValido(req)) {
+  // Cancello: solo sugli host protetti, e solo senza cookie valido.
+  if (PASSWORD && hostDaProteggere(req) && !cookieValido(req)) {
     return rispondiLogin(res, url.pathname)
   }
 

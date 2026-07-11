@@ -47,6 +47,8 @@ type Azione =
   | { type: 'INVIA_ASSESSMENT'; praticaId: string }
   | { type: 'CARICA_QUESTIONARIO_TRASCRIZIONE'; praticaId: string }
   | { type: 'CARICA_ASSESSFIRST'; praticaId: string; dipendenti: string[] }
+  | { type: 'MODIFICA_REPORT_AF'; praticaId: string; allegatoId: string; contenuto: string }
+  | { type: 'CONFERMA_REPORT_AF'; praticaId: string }
   | { type: 'CLIENTE_PRONTO'; praticaId: string }
   | { type: 'AVANZA_STEP_AUTONOMO'; praticaId: string }
   | { type: 'INVIA_CHAT_COPY'; praticaId: string; testo: string }
@@ -95,11 +97,11 @@ function avanzaStepAutonomo(p: Pratica): Pratica {
             contenuto: REPORT_IRENE_MOCK,
           })),
         ],
-        reportAF: { stato: 'email_inviata', dataOra: adesso, dettaglio: `${p.dipendenti.length} report generati e inviati al tutor` },
+        reportAF: { stato: 'generati', dataOra: adesso, dettaglio: `${p.dipendenti.length} report pronti — in revisione da Irene` },
         storico: [
           ...p.storico,
           { fase: 'generazione', azione: `Tipo di lavoro determinato dal sistema: ${ETICHETTA_TIPO[tipo].label} — report generato con la ${etichettaBatteria}`, autore: 'Sistema (Christian)', dataOra: adesso },
-          { fase: 'generazione', azione: `Report AssessFirst generati in simultanea per ${p.dipendenti.length} persone (casi a/b/c derivati dall'anagrafica)`, autore: 'Agente Report AF', dataOra: adesso },
+          { fase: 'generazione', azione: `Report AssessFirst generati in simultanea per ${p.dipendenti.length} persone — in attesa della revisione di Irene`, autore: 'Agente Report AF', dataOra: adesso },
           { fase: 'generazione', azione: 'Email al tutor con report principale + report AssessFirst (simulata)', autore: 'Sistema', dataOra: adesso },
         ],
       }
@@ -221,6 +223,42 @@ function reducer(state: AppState, azione: Azione): AppState {
         storico: [
           ...p.storico,
           { fase: 'raccolta-documenti', azione: `AssessFirst caricati (${azione.dipendenti.length} dipendenti)`, autore: 'Giulia T. (Tutor)', dataOra: ora() },
+        ],
+      }))
+
+    case 'MODIFICA_REPORT_AF':
+      return aggiornaPratica(state, azione.praticaId, (p) => ({
+        ...p,
+        allegati: p.allegati.map((a) =>
+          a.id === azione.allegatoId ? { ...a, contenuto: azione.contenuto, caricatoDa: 'Irene (revisionato)' } : a
+        ),
+        storico: [
+          ...p.storico,
+          {
+            fase: 'generazione',
+            azione: `Report AssessFirst «${p.allegati.find((a) => a.id === azione.allegatoId)?.dipendente ?? ''}» corretto da Irene`,
+            autore: 'Irene',
+            dataOra: ora(),
+          },
+        ],
+      }))
+
+    case 'CONFERMA_REPORT_AF':
+      return aggiornaPratica(state, azione.praticaId, (p) => ({
+        ...p,
+        reportAF: {
+          stato: 'email_inviata',
+          dataOra: ora(),
+          dettaglio: `ZIP inviato al tutor: report Word del passaggio 4 + ${p.allegati.filter((a) => a.tipo === 'report-af').length} report AssessFirst PDF`,
+        },
+        storico: [
+          ...p.storico,
+          {
+            fase: 'generazione',
+            azione: '📦 Irene ha confermato: ZIP (report Word + report AssessFirst) inviato all\'email del tutor — step 4a concluso',
+            autore: 'Irene',
+            dataOra: ora(),
+          },
         ],
       }))
 
@@ -371,6 +409,8 @@ interface StoreContextValue {
   inviaAssessment: (praticaId: string) => void
   caricaQuestionarioTrascrizione: (praticaId: string) => void
   caricaAssessFirst: (praticaId: string, dipendenti: string[]) => void
+  modificaReportAF: (praticaId: string, allegatoId: string, contenuto: string) => void
+  confermaReportAF: (praticaId: string) => void
   clientePronto: (praticaId: string) => void
   avanzaStepAutonomo: (praticaId: string) => void
   inviaChatCopy: (praticaId: string, testo: string) => void
@@ -424,6 +464,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     inviaAssessment: (praticaId) => dispatch({ type: 'INVIA_ASSESSMENT', praticaId }),
     caricaQuestionarioTrascrizione: (praticaId) => dispatch({ type: 'CARICA_QUESTIONARIO_TRASCRIZIONE', praticaId }),
     caricaAssessFirst: (praticaId, dipendenti) => dispatch({ type: 'CARICA_ASSESSFIRST', praticaId, dipendenti }),
+    modificaReportAF: (praticaId, allegatoId, contenuto) => dispatch({ type: 'MODIFICA_REPORT_AF', praticaId, allegatoId, contenuto }),
+    confermaReportAF: (praticaId) => dispatch({ type: 'CONFERMA_REPORT_AF', praticaId }),
     clientePronto: (praticaId) => dispatch({ type: 'CLIENTE_PRONTO', praticaId }),
     avanzaStepAutonomo: (praticaId) => dispatch({ type: 'AVANZA_STEP_AUTONOMO', praticaId }),
     inviaChatCopy: (praticaId, testo) => dispatch({ type: 'INVIA_CHAT_COPY', praticaId, testo }),
@@ -455,7 +497,7 @@ export function contaNotifiche(state: AppState, ruolo: string): number {
       // supervisione step 4a: generazioni in corso + report AF con problemi
       return (
         inFase(['generazione']) +
-        state.pratiche.filter((p) => p.reportAF && p.reportAF.stato === 'errore').length
+        state.pratiche.filter((p) => p.reportAF && (p.reportAF.stato === 'generati' || p.reportAF.stato === 'errore')).length
       )
     case 'erogazione':
       return inFase(['generazione', 'revisione', 'visual', 'revisione-diagrammi', 'checkpoint-copy', 'impaginazione', 'revisione-impaginazione', 'approvazione-finale'])

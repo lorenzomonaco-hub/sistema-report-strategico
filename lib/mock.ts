@@ -221,7 +221,7 @@ export const SEED_STATE: AppState = {
 
     p('pr-004', 'Orizzonte Games', 'Andrea Conti', 'a.conti@orizzontegames.it', [pers('Andrea Conti', 'titolare', 'Titolare'), pers('Fabio Landi', 'dipendente', 'Responsabile sviluppo')], 'revisione', '2026-06-10T09:00:00.000Z', {
       tipoLavoro: 'consulenza',
-      reportAF: { stato: 'email_inviata', dataOra: '2026-06-15T14:40:00.000Z', dettaglio: '2 report generati e inviati al tutor' },
+      reportAF: { stato: 'generati', dataOra: '2026-06-15T14:40:00.000Z', dettaglio: '2 report pronti — in revisione da Irene' },
       allegati: cartellaConReportAF(['Andrea Conti', 'Fabio Landi'], '2026-06-15T14:30:00.000Z'),
       versioni: [
         
@@ -230,7 +230,7 @@ export const SEED_STATE: AppState = {
       storico: [
         { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: '2026-06-10T09:00:00.000Z' },
         { fase: 'raccolta-documenti', azione: '«Cliente pronto» — pipeline automatica partita', autore: 'Giulia T. (Tutor)', dataOra: '2026-06-15T14:35:00.000Z' },
-        { fase: 'generazione', azione: 'Report AssessFirst generati in autonomia ed email inviata al tutor', autore: 'Agente Report AF', dataOra: '2026-06-15T14:40:00.000Z' },
+        { fase: 'generazione', azione: 'Report AssessFirst generati in simultanea — in attesa della revisione di Irene', autore: 'Agente Report AF', dataOra: '2026-06-15T14:40:00.000Z' },
         
         { fase: 'generazione', azione: 'Report generato dal sistema di generazione (Christian)', autore: 'Sistema (Christian)', dataOra: '2026-07-05T10:25:00.000Z' },
       ],

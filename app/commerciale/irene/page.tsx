@@ -1,10 +1,11 @@
 'use client'
 
 // ─── Area Commerciale — Irene (pipeline v2) ───
-// Irene SUPERVISIONA lo step autonomo 4a: la generazione dei report
-// AssessFirst (un PDF per dipendente) e l'invio dell'email al tutor.
-// Non opera più sui documenti: controlla che tutto fili liscio.
+// Irene è il CHECKPOINT del 4a: rivede i report AssessFirst generati,
+// li corregge se serve, e con la sua conferma parte lo ZIP al tutor
+// (report Word del passaggio 4 + report AssessFirst PDF). Lì il 4a si chiude.
 
+import { useState } from 'react'
 import { useApp, contaNotifiche } from '@/lib/store'
 import { indiceFase } from '@/lib/fasi'
 import { Pratica } from '@/lib/types'
@@ -16,15 +17,19 @@ const dataOraIt = (iso: string) =>
 
 const STATO_AF: Record<string, { label: string; classi: string }> = {
   in_attesa: { label: 'In lavorazione', classi: 'bg-amber-100 text-amber-800' },
-  generati: { label: 'Report generati', classi: 'bg-sky-100 text-sky-800' },
-  email_inviata: { label: '✓ Email inviata al tutor', classi: 'bg-green-100 text-green-700' },
+  generati: { label: '✍ Da revisionare e inviare', classi: 'bg-amber-100 text-amber-800' },
+  email_inviata: { label: '✓ ZIP inviato al tutor — 4a concluso', classi: 'bg-green-100 text-green-700' },
   errore: { label: '⚠ Errore — da controllare', classi: 'bg-rose-100 text-rose-700' },
 }
 
 function CartaSupervisione({ pratica }: { pratica: Pratica }) {
+  const { modificaReportAF, confermaReportAF } = useApp()
   const af = pratica.reportAF
   const stato = STATO_AF[af?.stato ?? 'in_attesa']
   const reportGenerati = pratica.allegati.filter((a) => a.tipo === 'report-af')
+  const daRevisionare = af?.stato === 'generati'
+  const [inModifica, setInModifica] = useState<string | null>(null)
+  const [bozza, setBozza] = useState('')
 
   return (
     <div className="rounded-2xl border border-linea bg-carta p-5 shadow-sm">
@@ -49,12 +54,56 @@ function CartaSupervisione({ pratica }: { pratica: Pratica }) {
       {reportGenerati.length > 0 && (
         <ul className="mt-3 space-y-1.5">
           {reportGenerati.map((r) => (
-            <li key={r.id} className="flex items-center justify-between gap-3 rounded-xl border border-green-100 bg-green-50/60 px-3 py-2 text-sm">
-              <span className="truncate text-green-900">📊 {r.nome}</span>
-              <span className="shrink-0 text-xs text-green-700">generato in autonomia</span>
+            <li key={r.id} className={`rounded-xl border px-3 py-2 text-sm ${daRevisionare ? 'border-amber-100 bg-amber-50/60' : 'border-green-100 bg-green-50/60'}`}>
+              <div className="flex items-center justify-between gap-3">
+                <span className={`truncate ${daRevisionare ? 'text-amber-900' : 'text-green-900'}`}>📊 {r.nome}</span>
+                {daRevisionare ? (
+                  <button
+                    onClick={() => {
+                      setInModifica(inModifica === r.id ? null : r.id)
+                      setBozza(r.contenuto ?? '')
+                    }}
+                    className="shrink-0 text-xs font-semibold text-violet-700 transition hover:text-violet-900"
+                  >
+                    {inModifica === r.id ? 'Chiudi' : '✍ Rivedi e correggi'}
+                  </button>
+                ) : (
+                  <span className="shrink-0 text-xs text-green-700">
+                    {r.caricatoDa === 'Irene (revisionato)' ? 'revisionato da Irene' : 'confermato'}
+                  </span>
+                )}
+              </div>
+              {inModifica === r.id && (
+                <div className="mt-2">
+                  <textarea
+                    value={bozza}
+                    onChange={(e) => setBozza(e.target.value)}
+                    rows={8}
+                    className="w-full rounded-xl border border-linea bg-carta p-3 font-mono text-xs leading-5 focus:border-violet-400 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      modificaReportAF(pratica.id, r.id, bozza)
+                      setInModifica(null)
+                    }}
+                    className="mt-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700"
+                  >
+                    Salva la correzione
+                  </button>
+                </div>
+              )}
             </li>
           ))}
         </ul>
+      )}
+
+      {daRevisionare && (
+        <button
+          onClick={() => confermaReportAF(pratica.id)}
+          className="mt-3 w-full rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700"
+        >
+          📦 Conferma e invia lo ZIP al tutor (report Word + report AssessFirst)
+        </button>
       )}
 
       {af?.stato === 'errore' && (
@@ -86,9 +135,10 @@ export default function PaginaIrene() {
         <section className="anima anima-1 rounded-2xl border border-violet-200 bg-violet-50/70 p-5">
           <h2 className="font-display text-base font-bold tracking-tight text-violet-900">👁 Il tuo ruolo nella pipeline v2</h2>
           <p className="mt-1.5 text-sm leading-6 text-violet-800/80">
-            I report AssessFirst (uno per dipendente) vengono generati <strong>in autonomia</strong> dall&apos;agente
-            e inviati via email al tutor insieme al report principale. Qui controlli che ogni pratica completi il
-            passaggio senza intoppi: se qualcosa va storto, lo vedi subito.
+            I report AssessFirst (uno per persona) vengono generati in simultanea dall&apos;agente, ma
+            <strong> l&apos;invio lo decidi tu</strong>: li rivedi, li correggi se serve, e con la tua conferma parte lo ZIP
+            all&apos;email del tutor — dentro c&apos;è il report Word del passaggio 4 più i report AssessFirst in PDF.
+            Con l&apos;invio, lo step 4a è concluso.
           </p>
         </section>
 

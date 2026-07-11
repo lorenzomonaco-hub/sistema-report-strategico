@@ -1,110 +1,246 @@
 'use client'
 
-// ─── Laboratorio — banchi di prova a compartimenti stagni ───
-// Ogni compartimento della pipeline si testa qui da solo, con l'API reale,
-// senza toccare la piattaforma né gli altri compartimenti.
+// ─── Laboratorio — console dei blocchi della pipeline ───
+// Il Laboratorio è il livello backend della pipeline: ogni card è un blocco
+// indipendente (il suo Git, il suo servizio, i suoi test). Da qui si vede lo
+// stato vivo di ogni servizio e si entra nel banco di prova del blocco.
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import RoleShell from '@/components/RoleShell'
 
-const COMPARTIMENTI = [
+const GITHUB = 'https://github.com/lorenzomonaco-hub'
+
+interface Blocco {
+  passo: string
+  titolo: string
+  descrizione: string
+  proprietario: 'Lorenzo' | 'Christian'
+  accento: string
+  url?: string
+  repo?: string
+  bench?: string
+}
+
+const BLOCCHI: Blocco[] = [
   {
-    numero: 45,
-    titolo: 'Generazione + Revisione — sistema di Christian',
-    descrizione: 'I compartimenti 4 e 5 sono stati sostituiti: generazione e revisione arrivano dal GitHub di Christian, in integrazione.',
-    href: '',
+    passo: '3',
+    titolo: 'Generazione',
+    descrizione: 'Esegue la batteria di prompt (Consulenza o Branding) e produce la prima bozza del report.',
+    proprietario: 'Christian',
     accento: 'bg-teal-500',
-    attivo: false,
   },
   {
-    numero: 6,
-    titolo: 'Agente Visual',
-    descrizione: 'Tabelle, diagrammi, callout e specifiche per la designer al posto dei muri di testo.',
-    href: '/laboratorio/visual',
+    passo: '4a',
+    titolo: 'Report AF + email tutor',
+    descrizione: 'Un report AssessFirst per ogni dipendente, in piena autonomia, poi email al tutor.',
+    proprietario: 'Lorenzo',
+    accento: 'bg-indigo-500',
+    repo: `${GITHUB}/blocco-report-af`,
+  },
+  {
+    passo: '5',
+    titolo: 'Revisione',
+    descrizione: 'La prima valutazione input/output della bozza generata.',
+    proprietario: 'Christian',
+    accento: 'bg-teal-500',
+  },
+  {
+    passo: '6',
+    titolo: 'Visual',
+    descrizione: 'Trasforma i muri di testo in tabelle, diagrammi e grafici col tema pastello.',
+    proprietario: 'Lorenzo',
     accento: 'bg-cyan-500',
-    attivo: true,
+    url: 'https://blocco-visual-production.up.railway.app',
+    repo: `${GITHUB}/blocco-visual`,
+    bench: '/laboratorio/visual',
   },
   {
-    numero: 7,
-    titolo: 'Revisore Leggibilità',
-    descrizione: 'Il lettore ignaro: giudica se i visual fanno capire davvero. Verdetto e lezioni per il Visual.',
-    href: '/laboratorio/leggibilita',
+    passo: '7',
+    titolo: 'Revisione diagrammi',
+    descrizione: 'Il lettore ignaro: giudica i visual in loop finché non sono perfetti, con lezioni.',
+    proprietario: 'Lorenzo',
     accento: 'bg-violet-500',
-    attivo: true,
+    repo: `${GITHUB}/blocco-revisione-diagrammi`,
+    bench: '/laboratorio/leggibilita',
   },
   {
-    numero: 8,
-    titolo: 'Grafica — impaginazione automatica',
-    descrizione: 'Carichi il PDF del cliente: il worker su Railway lo impagina nel modello Macheda con controlli e verdetto.',
-    href: '/laboratorio/grafica',
+    passo: '9',
+    titolo: 'Impaginazione',
+    descrizione: 'Impagina il report nel modello Macheda: PDF dentro, report impaginato e verdetto fuori.',
+    proprietario: 'Lorenzo',
     accento: 'bg-stone-500',
-    attivo: true,
+    url: 'https://blocco-impaginazione-production.up.railway.app',
+    repo: `${GITHUB}/blocco-impaginazione`,
+    bench: '/laboratorio/grafica',
+  },
+  {
+    passo: '10',
+    titolo: 'Revisione impaginazione',
+    descrizione: 'Confronta il PDF impaginato con tutta la base di conoscenza prima della consegna.',
+    proprietario: 'Lorenzo',
+    accento: 'bg-rose-400',
+    repo: `${GITHUB}/blocco-revisione-impaginazione`,
+  },
+  {
+    passo: '1 · 4a · 11',
+    titolo: 'Email',
+    descrizione: 'Il servizio comune che manda le notifiche: vendita registrata, report AF, PDF finale.',
+    proprietario: 'Lorenzo',
+    accento: 'bg-amber-500',
+    repo: `${GITHUB}/blocco-email`,
   },
 ]
+
+interface Salute {
+  stato: string
+  chiave_api_configurata?: boolean
+  token_configurato?: boolean
+  modello?: string
+}
+
+type EsitoSalute = { tipo: 'online'; dati: Salute } | { tipo: 'offline' } | { tipo: 'attesa' }
+
+function BadgeSalute({ blocco }: { blocco: Blocco }) {
+  const [esito, setEsito] = useState<EsitoSalute>({ tipo: 'attesa' })
+
+  useEffect(() => {
+    if (!blocco.url) return
+    let fermo = false
+    fetch(`${blocco.url}/health`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+      .then((dati: Salute) => {
+        if (!fermo) setEsito({ tipo: 'online', dati })
+      })
+      .catch(() => {
+        if (!fermo) setEsito({ tipo: 'offline' })
+      })
+    return () => {
+      fermo = true
+    }
+  }, [blocco.url])
+
+  if (!blocco.url) {
+    return (
+      <span className="shrink-0 rounded-full bg-inchiostro/5 px-2.5 py-0.5 text-xs font-semibold text-inchiostro/40">
+        {blocco.proprietario === 'Christian' ? 'In integrazione' : 'In costruzione'}
+      </span>
+    )
+  }
+  if (esito.tipo === 'attesa') {
+    return (
+      <span className="shrink-0 rounded-full bg-inchiostro/5 px-2.5 py-0.5 text-xs font-semibold text-inchiostro/40">
+        Controllo…
+      </span>
+    )
+  }
+  if (esito.tipo === 'offline') {
+    return (
+      <span className="shrink-0 rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
+        Non raggiungibile
+      </span>
+    )
+  }
+  return (
+    <span className="shrink-0 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+      Online
+    </span>
+  )
+}
+
+function DettagliSalute({ blocco }: { blocco: Blocco }) {
+  const [dati, setDati] = useState<Salute | null>(null)
+
+  useEffect(() => {
+    if (!blocco.url) return
+    let fermo = false
+    fetch(`${blocco.url}/health`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+      .then((d: Salute) => {
+        if (!fermo) setDati(d)
+      })
+      .catch(() => {})
+    return () => {
+      fermo = true
+    }
+  }, [blocco.url])
+
+  if (!blocco.url || !dati) return null
+  return (
+    <p className="mt-2 text-xs text-inchiostro/40">
+      {dati.modello ? `Modello ${dati.modello}` : ''}
+      {dati.chiave_api_configurata === false ? ' · chiave API mancante (regia agentica spenta)' : ''}
+    </p>
+  )
+}
 
 export default function PaginaLaboratorio() {
   return (
     <RoleShell
       ruolo="Laboratorio"
       colore="bg-ambra"
-      sottotitolo="Banchi di prova a compartimenti stagni — ogni passaggio si testa da solo, con l'API reale"
+      sottotitolo="La console dei blocchi: ogni pezzo della pipeline ha il suo Git, il suo servizio e il suo banco di prova"
     >
       <div className="space-y-6">
         <div className="anima anima-1 rounded-2xl border border-linea bg-carta p-5 shadow-sm">
-          <h2 className="font-display text-lg font-bold tracking-tight text-inchiostro">
-            🧪 Come funziona
-          </h2>
+          <h2 className="font-display text-lg font-bold tracking-tight text-inchiostro">🧱 Architettura a blocchi</h2>
           <p className="mt-2 text-sm leading-6 text-inchiostro/60">
-            Ogni compartimento è isolato: carichi un documento in ingresso, il compartimento lo lavora con il suo
-            prompt e l&apos;API di Claude, e ti restituisce il documento in uscita. Nessun dato tocca la pipeline:
-            è la palestra dove i prompt si mettono a punto prima di collegare tutto.
+            Ogni blocco è un modulo indipendente: il suo repository Git, il suo servizio su Railway e il suo
+            banco di prova. Qui si lavora sul backend di ogni singolo passaggio — test agentici, verifiche in
+            produzione — senza toccare la pipeline né gli altri blocchi. I numeri sono gli step della pipeline.
           </p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          {COMPARTIMENTI.map((c, i) => {
-            const corpo = (
-              <>
-                <div className={`h-1 rounded-full ${c.accento} ${c.attivo ? '' : 'opacity-30'}`} />
-                <div className="mt-3 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold tracking-wide text-inchiostro/40 uppercase">
-                      Compartimento {c.numero === 45 ? 'n°4+5' : `n°${c.numero}`}
-                    </p>
-                    <h3 className={`font-display mt-0.5 text-lg font-bold tracking-tight ${c.attivo ? 'text-inchiostro' : 'text-inchiostro/40'}`}>
-                      {c.titolo}
-                    </h3>
-                    <p className={`mt-1 text-sm leading-5 ${c.attivo ? 'text-inchiostro/60' : 'text-inchiostro/35'}`}>
-                      {c.descrizione}
-                    </p>
-                  </div>
-                  {c.attivo ? (
-                    <span className="shrink-0 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
-                      Attivo
-                    </span>
-                  ) : (
-                    <span className="shrink-0 rounded-full bg-inchiostro/5 px-2.5 py-0.5 text-xs font-semibold text-inchiostro/40">
-                      In preparazione
-                    </span>
+          {BLOCCHI.map((b, i) => (
+            <div
+              key={b.titolo}
+              className={`anima anima-${Math.min(i + 2, 6)} flex flex-col rounded-2xl border border-linea bg-carta p-5 shadow-sm`}
+            >
+              <div className={`h-1 rounded-full ${b.accento} ${b.url ? '' : 'opacity-30'}`} />
+              <div className="mt-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold tracking-wide text-inchiostro/40 uppercase">
+                    Step {b.passo} · {b.proprietario}
+                  </p>
+                  <h3 className={`font-display mt-0.5 text-lg font-bold tracking-tight ${b.url || b.bench ? 'text-inchiostro' : 'text-inchiostro/50'}`}>
+                    {b.titolo}
+                  </h3>
+                  <p className={`mt-1 text-sm leading-5 ${b.url || b.bench ? 'text-inchiostro/60' : 'text-inchiostro/35'}`}>
+                    {b.descrizione}
+                  </p>
+                </div>
+                <BadgeSalute blocco={b} />
+              </div>
+              <DettagliSalute blocco={b} />
+              {(b.bench || b.repo) && (
+                <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-3">
+                  {b.bench && (
+                    <Link href={b.bench} className="text-sm font-semibold text-petrolio transition hover:text-petrolio-scuro">
+                      Banco di prova →
+                    </Link>
+                  )}
+                  {b.repo && (
+                    <a
+                      href={b.repo}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm font-medium text-inchiostro/40 transition hover:text-petrolio"
+                    >
+                      Repository Git ↗
+                    </a>
                   )}
                 </div>
-                {c.attivo && <p className="mt-3 text-sm font-semibold text-petrolio">Apri il banco di prova →</p>}
-              </>
-            )
-            const classi = `anima anima-${Math.min(i + 2, 6)} rounded-2xl border border-linea bg-carta p-5 shadow-sm ${
-              c.attivo ? 'card-sollevabile' : ''
-            }`
-            return c.attivo ? (
-              <Link key={c.numero} href={c.href} className={classi}>
-                {corpo}
-              </Link>
-            ) : (
-              <div key={c.numero} className={classi}>
-                {corpo}
-              </div>
-            )
-          })}
+              )}
+            </div>
+          ))}
         </div>
+
+        <p className="anima anima-6 text-center text-xs text-inchiostro/40">
+          Generazione e Revisione arrivano dal sistema di Christian e si agganciano con lo stesso contratto
+          standard degli altri blocchi (health, job, esito). I blocchi «in costruzione» hanno già il repository
+          con lo scheletro pronto.
+        </p>
       </div>
     </RoleShell>
   )

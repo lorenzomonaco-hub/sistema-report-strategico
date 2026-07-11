@@ -266,7 +266,7 @@ export default function BancoReportAF() {
             <label className="mb-1 block text-xs font-medium text-inchiostro/60">Piano di consulenza (Word o PDF — il documento del passaggio 4)</label>
             <input
               type="file"
-              accept=".pdf,.docx"
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               onChange={(e) => setPiano(e.target.files?.[0] ?? null)}
               className="block w-full text-sm text-inchiostro/60 file:mr-3 file:rounded-xl file:border-0 file:bg-petrolio file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-petrolio-scuro"
             />
@@ -277,7 +277,7 @@ export default function BancoReportAF() {
             </label>
             <input
               type="file"
-              accept=".pdf"
+              accept=".pdf,application/pdf"
               multiple
               onChange={(e) => setAssessfirst(e.target.files ? Array.from(e.target.files) : [])}
               className="block w-full text-sm text-inchiostro/60 file:mr-3 file:rounded-xl file:border-0 file:bg-petrolio file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-petrolio-scuro"

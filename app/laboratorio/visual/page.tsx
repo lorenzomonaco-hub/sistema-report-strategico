@@ -177,7 +177,7 @@ export default function BancoVisualBlocco() {
             <label className="mb-1 block text-xs font-medium text-inchiostro/60">Report in Word (.docx)</label>
             <input
               type="file"
-              accept=".docx"
+              accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               onChange={(e) => {
                 setFile(e.target.files?.[0] ?? null)
                 setStima(null)

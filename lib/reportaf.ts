@@ -11,6 +11,33 @@ export interface PassoJobAF {
   ora: string
 }
 
+/** Limiti reali della pipeline, letti da /health: il tetto di costo si calcola
+ *  SOLO da questi numeri (mai dalla dimensione dei file caricati — un PDF
+ *  illustrato pesa molto più del testo che ne verrà estratto). */
+export interface LimitiReportAF {
+  max_car_piano: number
+  max_car_af_per_file: number
+  max_file_af: number
+  max_token_uscita: number
+  max_continuazioni: number
+  max_car_campo: number
+  caratteri_prompt_sistema: number
+}
+
+export interface SaluteReportAF {
+  stato: string
+  modello?: string
+  chiave_api_configurata?: boolean
+  token_configurato?: boolean
+  limiti?: LimitiReportAF
+}
+
+export async function leggiSaluteReportAF(): Promise<SaluteReportAF> {
+  const r = await fetch(`${URL_REPORT_AF}/health`)
+  if (!r.ok) throw new Error(`health non raggiungibile (${r.status})`)
+  return r.json()
+}
+
 export interface StatoJobReportAF {
   id: string
   fase: string

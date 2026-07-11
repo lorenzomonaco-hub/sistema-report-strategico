@@ -14,10 +14,12 @@ import {
   CHIAVE_TOKEN_REPORT_AF,
   ETICHETTA_CHECK_AF,
   ETICHETTA_PASSO_AF,
+  LimitiReportAF,
   StatoJobReportAF,
   URL_REPORT_AF,
   creaJobReportAF,
   leggiMarkdownReportAF,
+  leggiSaluteReportAF,
   meseCorrenteAF,
   scaricaPdfReportAF,
   statoJobReportAF,
@@ -30,16 +32,40 @@ const VERDETTO_STILE: Record<string, string> = {
   DA_CONTROLLARE_A_MANO: 'border-amber-200 bg-amber-50 text-amber-800',
 }
 
-/** Stima grezza: ~3,3 caratteri per token (tokenizer Claude 4.x/5), prezzi ufficiali per milione di token. */
+/** ~3,3 caratteri per token (tokenizer Claude 4.x/5), prezzi ufficiali per milione di token. */
 const PREZZI: Record<string, { input: number; output: number }> = {
   'claude-sonnet-5': { input: 2, output: 10 },
   'claude-opus-4-8': { input: 5, output: 25 },
 }
 
-function stimaCosto(caratteriInput: number, modello: string): { euro: string; token: number } {
-  const prezzo = PREZZI[modello] ?? PREZZI['claude-sonnet-5']
+/**
+ * Tetto di costo per un turno singolo (senza continuazione): usa SOLO i
+ * limiti reali che il backend applica davvero (letti in diretta da /health),
+ * mai la dimensione dei file caricati — un piano illustrato pesa molti MB ma
+ * il testo che ne viene estratto è sempre troncato agli stessi limiti di uno
+ * senza grafica. Il costo reale è quasi sempre più basso (i report tipici
+ * restano su ~15.000 parole/token, ben sotto i tetti usati qui).
+ *
+ * Non moltiplichiamo per le eventuali continuazioni: nella pratica i report
+ * (~7.900 parole) restano sotto il limite di un solo turno, quindi non
+ * scattano mai. Lo segnaliamo comunque come avvertenza separata, perché la
+ * pipeline oggi rimanda l'intero contesto ad ogni round (nessun prompt
+ * caching): se un giorno scattasse, il costo di QUEL round si ripeterebbe.
+ */
+function stimaTettoCosto(numeroFileAF: number, limiti: LimitiReportAF, modello: string): { euro: string; token: number } | null {
+  // Niente fallback silenzioso sul prezzo: se il modello non è tra quelli che
+  // conosciamo, non possiamo garantire che il numero mostrato sia quello
+  // giusto — meglio dire "non disponibile" che mostrare un prezzo sbagliato.
+  const prezzo = PREZZI[modello]
+  if (!prezzo) return null
+  // destinatario+candidato+ruolo sono nomi/ruoli brevi ma SENZA tetto server-side
+  // esplicito nella formula finché non lo sommiamo: contarli qui garantisce che
+  // il numero resti un vero tetto massimo anche se qualcuno incolla troppo testo
+  // in quei campi (il server comunque rifiuta oltre max_car_campo).
+  const caratteriInput =
+    limiti.max_car_piano + numeroFileAF * limiti.max_car_af_per_file + limiti.caratteri_prompt_sistema + 3 * limiti.max_car_campo
   const tokenInput = Math.round(caratteriInput / 3.3)
-  const tokenOutput = 15000 // report tipo ~7.900 parole
+  const tokenOutput = limiti.max_token_uscita
   const costo = (tokenInput * prezzo.input + tokenOutput * prezzo.output) / 1_000_000
   return { euro: costo.toFixed(2), token: tokenInput + tokenOutput }
 }
@@ -59,7 +85,9 @@ export default function BancoReportAF() {
   const [avvioInCorso, setAvvioInCorso] = useState(false)
   const [markdown, setMarkdown] = useState('')
   const [chiedoConferma, setChiedoConferma] = useState(false)
-  const [modello, setModello] = useState('claude-sonnet-5')
+  const [modello, setModello] = useState<string | null>(null)
+  const [limiti, setLimiti] = useState<LimitiReportAF | null>(null)
+  const [erroreLimiti, setErroreLimiti] = useState(false)
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- lettura iniziale da localStorage
@@ -69,10 +97,23 @@ export default function BancoReportAF() {
   }, [])
 
   useEffect(() => {
-    fetch(`${URL_REPORT_AF}/health`)
-      .then((r) => r.json())
-      .then((h) => h?.modello && setModello(h.modello))
-      .catch(() => {})
+    // Il modello e i limiti si leggono SEMPRE dal vivo: mai un fallback
+    // silenzioso, perché una stima calcolata sul modello sbagliato
+    // mostrerebbe un prezzo sbagliato senza che nessuno se ne accorga.
+    let smontato = false
+    leggiSaluteReportAF()
+      .then((h) => {
+        if (smontato) return
+        if (h.modello) setModello(h.modello)
+        if (h.limiti) setLimiti(h.limiti)
+        else setErroreLimiti(true)
+      })
+      .catch(() => {
+        if (!smontato) setErroreLimiti(true)
+      })
+    return () => {
+      smontato = true
+    }
   }, [])
 
   const salvaToken = (v: string) => {
@@ -81,10 +122,12 @@ export default function BancoReportAF() {
   }
 
   const finale = stato?.fase === 'completato' || stato?.fase === 'errore'
-  const prontoPerInvio = !!token && !!piano && assessfirst.length > 0 && !!destinatario.trim() && !!candidato.trim() && !!ruolo.trim()
+  const troppiFileAF = !!limiti && assessfirst.length > limiti.max_file_af
+  const prontoPerInvio =
+    !!token && !!piano && assessfirst.length > 0 && !!destinatario.trim() && !!candidato.trim() && !!ruolo.trim() &&
+    !!modello && !!limiti && !troppiFileAF
 
-  const caratteriInputStimati = (piano?.size ?? 0) + assessfirst.reduce((s, f) => s + f.size, 0)
-  const stima = stimaCosto(caratteriInputStimati, modello)
+  const stima = limiti && modello ? stimaTettoCosto(assessfirst.length, limiti, modello) : null
 
   useEffect(() => {
     if (!jobId || !token) return
@@ -151,10 +194,19 @@ export default function BancoReportAF() {
           ← Tutti i compartimenti
         </Link>
 
-        <div className="anima anima-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          ⚠️ Questo banco chiama l&apos;API a pagamento ({modello}). Prima di ogni invio ti chiedo conferma
-          mostrandoti una stima di costo.
-        </div>
+        {erroreLimiti ? (
+          <div className="anima anima-2 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+            ⚠️ Non riesco a leggere dal server il modello e i limiti reali (serve per stimare il costo in modo
+            onesto): l&apos;invio resta bloccato finché il blocco non risponde. Ricarica la pagina o controlla che{' '}
+            {URL_REPORT_AF.replace('https://', '')} sia raggiungibile.
+          </div>
+        ) : (
+          <div className="anima anima-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            ⚠️ Questo banco chiama l&apos;API a pagamento ({modello ?? 'lettura in corso…'}). Prima di ogni invio ti
+            chiedo conferma mostrandoti un tetto massimo di costo, calcolato sui limiti reali del server — mai sulla
+            dimensione dei file caricati (un piano illustrato pesa molto di più del testo che ne verrà estratto).
+          </div>
+        )}
 
         {/* 1 · Collegamento */}
         <section className="anima anima-2 rounded-2xl border border-linea bg-carta p-5 shadow-sm">
@@ -179,16 +231,19 @@ export default function BancoReportAF() {
             <div>
               <label className="mb-1 block text-xs font-medium text-inchiostro/60">Candidato (nome e cognome)</label>
               <input value={candidato} onChange={(e) => setCandidato(e.target.value)} placeholder="Es. Fabio Reginato"
+                maxLength={limiti?.max_car_campo ?? 300}
                 className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none" />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-inchiostro/60">Ruolo operativo reale</label>
               <input value={ruolo} onChange={(e) => setRuolo(e.target.value)} placeholder="Es. Titolare"
+                maxLength={limiti?.max_car_campo ?? 300}
                 className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none" />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-inchiostro/60">Destinatario/i del report</label>
               <input value={destinatario} onChange={(e) => setDestinatario(e.target.value)} placeholder="Es. Fabio Reginato"
+                maxLength={limiti?.max_car_campo ?? 300}
                 className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none" />
             </div>
             <div>
@@ -227,8 +282,13 @@ export default function BancoReportAF() {
               onChange={(e) => setAssessfirst(e.target.files ? Array.from(e.target.files) : [])}
               className="block w-full text-sm text-inchiostro/60 file:mr-3 file:rounded-xl file:border-0 file:bg-petrolio file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-petrolio-scuro"
             />
-            {assessfirst.length > 0 && (
+            {assessfirst.length > 0 && !troppiFileAF && (
               <p className="mt-1.5 text-xs text-inchiostro/50">{assessfirst.length} file selezionati</p>
+            )}
+            {troppiFileAF && limiti && (
+              <p className="mt-1.5 text-xs font-medium text-rose-700">
+                {assessfirst.length} file selezionati — il server ne accetta al massimo {limiti.max_file_af} per persona.
+              </p>
             )}
           </div>
         </section>
@@ -247,9 +307,9 @@ export default function BancoReportAF() {
                   className="rounded-xl border border-linea bg-carta px-3 py-2 text-xs font-semibold text-inchiostro/60 transition hover:border-petrolio/40">
                   Annulla
                 </button>
-                <button onClick={avviaDavvero} disabled={avvioInCorso}
+                <button onClick={avviaDavvero} disabled={avvioInCorso || !stima || troppiFileAF}
                   className="rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:opacity-40">
-                  {avvioInCorso ? 'Invio…' : `Sì, spendi ~$${stima.euro} e genera`}
+                  {avvioInCorso ? 'Invio…' : stima ? `Sì, spendi fino a ~$${stima.euro} e genera` : 'Stima non disponibile'}
                 </button>
               </div>
             ) : (
@@ -263,11 +323,14 @@ export default function BancoReportAF() {
             )}
           </div>
 
-          {chiedoConferma && !jobId && (
+          {chiedoConferma && !jobId && stima && (
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Stima: ~{stima.token.toLocaleString('it-IT')} token totali con <strong>{modello}</strong> →{' '}
-              <strong>circa ${stima.euro}</strong>. È una stima approssimativa (dipende dalla lunghezza reale del
-              report generato); confermi l&apos;invio?
+              Tetto massimo: ~{stima.token.toLocaleString('it-IT')} token con <strong>{modello}</strong> →{' '}
+              <strong>fino a ${stima.euro}</strong> per un turno. Calcolato sui LIMITI del server (non sui file
+              caricati): il costo reale sarà quasi sempre più basso, perché il testo estratto è tipicamente molto
+              sotto questi tetti. Nota: se il report richiedesse una continuazione oltre un turno (raro — i report
+              tipici restano sotto questo limite), il costo di quel turno in più si ripeterebbe, perché oggi la
+              pipeline rimanda l&apos;intero contesto ad ogni round. Confermi l&apos;invio?
             </div>
           )}
 

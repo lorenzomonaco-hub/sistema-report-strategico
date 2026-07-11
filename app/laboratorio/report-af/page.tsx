@@ -376,9 +376,17 @@ export default function BancoReportAF() {
               )}
 
               {stato?.fase === 'errore' && (
-                <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-                  <strong>Errore del server:</strong> {stato.errore}
-                </div>
+                <>
+                  <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                    <strong>Errore del server:</strong> {stato.errore}
+                  </div>
+                  <button
+                    onClick={azzera}
+                    className="mt-3 w-full rounded-xl bg-petrolio px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-petrolio-scuro"
+                  >
+                    ↺ Riprova con un nuovo job (ricarica i file e riavvia)
+                  </button>
+                </>
               )}
 
               {stato?.verdetto && (

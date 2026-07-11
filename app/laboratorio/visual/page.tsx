@@ -1,318 +1,324 @@
 'use client'
 
-// ─── Laboratorio · Compartimento n°6 — Agente Visual ───
-// Banco di prova isolato: report approvato in ingresso → report arricchito
-// con tabelle, diagrammi, callout e specifiche per la designer in uscita.
+// ─── Compartimento n°6 — Visual (banco di prova del BLOCCO) ───
+// Parla col blocco Visual su Railway: carichi il Word del report, il server
+// legge la struttura (stima GRATUITA), tu confermi il costo, la regia
+// agentica pianifica i visual (17 famiglie) e esce il PDF pastello o il docx.
+// Sostituisce il vecchio banco v1 (prompt nel browser), superato dal blocco.
 
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import RoleShell from '@/components/RoleShell'
-import { CHIAVE_STORAGE_API, eseguiVisual, MODELLI_LAB } from '@/lib/laboratorio'
+import {
+  CHIAVE_TOKEN_VISUAL,
+  ETICHETTA_PASSO_VISUAL,
+  StatoJobVisual,
+  StimaVisual,
+  URL_VISUAL,
+  creaJobVisual,
+  scaricaUscitaVisual,
+  statoJobVisual,
+  stimaCostoVisual,
+  stimaVisual,
+} from '@/lib/visualblocco'
 
-type Stato = 'pronto' | 'in-esecuzione' | 'completato' | 'errore'
+const CHIAVE_ULTIMO_JOB = 'laboratorio-visual-ultimo-job'
 
-/** Ultima corsa del banco n°4 (il documento revisionato è l'ingresso naturale del Visual). */
-const CHIAVE_ULTIMA_REVISIONE = 'laboratorio-ultima-revisione'
-/** Dove questo banco salva la propria uscita, per il futuro banco n°7 (Leggibilità). */
-const CHIAVE_ULTIMO_VISUAL = 'laboratorio-ultimo-visual'
+const VERDETTO_STILE: Record<string, string> = {
+  APPROVATO: 'border-green-200 bg-green-50 text-green-800',
+  RIMANDATO: 'border-rose-200 bg-rose-50 text-rose-800',
+  DA_CONTROLLARE_A_MANO: 'border-amber-200 bg-amber-50 text-amber-800',
+}
 
-export default function BancoVisual() {
-  const [chiaveApi, setChiaveApi] = useState('')
-  const [modello, setModello] = useState<string>(MODELLI_LAB[0].id)
-  const [documento, setDocumento] = useState('')
-  const [stato, setStato] = useState<Stato>('pronto')
-  const [risultato, setRisultato] = useState('')
+export default function BancoVisualBlocco() {
+  const [token, setToken] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [titolo, setTitolo] = useState('')
+  const [formato, setFormato] = useState<'pdf' | 'docx'>('pdf')
+  const [stima, setStima] = useState<StimaVisual | null>(null)
+  const [stimaInCorso, setStimaInCorso] = useState(false)
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [stato, setStato] = useState<StatoJobVisual | null>(null)
   const [errore, setErrore] = useState('')
-  const [token, setToken] = useState<{ input: number; output: number } | null>(null)
-  const [importDisponibile, setImportDisponibile] = useState(false)
-
-  const abortRef = useRef<AbortController | null>(null)
-  const areaRisultatoRef = useRef<HTMLDivElement | null>(null)
+  const [avvioInCorso, setAvvioInCorso] = useState(false)
 
   useEffect(() => {
-    try {
-      const salvata = localStorage.getItem(CHIAVE_STORAGE_API)
-      if (salvata) setChiaveApi(salvata)
-      setImportDisponibile(localStorage.getItem(CHIAVE_ULTIMA_REVISIONE) !== null)
-    } catch {
-      // storage non disponibile
-    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lettura iniziale da localStorage
+    setToken(localStorage.getItem(CHIAVE_TOKEN_VISUAL) ?? '')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- ripresa ultimo job del banco
+    setJobId(localStorage.getItem(CHIAVE_ULTIMO_JOB))
   }, [])
+
+  const salvaToken = (v: string) => {
+    setToken(v)
+    localStorage.setItem(CHIAVE_TOKEN_VISUAL, v)
+  }
+
+  const finale = stato?.fase === 'completato' || stato?.fase === 'errore'
+  const costo = stima ? stimaCostoVisual(stima) : null
 
   useEffect(() => {
-    return () => abortRef.current?.abort()
-  }, [])
-
-  const salvaChiave = (valore: string) => {
-    setChiaveApi(valore)
-    try {
-      if (valore) localStorage.setItem(CHIAVE_STORAGE_API, valore)
-      else localStorage.removeItem(CHIAVE_STORAGE_API)
-    } catch {
-      // storage non disponibile
+    if (!jobId || !token) return
+    let fermo = false
+    const aggiorna = async () => {
+      try {
+        const s = await statoJobVisual(token, jobId)
+        if (!fermo) setStato(s)
+        if (s.fase === 'completato' || s.fase === 'errore') return true
+      } catch (e) {
+        if (!fermo) setErrore(e instanceof Error ? e.message : 'errore di collegamento')
+        return true
+      }
+      return false
     }
-  }
-
-  const importaDalBanco4 = () => {
-    try {
-      const dati = localStorage.getItem(CHIAVE_ULTIMA_REVISIONE)
-      if (!dati) return
-      const { risultato: revisione } = JSON.parse(dati) as { risultato: string }
-      if (revisione) setDocumento(revisione)
-    } catch {
-      // dati corrotti: ignora
+    aggiorna()
+    const intervallo = window.setInterval(async () => {
+      if (await aggiorna()) window.clearInterval(intervallo)
+    }, 5000)
+    return () => {
+      fermo = true
+      window.clearInterval(intervallo)
     }
-  }
+  }, [jobId, token])
 
-  const caricaFile = (file: File) => {
-    const lettore = new FileReader()
-    lettore.onload = () => setDocumento(String(lettore.result ?? ''))
-    lettore.readAsText(file)
+  const calcolaStima = async () => {
+    if (!file || !token) return
+    setErrore('')
+    setStimaInCorso(true)
+    setStima(null)
+    try {
+      setStima(await stimaVisual(token, file))
+    } catch (e) {
+      setErrore(e instanceof Error ? e.message : 'stima fallita')
+    } finally {
+      setStimaInCorso(false)
+    }
   }
 
   const avvia = async () => {
-    setStato('in-esecuzione')
-    setRisultato('')
+    if (!file || !token || !stima) return
     setErrore('')
-    setToken(null)
-    abortRef.current = new AbortController()
+    setAvvioInCorso(true)
     try {
-      const esito = await eseguiVisual({
-        chiaveApi: chiaveApi.trim(),
-        modello,
-        documento,
-        segnale: abortRef.current.signal,
-        onTesto: (frammento) => {
-          setRisultato((prev) => prev + frammento)
-          areaRisultatoRef.current?.scrollTo({ top: areaRisultatoRef.current.scrollHeight })
-        },
-      })
-      setToken({ input: esito.tokenInput, output: esito.tokenOutput })
-      setStato('completato')
-      // rende la corsa disponibile al futuro banco n°7 (Leggibilità)
-      try {
-        localStorage.setItem(CHIAVE_ULTIMO_VISUAL, JSON.stringify({ documento, risultato: esito.testo }))
-      } catch {
-        // quota piena: il passaggio di mano è facoltativo
-      }
+      const id = await creaJobVisual({ token, file, titolo: titolo.trim() || (file.name ?? ''), formato })
+      localStorage.setItem(CHIAVE_ULTIMO_JOB, id)
+      setStato(null)
+      setStima(null)
+      setJobId(id)
     } catch (e) {
-      if ((e as Error).name === 'AbortError') {
-        setStato('pronto')
-        return
-      }
-      setErrore((e as Error).message)
-      setStato('errore')
+      setErrore(e instanceof Error ? e.message : 'avvio fallito')
+    } finally {
+      setAvvioInCorso(false)
     }
   }
 
-  const annulla = () => {
-    abortRef.current?.abort()
-    setStato('pronto')
+  const azzera = () => {
+    localStorage.removeItem(CHIAVE_ULTIMO_JOB)
+    setJobId(null)
+    setStato(null)
+    setStima(null)
+    setErrore('')
   }
 
-  const scarica = () => {
-    const blob = new Blob([risultato], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'report-con-visual.md'
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const prontoAllAvvio = chiaveApi.trim().length > 10 && documento.trim().length > 50
-
-  // statistiche sugli elementi visivi inseriti (solo a corsa completata)
-  const statistiche =
-    stato === 'completato'
-      ? {
-          tabelle: (risultato.match(/^\|.*\|$/gm) ?? []).filter((r) => /-{3,}/.test(r)).length,
-          diagrammi: (risultato.match(/```/g) ?? []).length / 2,
-          callout: (risultato.match(/^>\s*📌/gm) ?? []).length,
-          perDesigner: (risultato.match(/\[VISUAL DA REALIZZARE\]/g) ?? []).length,
-        }
-      : null
+  const uso = stato?.regia?.uso
 
   return (
     <RoleShell
-      ruolo="Compartimento n°6 — Agente Visual"
-      colore="bg-cyan-500"
-      sottotitolo="Tabelle, diagrammi e callout al posto dei muri di testo — comprensibile a chiunque"
+      ruolo="Compartimento n°6 — Visual"
+      colore="bg-cyan-600"
+      sottotitolo="Word dentro → regia agentica dei visual (17 famiglie) → PDF pastello o docx fuori"
     >
-      <div className="space-y-5">
-        <Link
-          href="/laboratorio"
-          className="anima anima-1 inline-block text-sm text-inchiostro/40 transition hover:text-petrolio"
-        >
+      <div className="space-y-6">
+        <Link href="/laboratorio" className="anima anima-1 block text-sm text-inchiostro/40 transition hover:text-petrolio">
           ← Tutti i compartimenti
         </Link>
 
-        {/* Collegamento */}
-        <section className="anima anima-1 rounded-2xl border border-linea bg-carta p-5 shadow-sm">
+        <div className="anima anima-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          ⚠️ La regia chiama l&apos;API a pagamento. La stima però è <strong>gratuita</strong>: il server legge il
+          documento e conta i numeri veri (blocchi, lotti) senza toccare l&apos;API — confermi solo dopo averla vista.
+        </div>
+
+        {/* 1 · Collegamento */}
+        <section className="anima anima-2 rounded-2xl border border-linea bg-carta p-5 shadow-sm">
           <h2 className="font-display text-lg font-bold tracking-tight text-inchiostro">1 · Collegamento</h2>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <label className="mt-3 mb-1 block text-xs font-medium text-inchiostro/60">Token del blocco</label>
+          <input
+            type="password"
+            value={token}
+            onChange={(e) => salvaToken(e.target.value)}
+            placeholder="incolla il WORKER_TOKEN (Railway → blocco-visual → Variables)"
+            className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none"
+          />
+          <p className="mt-1.5 text-xs text-inchiostro/40">
+            Resta solo in questo browser e viaggia esclusivamente verso {URL_VISUAL.replace('https://', '')}.
+          </p>
+        </section>
+
+        {/* 2 · Documento */}
+        <section className="anima anima-3 rounded-2xl border border-linea bg-carta p-5 shadow-sm">
+          <h2 className="font-display text-lg font-bold tracking-tight text-inchiostro">2 · Documento</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-semibold text-inchiostro/60">Chiave API Anthropic</label>
-              <input
-                type="password"
-                value={chiaveApi}
-                onChange={(e) => salvaChiave(e.target.value)}
-                placeholder="sk-ant-..."
-                className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none"
-              />
-              <p className="mt-1 text-xs text-inchiostro/40">La stessa degli altri banchi: resta solo in questo browser.</p>
+              <label className="mb-1 block text-xs font-medium text-inchiostro/60">Titolo (per il nome del file)</label>
+              <input value={titolo} onChange={(e) => setTitolo(e.target.value)} placeholder="Es. Zurlo Matteo - Piano Marketing"
+                maxLength={200}
+                className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold text-inchiostro/60">Modello</label>
-              <select
-                value={modello}
-                onChange={(e) => setModello(e.target.value)}
-                className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none"
-              >
-                {MODELLI_LAB.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.nome}
-                  </option>
-                ))}
+              <label className="mb-1 block text-xs font-medium text-inchiostro/60">Formato di uscita</label>
+              <select value={formato} onChange={(e) => setFormato(e.target.value as 'pdf' | 'docx')}
+                className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none">
+                <option value="pdf">PDF — motore pastello (consigliato)</option>
+                <option value="docx">Word — stampi nativi</option>
               </select>
             </div>
           </div>
-        </section>
-
-        {/* Documento in ingresso */}
-        <section className="anima anima-2 rounded-2xl border border-linea bg-carta p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-lg font-bold tracking-tight text-inchiostro">
-              2 · Report approvato da arricchire
-            </h2>
-            {importDisponibile && (
-              <button
-                onClick={importaDalBanco4}
-                className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
-              >
-                ↩ Importa la revisione del banco n°4
-              </button>
-            )}
-          </div>
-          <div className="mt-3">
+          <div className="mt-4">
+            <label className="mb-1 block text-xs font-medium text-inchiostro/60">Report in Word (.docx)</label>
             <input
               type="file"
-              accept=".txt,.md,.markdown,text/plain,text/markdown"
-              onChange={(e) => e.target.files?.[0] && caricaFile(e.target.files[0])}
-              className="mb-2 w-full rounded-xl border border-dashed border-linea px-3 py-1.5 text-xs text-inchiostro/60 file:mr-3 file:rounded-lg file:border-0 file:bg-petrolio file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
+              accept=".docx"
+              onChange={(e) => {
+                setFile(e.target.files?.[0] ?? null)
+                setStima(null)
+              }}
+              className="block w-full text-sm text-inchiostro/60 file:mr-3 file:rounded-xl file:border-0 file:bg-petrolio file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-petrolio-scuro"
             />
-            <textarea
-              value={documento}
-              onChange={(e) => setDocumento(e.target.value)}
-              placeholder="Incolla qui il report approvato dal Supervisore..."
-              className="h-56 w-full rounded-xl border border-linea bg-carta p-3 font-mono text-xs leading-5 focus:border-petrolio focus:outline-none"
-            />
-            <p className="mt-1 text-right text-xs text-inchiostro/40">
-              {documento.trim()
-                ? `${documento.trim().split(/\s+/).length.toLocaleString('it-IT')} parole`
-                : 'nessun documento'}
-            </p>
           </div>
         </section>
 
-        {/* Esecuzione */}
-        <section className="anima anima-3 rounded-2xl border border-linea bg-carta p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-lg font-bold tracking-tight text-inchiostro">3 · Arricchimento visivo</h2>
-            {stato === 'in-esecuzione' ? (
-              <button
-                onClick={annulla}
-                className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
-              >
-                ■ Annulla
+        {/* 3 · Stima e generazione */}
+        <section className="anima anima-4 rounded-2xl border border-linea bg-carta p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-lg font-bold tracking-tight text-inchiostro">3 · Stima e generazione</h2>
+            {jobId ? (
+              <button onClick={azzera} className="text-xs font-medium text-inchiostro/40 transition hover:text-petrolio">
+                Nuovo job
               </button>
+            ) : stima ? (
+              <div className="flex items-center gap-2">
+                <button onClick={() => setStima(null)}
+                  className="rounded-xl border border-linea bg-carta px-3 py-2 text-xs font-semibold text-inchiostro/60 transition hover:border-petrolio/40">
+                  Annulla
+                </button>
+                <button onClick={avvia} disabled={avvioInCorso || !costo}
+                  className="rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:opacity-40">
+                  {avvioInCorso ? 'Invio…' : costo ? `Sì, spendi ~$${costo.euro} e genera` : 'Prezzo modello sconosciuto'}
+                </button>
+              </div>
             ) : (
               <button
-                onClick={avvia}
-                disabled={!prontoAllAvvio}
-                className={`rounded-xl px-5 py-2.5 text-sm font-semibold shadow-sm transition ${
-                  prontoAllAvvio
-                    ? 'bg-cyan-600 text-white hover:bg-cyan-700'
-                    : 'cursor-not-allowed bg-inchiostro/10 text-inchiostro/40'
-                }`}
+                onClick={calcolaStima}
+                disabled={!token || !file || stimaInCorso}
+                className="rounded-xl bg-petrolio px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-petrolio-scuro disabled:cursor-not-allowed disabled:opacity-40"
               >
-                ✨ Avvia l&apos;Agente Visual
+                {stimaInCorso ? 'Leggo il documento…' : '① Calcola la stima (gratis)'}
               </button>
             )}
           </div>
-          {!prontoAllAvvio && stato === 'pronto' && (
-            <p className="mt-2 text-xs text-inchiostro/40">Servono: chiave API e il report da arricchire.</p>
-          )}
 
-          {stato === 'in-esecuzione' && (
-            <p className="mt-3 flex items-center gap-2 text-sm text-cyan-700">
-              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-cyan-500" />
-              L&apos;Agente Visual sta trasformando i blocchi di testo in tabelle e diagrammi...
-            </p>
-          )}
-          {stato === 'errore' && (
-            <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              ⚠ {errore}
-            </p>
-          )}
-
-          {statistiche && (
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                { etichetta: 'Tabelle', valore: statistiche.tabelle },
-                { etichetta: 'Diagrammi', valore: Math.floor(statistiche.diagrammi) },
-                { etichetta: 'Callout 📌', valore: statistiche.callout },
-                { etichetta: 'Per la designer', valore: statistiche.perDesigner },
-              ].map((s) => (
-                <div key={s.etichetta} className="rounded-xl border border-linea bg-carta px-3 py-2.5 text-center">
-                  <p className="font-display text-xl font-bold text-cyan-700">{s.valore}</p>
-                  <p className="text-xs text-inchiostro/50">{s.etichetta}</p>
-                </div>
-              ))}
+          {stima && !jobId && (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Il documento ha <strong>{stima.blocchi.toLocaleString('it-IT')} blocchi</strong> →{' '}
+              {stima.lotti} chiamate alla regia con <strong>{stima.modello}</strong>, ~{stima.visual_previsti} visual
+              previsti. {costo ? (
+                <>Tetto stimato: ~{costo.token.toLocaleString('it-IT')} token → <strong>circa ${costo.euro}</strong>. Confermi?</>
+              ) : (
+                <>Non conosco il prezzo di «{stima.modello}»: invio bloccato per prudenza.</>
+              )}
             </div>
           )}
 
-          {(risultato || stato === 'in-esecuzione') && (
-            <div className="mt-4 overflow-hidden rounded-xl border border-linea">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-linea bg-linea/30 px-4 py-2">
-                <span className="text-xs font-semibold text-inchiostro/60">
-                  Report con visual {stato === 'completato' && '· ✓ completato'}
-                </span>
-                {stato === 'completato' && (
-                  <div className="flex items-center gap-2">
-                    {token && (
-                      <span className="text-xs text-inchiostro/40">
-                        {token.input.toLocaleString('it-IT')} token in · {token.output.toLocaleString('it-IT')} out
-                      </span>
-                    )}
-                    <button
-                      onClick={() => navigator.clipboard.writeText(risultato)}
-                      className="rounded-lg border border-linea bg-carta px-3 py-1 text-xs font-semibold text-inchiostro/60 transition hover:border-petrolio/40 hover:text-petrolio"
-                    >
-                      Copia
-                    </button>
-                    <button
-                      onClick={scarica}
-                      className="rounded-lg bg-petrolio px-3 py-1 text-xs font-semibold text-white transition hover:bg-petrolio-scuro"
-                    >
-                      ⬇ Scarica .md
-                    </button>
-                  </div>
+          {!jobId && !stima && (
+            <p className="mt-2 text-sm text-inchiostro/50">Servono: token e il Word del report. La stima non costa nulla.</p>
+          )}
+
+          {jobId && (
+            <>
+              <ul className="mt-3 space-y-1.5">
+                {(stato?.passi ?? []).map((p, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm text-inchiostro/70">
+                    <span className="text-green-600">✓</span>
+                    {ETICHETTA_PASSO_VISUAL[p.passo] ?? p.passo}
+                    <span className="ml-auto text-xs text-inchiostro/35">{p.ora.slice(11, 19)}</span>
+                  </li>
+                ))}
+                {!finale && (
+                  <li className="flex items-center gap-2 text-sm text-inchiostro/40">
+                    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ambra border-t-transparent" />
+                    {stato ? (ETICHETTA_PASSO_VISUAL[stato.fase] ?? stato.fase) : 'collegamento'}…
+                  </li>
                 )}
-              </div>
-              <div
-                ref={areaRisultatoRef}
-                className="max-h-[28rem] overflow-y-auto bg-carta p-4 text-sm leading-6 whitespace-pre-wrap text-inchiostro/80"
-              >
-                {risultato || '...'}
-              </div>
-            </div>
+              </ul>
+
+              {stato?.regia && (
+                <p className="mt-3 text-xs text-inchiostro/50">
+                  Regia: {stato.regia.modo} · {stato.regia.visual_pianificati.toLocaleString('it-IT')} visual pianificati
+                  {uso && (
+                    <>
+                      {' '}· {uso.token_in.toLocaleString('it-IT')} token vivi + {uso.token_cache_lettura.toLocaleString('it-IT')} dalla cache
+                      (1/10) · {uso.token_out.toLocaleString('it-IT')} in uscita
+                    </>
+                  )}
+                </p>
+              )}
+
+              {stato?.qa && (
+                <div className="mt-4 grid gap-1.5 sm:grid-cols-2">
+                  {Object.entries(stato.qa.esiti).map(([k, ok]) => (
+                    <div key={k} className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs ${ok ? 'bg-green-50 text-green-700' : 'bg-rose-50 text-rose-700'}`}>
+                      {ok ? '✓' : '✗'} {k}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {stato?.fase === 'errore' && (
+                <>
+                  <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                    <strong>Errore del server:</strong> {stato.errore}
+                  </div>
+                  <button
+                    onClick={azzera}
+                    className="mt-3 w-full rounded-xl bg-petrolio px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-petrolio-scuro"
+                  >
+                    ↺ Riprova con un nuovo job (ricarica il file e riavvia)
+                  </button>
+                </>
+              )}
+
+              {stato?.verdetto && (
+                <div className={`mt-4 rounded-xl border px-4 py-3 text-sm ${VERDETTO_STILE[stato.verdetto] ?? 'border-linea bg-carta'}`}>
+                  <strong>Verdetto: {stato.verdetto.replaceAll('_', ' ')}</strong>
+                  {stato.pagine ? ` — ${stato.pagine} pagine` : ''}
+                </div>
+              )}
+
+              {stato?.fase === 'completato' && (
+                <button
+                  onClick={() =>
+                    scaricaUscitaVisual(
+                      token,
+                      jobId,
+                      stato.pdf ? 'pdf' : 'docx',
+                      stato.pdf ?? stato.docx ?? 'report-illustrato'
+                    ).catch((e) => setErrore(String(e)))
+                  }
+                  className="mt-4 w-full rounded-xl bg-petrolio px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-petrolio-scuro"
+                >
+                  ⬇ Scarica il report illustrato ({stato.pdf ? 'PDF' : 'Word'})
+                </button>
+              )}
+            </>
+          )}
+
+          {errore && (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{errore}</div>
           )}
         </section>
 
-        <p className="anima anima-4 text-center text-xs text-inchiostro/35">
-          I blocchi [VISUAL DA REALIZZARE] sono le specifiche pronte per la collega grafica: tipo di grafico, dati
-          esatti e messaggio da trasmettere. L&apos;uscita di questo banco è l&apos;ingresso del futuro n°7 (Leggibilità).
+        <p className="anima anima-5 text-center text-xs text-inchiostro/40">
+          Compartimento stagno: il banco parla solo col blocco Visual su Railway, non tocca le pratiche della piattaforma.
         </p>
       </div>
     </RoleShell>

@@ -177,9 +177,16 @@ export default function BancoVisualBlocco() {
             <label className="mb-1 block text-xs font-medium text-inchiostro/60">Report in Word (.docx)</label>
             <input
               type="file"
-              accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               onChange={(e) => {
-                setFile(e.target.files?.[0] ?? null)
+                const f = e.target.files?.[0] ?? null
+                if (f && !f.name.toLowerCase().endsWith('.docx')) {
+                  setErrore(`«${f.name}» non è un Word .docx: il Visual lavora sulla struttura del documento Word (i PDF non la conservano).`)
+                  setFile(null)
+                  e.target.value = ''
+                  return
+                }
+                setErrore('')
+                setFile(f)
                 setStima(null)
               }}
               className="block w-full text-sm text-inchiostro/60 file:mr-3 file:rounded-xl file:border-0 file:bg-petrolio file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-petrolio-scuro"

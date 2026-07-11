@@ -266,8 +266,17 @@ export default function BancoReportAF() {
             <label className="mb-1 block text-xs font-medium text-inchiostro/60">Piano di consulenza (Word o PDF — il documento del passaggio 4)</label>
             <input
               type="file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              onChange={(e) => setPiano(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null
+                if (f && !/\.(pdf|docx)$/i.test(f.name)) {
+                  setErrore(`«${f.name}» non va: il piano deve essere un Word (.docx) o un PDF.`)
+                  setPiano(null)
+                  e.target.value = ''
+                  return
+                }
+                setErrore('')
+                setPiano(f)
+              }}
               className="block w-full text-sm text-inchiostro/60 file:mr-3 file:rounded-xl file:border-0 file:bg-petrolio file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-petrolio-scuro"
             />
           </div>
@@ -277,9 +286,19 @@ export default function BancoReportAF() {
             </label>
             <input
               type="file"
-              accept=".pdf,application/pdf"
               multiple
-              onChange={(e) => setAssessfirst(e.target.files ? Array.from(e.target.files) : [])}
+              onChange={(e) => {
+                const files = e.target.files ? Array.from(e.target.files) : []
+                const nonPdf = files.filter((f) => !f.name.toLowerCase().endsWith('.pdf'))
+                if (nonPdf.length > 0) {
+                  setErrore(`Questi file non sono PDF: ${nonPdf.map((f) => f.name).join(', ')}. Gli AssessFirst vanno caricati in PDF.`)
+                  setAssessfirst([])
+                  e.target.value = ''
+                  return
+                }
+                setErrore('')
+                setAssessfirst(files)
+              }}
               className="block w-full text-sm text-inchiostro/60 file:mr-3 file:rounded-xl file:border-0 file:bg-petrolio file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-petrolio-scuro"
             />
             {assessfirst.length > 0 && !troppiFileAF && (

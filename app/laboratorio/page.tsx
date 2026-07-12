@@ -63,8 +63,9 @@ const BLOCCHI: Blocco[] = [
     descrizione: 'Il lettore ignaro: giudica i visual in loop finché non sono perfetti, con lezioni.',
     proprietario: 'Lorenzo',
     accento: 'bg-violet-500',
+    url: 'https://blocco-revisione-diagrammi-production.up.railway.app',
     repo: `${GITHUB}/blocco-revisione-diagrammi`,
-    bench: '/laboratorio/leggibilita',
+    bench: '/laboratorio/revisione-diagrammi',
   },
   {
     passo: '9',

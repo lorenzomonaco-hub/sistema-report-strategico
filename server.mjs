@@ -16,6 +16,10 @@ const PORTA = Number(process.env.PORT ?? 8000)
 const RADICE = resolve('out')
 const PASSWORD = process.env.ACCESSO_PASSWORD ?? ''
 const COOKIE = 'accesso-report'
+// Quadro amministrativo: password dedicata, su QUALSIASI host (anche l'URL
+// grezzo di Railway). Senza ACCESSO_ADMIN la sezione resta chiusa a tutti.
+const ADMIN = process.env.ACCESSO_ADMIN ?? ''
+const COOKIE_ADMIN = 'accesso-admin'
 const GIORNI_SESSIONE = 30
 // Elenco separato da virgole degli host da proteggere. Vuoto = protegge
 // qualsiasi host (default sicuro se non configurato esplicitamente).
@@ -60,10 +64,18 @@ const uguali = (a, b) => {
   return x.length === y.length && timingSafeEqual(x, y)
 }
 
+const firmaAdmin = () => createHmac('sha256', `sale-amministrazione|${ADMIN}`).update('ok').digest('hex')
+
 const cookieValido = (req) => {
   const riga = req.headers.cookie ?? ''
   const voce = riga.split(';').map((v) => v.trim()).find((v) => v.startsWith(`${COOKIE}=`))
   return voce ? uguali(voce.slice(COOKIE.length + 1), firma()) : false
+}
+
+const cookieAdminValido = (req) => {
+  const riga = req.headers.cookie ?? ''
+  const voce = riga.split(';').map((v) => v.trim()).find((v) => v.startsWith(`${COOKIE_ADMIN}=`))
+  return voce ? uguali(voce.slice(COOKIE_ADMIN.length + 1), firmaAdmin()) : false
 }
 
 // Anti forza-bruta: massimo 10 tentativi per IP ogni 10 minuti.
@@ -81,7 +93,7 @@ const registraTentativo = (ip) => {
   else voce.conta += 1
 }
 
-const paginaLogin = (dopo, errore) => `<!doctype html>
+const paginaLogin = (dopo, errore, opzioni = {}) => `<!doctype html>
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -125,10 +137,10 @@ const paginaLogin = (dopo, errore) => `<!doctype html>
 <body>
   <main class="carta">
     <div class="filo"></div>
-    <h1>Sistema Report Strategico</h1>
-    <p class="sotto">Area riservata al team. Inserisci la password di accesso per continuare.</p>
+    <h1>${opzioni.titolo ?? 'Sistema Report Strategico'}</h1>
+    <p class="sotto">${opzioni.sotto ?? 'Area riservata al team. Inserisci la password di accesso per continuare.'}</p>
     ${errore ? `<div class="errore">${errore}</div>` : ''}
-    <form method="post" action="/accesso">
+    <form method="post" action="${opzioni.azione ?? '/accesso'}">
       <input type="hidden" name="dopo" value="${dopo.replaceAll('"', '')}">
       <label for="password">Password di accesso</label>
       <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
@@ -142,6 +154,17 @@ const paginaLogin = (dopo, errore) => `<!doctype html>
 const rispondiLogin = (res, dopo, errore = '', codice = 401) => {
   res.writeHead(codice, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
   res.end(paginaLogin(dopo, errore))
+}
+
+const OPZIONI_ADMIN = {
+  titolo: 'Quadro Amministrativo',
+  sotto: 'Sezione riservata agli amministratori. Serve la password amministrativa dedicata.',
+  azione: '/accesso-admin',
+}
+
+const rispondiLoginAdmin = (res, dopo, errore = '', codice = 401) => {
+  res.writeHead(codice, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+  res.end(paginaLogin(dopo, errore, OPZIONI_ADMIN))
 }
 
 const inviaFile = (res, percorso) => {
@@ -217,6 +240,41 @@ const server = createServer(async (req, res) => {
   // Cancello: solo sugli host protetti, e solo senza cookie valido.
   if (PASSWORD && hostDaProteggere(req) && !cookieValido(req)) {
     return rispondiLogin(res, url.pathname)
+  }
+
+  // Login del Quadro Amministrativo (password dedicata, tutti gli host).
+  if (ADMIN && url.pathname === '/accesso-admin' && req.method === 'POST') {
+    if (bloccato(ip)) return rispondiLoginAdmin(res, '/amministrazione', 'Troppi tentativi: riprova tra qualche minuto.', 429)
+    let dati
+    try {
+      dati = new URLSearchParams(await leggiCorpo(req))
+    } catch {
+      return rispondiLoginAdmin(res, '/amministrazione', 'Richiesta non valida.', 400)
+    }
+    const dopo = (dati.get('dopo') ?? '/amministrazione').startsWith('/') ? (dati.get('dopo') ?? '/amministrazione') : '/amministrazione'
+    if (uguali(dati.get('password') ?? '', ADMIN)) {
+      tentativi.delete(ip)
+      res.writeHead(302, {
+        'set-cookie': `${COOKIE_ADMIN}=${firmaAdmin()}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${GIORNI_SESSIONE * 86400}${sicuro ? '; Secure' : ''}`,
+        location: dopo,
+      })
+      return res.end()
+    }
+    registraTentativo(ip)
+    return rispondiLoginAdmin(res, dopo, 'Password sbagliata.')
+  }
+
+  // Cancello del Quadro Amministrativo: la sezione (pagina e payload) è
+  // servita SOLO col cookie admin — su qualsiasi host. Senza ACCESSO_ADMIN
+  // configurata la sezione resta chiusa (403), mai aperta per sbaglio.
+  if (url.pathname.startsWith('/amministrazione')) {
+    if (!ADMIN) {
+      res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' })
+      return res.end('Sezione amministrativa non configurata')
+    }
+    if (!cookieAdminValido(req)) {
+      return rispondiLoginAdmin(res, url.pathname)
+    }
   }
 
   if (req.method !== 'GET' && req.method !== 'HEAD') {

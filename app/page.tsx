@@ -178,12 +178,20 @@ export default function Home() {
             prepara la pratica e i documenti del cliente, Erogazione Copy produce il report e lo porta
             alla consegna.
           </p>
-          <Link
-            href="/laboratorio"
-            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-linea bg-carta px-4 py-2 text-sm font-semibold text-inchiostro/60 transition hover:border-ambra/50 hover:text-ambra"
-          >
-            🧪 Laboratorio — banchi di prova dei compartimenti
-          </Link>
+          <div className="mt-4 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/laboratorio"
+              className="inline-flex items-center gap-2 rounded-xl border border-linea bg-carta px-4 py-2 text-sm font-semibold text-inchiostro/60 transition hover:border-ambra/50 hover:text-ambra"
+            >
+              🧪 Laboratorio — banchi di prova dei compartimenti
+            </Link>
+            <Link
+              href="/amministrazione"
+              className="inline-flex items-center gap-2 rounded-xl border border-linea bg-carta px-4 py-2 text-sm font-semibold text-inchiostro/60 transition hover:border-petrolio/50 hover:text-petrolio"
+            >
+              🔐 Quadro Amministrativo — solo con password dedicata
+            </Link>
+          </div>
         </footer>
       </div>
     </div>

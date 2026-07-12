@@ -6,6 +6,7 @@
 
 import React, { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import { AppState, Apprendimento, FaseId, PersonaAF, Pratica, VersioneDocumento, relazioneAF } from './types'
+import { CronologiaFasi, leggiStatoCondiviso, scriviStatoCondiviso, tokenDati } from './datiblocco'
 import { documentiTutorPronti, faseSuccessiva, faseById } from './fasi'
 import { batteriaIdPerTipo, batteriaPerTipo, ETICHETTA_TIPO } from './batterie'
 import {
@@ -405,6 +406,10 @@ interface StoreContextValue {
   state: AppState
   /** true dopo che lo stato salvato è stato ripristinato da localStorage */
   pronto: boolean
+  /** sincronizzazione con l'archivio condiviso (blocco dati su Railway) */
+  sincronizzazione: 'in-corso' | 'online' | 'offline'
+  /** timbri del server: praticaId → [{fase, dataOra}] — la base del Gantt reale */
+  cronologia: CronologiaFasi
   creaPratica: (dati: { azienda: string; cliente: string; email: string; dipendenti: PersonaAF[] }) => void
   inviaAssessment: (praticaId: string) => void
   caricaQuestionarioTrascrizione: (praticaId: string) => void
@@ -427,18 +432,57 @@ const StoreContext = createContext<StoreContextValue | null>(null)
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, SEED_STATE)
   const [pronto, setPronto] = React.useState(false)
+  const [sincronizzazione, setSincronizzazione] = React.useState<'in-corso' | 'online' | 'offline'>('in-corso')
+  const [cronologia, setCronologia] = React.useState<CronologiaFasi>({})
   const idratato = useRef(false)
+  // ─── Archivio condiviso: revisione nota, cambi arrivati DAL server (da non
+  // rispedire), salvataggio in attesa ───
+  const revisione = useRef<number | null>(null)
+  const daServer = useRef(false)
+  const attesaPush = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const statoCorrente = useRef(state)
+  statoCorrente.current = state
 
   useEffect(() => {
+    let statoLocale: AppState | null = null
     try {
       const salvato = localStorage.getItem(STORAGE_KEY)
-      if (salvato) dispatch({ type: 'HYDRATE', payload: JSON.parse(salvato) as AppState })
+      if (salvato) {
+        statoLocale = JSON.parse(salvato) as AppState
+        dispatch({ type: 'HYDRATE', payload: statoLocale })
+      }
     } catch {
       // stato corrotto: si riparte dal seed
     }
     idratato.current = true
     // eslint-disable-next-line react-hooks/set-state-in-effect -- idratazione intenzionale una-tantum da localStorage
     setPronto(true)
+
+    // Poi l'archivio condiviso: se il blocco dati ha uno stato, VINCE lui
+    // (è la pipeline di tutto il team); se è ancora vuoto, lo semina questo
+    // browser. Senza token o senza rete si lavora in locale come prima.
+    const token = tokenDati()
+    if (!token) {
+      setSincronizzazione('offline')
+      return
+    }
+    leggiStatoCondiviso(token)
+      .then((doc) => {
+        if (doc.stato) {
+          daServer.current = true
+          dispatch({ type: 'HYDRATE', payload: doc.stato })
+          revisione.current = doc.revisione
+          setCronologia(doc.cronologia ?? {})
+        } else {
+          const semina = statoLocale ?? statoCorrente.current
+          return scriviStatoCondiviso(token, semina, doc.revisione).then((r) => {
+            revisione.current = r.revisione
+            setCronologia(r.cronologia ?? {})
+          })
+        }
+      })
+      .then(() => setSincronizzazione('online'))
+      .catch(() => setSincronizzazione('offline'))
   }, [])
 
   // Il primo run di questo effect avviene nello stesso commit dell'idratazione,
@@ -455,11 +499,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // quota piena: ignora
     }
+    // I cambi arrivati DAL server non vanno rispediti al server.
+    if (daServer.current) {
+      daServer.current = false
+      return
+    }
+    const token = tokenDati()
+    if (!token) return
+    if (attesaPush.current) clearTimeout(attesaPush.current)
+    attesaPush.current = setTimeout(() => {
+      attesaPush.current = null
+      scriviStatoCondiviso(token, statoCorrente.current, revisione.current)
+        .then((r) => {
+          revisione.current = r.revisione
+          setCronologia(r.cronologia ?? {})
+          setSincronizzazione('online')
+        })
+        .catch(() => setSincronizzazione('offline'))
+    }, 1200)
   }, [state])
+
+  // Ogni 25s: se qualcun altro ha aggiornato la pipeline, la si riprende.
+  useEffect(() => {
+    const intervallo = setInterval(() => {
+      const token = tokenDati()
+      if (!token || document.hidden || attesaPush.current) return
+      leggiStatoCondiviso(token)
+        .then((doc) => {
+          setSincronizzazione('online')
+          if (doc.stato && revisione.current !== null && doc.revisione !== revisione.current) {
+            daServer.current = true
+            dispatch({ type: 'HYDRATE', payload: doc.stato })
+            revisione.current = doc.revisione
+            setCronologia(doc.cronologia ?? {})
+          }
+        })
+        .catch(() => setSincronizzazione('offline'))
+    }, 25_000)
+    return () => clearInterval(intervallo)
+  }, [])
 
   const value: StoreContextValue = {
     state,
     pronto,
+    sincronizzazione,
+    cronologia,
     creaPratica: (dati) => dispatch({ type: 'CREA_PRATICA', ...dati }),
     inviaAssessment: (praticaId) => dispatch({ type: 'INVIA_ASSESSMENT', praticaId }),
     caricaQuestionarioTrascrizione: (praticaId) => dispatch({ type: 'CARICA_QUESTIONARIO_TRASCRIZIONE', praticaId }),

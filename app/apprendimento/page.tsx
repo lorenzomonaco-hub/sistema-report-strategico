@@ -4,8 +4,15 @@
 // Ogni revisione umana genera una proposta di miglioramento dei prompt.
 // Nulla diventa attivo senza l'approvazione esplicita del Team Copy.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useApp } from '@/lib/store'
+import {
+  CHIAVE_TOKEN_VISUAL,
+  cancellaLezioneOnline,
+  leggiApprendimentoOnline,
+  leggiLezioniOnline,
+  listaApprendimentiOnline,
+} from '@/lib/visualblocco'
 import RoleShell from '@/components/RoleShell'
 import StatusBadge from '@/components/StatusBadge'
 import DiffView from '@/components/DiffView'
@@ -24,6 +31,133 @@ const PASSI_CICLO = [
   { icona: '📝', titolo: 'Proposta miglioramento prompt', dettaglio: 'Il prompt a monte viene rivisto' },
   { icona: '✅', titolo: 'Approvazione del Team Copy', dettaglio: 'Il prompt viene aggiornato e versionato' },
 ]
+
+/** La MEMORIA ONLINE dell'Agente Visual: vive sul server del blocco (come la
+ *  KB del progetto sales) e viene caricata da OGNI generazione. Da qui si
+ *  consulta e si governa: una lezione sbagliata si elimina con un click. */
+function MemoriaVisualOnline() {
+  const [token, setToken] = useState('')
+  const [lezioni, setLezioni] = useState<string[] | null>(null)
+  const [report, setReport] = useState<string[] | null>(null)
+  const [aperto, setAperto] = useState('')
+  const [contenuto, setContenuto] = useState('')
+  const [errore, setErrore] = useState('')
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- token condiviso dei blocchi
+    setToken(localStorage.getItem(CHIAVE_TOKEN_VISUAL) ?? localStorage.getItem('worker-grafica-token') ?? '')
+  }, [])
+
+  const carica = (t: string) => {
+    setErrore('')
+    Promise.all([leggiLezioniOnline(t), listaApprendimentiOnline(t)])
+      .then(([lez, rep]) => {
+        setLezioni(lez)
+        setReport(rep)
+      })
+      .catch((e) => setErrore(e instanceof Error ? e.message : 'collegamento fallito'))
+  }
+
+  useEffect(() => {
+    if (token) carica(token)
+  }, [token])
+
+  return (
+    <section className="anima anima-2 rounded-2xl border border-cyan-200 bg-cyan-50/60 p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-display text-base font-bold tracking-tight text-cyan-900">
+            🧠 Memoria viva dell&apos;Agente Visual (online)
+          </h2>
+          <p className="mt-1 text-sm text-cyan-900/70">
+            Vive sul server del blocco e viene caricata da <strong>ogni generazione</strong>. I report del
+            revisore si accumulano qui a ogni giro del loop 6↔7 — per sempre.
+          </p>
+        </div>
+        {!lezioni && (
+          <input
+            type="password"
+            value={token}
+            onChange={(e) => {
+              setToken(e.target.value)
+              localStorage.setItem(CHIAVE_TOKEN_VISUAL, e.target.value)
+            }}
+            placeholder="token dei blocchi"
+            className="w-56 rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none"
+          />
+        )}
+      </div>
+
+      {errore && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{errore}</p>}
+
+      {lezioni && (
+        <div className="mt-4">
+          <h3 className="text-sm font-bold text-inchiostro">Lezioni attive ({lezioni.length}) — caricate da ogni regia</h3>
+          <ul className="mt-2 max-h-72 space-y-1.5 overflow-y-auto">
+            {lezioni.map((l, i) => (
+              <li key={i} className="flex items-start gap-2 rounded-xl border border-cyan-100 bg-carta px-3 py-2 text-xs leading-5 text-inchiostro/80">
+                <span className="flex-1">{l}</span>
+                <button
+                  onClick={() => {
+                    if (!window.confirm('Eliminare questa lezione dalla memoria del Visual?')) return
+                    cancellaLezioneOnline(token, i)
+                      .then(() => carica(token))
+                      .catch((e) => setErrore(String(e)))
+                  }}
+                  aria-label="Elimina lezione"
+                  className="shrink-0 text-rose-400 transition hover:text-rose-700"
+                >
+                  🗑
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {report && (
+        <div className="mt-4">
+          <h3 className="text-sm font-bold text-inchiostro">Archivio report del revisore ({report.length})</h3>
+          {report.length === 0 ? (
+            <p className="mt-1 text-xs text-inchiostro/50">
+              Ancora vuoto: si riempie a ogni giro del loop dalla prossima generazione.
+            </p>
+          ) : (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {report.map((n) => (
+                <button
+                  key={n}
+                  onClick={() =>
+                    aperto === n
+                      ? (setAperto(''), setContenuto(''))
+                      : leggiApprendimentoOnline(token, n)
+                          .then((c) => {
+                            setAperto(n)
+                            setContenuto(c)
+                          })
+                          .catch((e) => setErrore(String(e)))
+                  }
+                  className={`rounded-xl border px-3 py-1.5 text-xs font-medium transition ${
+                    aperto === n
+                      ? 'border-cyan-400 bg-cyan-100 text-cyan-900'
+                      : 'border-linea bg-carta text-inchiostro/60 hover:border-petrolio/40 hover:text-petrolio'
+                  }`}
+                >
+                  📋 {n.replace('.md', '')}
+                </button>
+              ))}
+            </div>
+          )}
+          {contenuto && (
+            <pre className="mt-3 max-h-80 overflow-y-auto rounded-xl bg-linea/30 p-4 text-xs leading-5 whitespace-pre-wrap text-inchiostro/80">
+              {contenuto}
+            </pre>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
 
 export default function PaginaCentroApprendimento() {
   const { state, approvaApprendimento, scartaApprendimento } = useApp()
@@ -71,6 +205,8 @@ export default function PaginaCentroApprendimento() {
             Dopo l&apos;approvazione, il prompt interessato viene aggiornato e la modifica registrata nel changelog con una nuova versione.
           </p>
         </section>
+
+        <MemoriaVisualOnline />
 
         {/* 2. Riga statistiche */}
         <section className="anima anima-2 grid grid-cols-2 gap-4 sm:grid-cols-4">

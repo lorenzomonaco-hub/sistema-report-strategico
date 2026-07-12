@@ -194,3 +194,32 @@ export async function leggiReportGiro(token: string, jobId: string, giro: number
   if (!r.ok) throw new Error(`report non disponibile (${r.status})`)
   return r.text()
 }
+
+// ─── Memoria online dell'Agente Visual (Centro Apprendimento) ───
+
+export async function leggiLezioniOnline(token: string): Promise<string[]> {
+  const r = await fetch(`${URL_VISUAL}/lezioni`, { headers: { Authorization: `Bearer ${token}` } })
+  const j = await esito<{ lezioni: string[] }>(r)
+  return j.lezioni
+}
+
+/** Governance umana: rimuove una lezione sbagliata dalla memoria del blocco. */
+export async function cancellaLezioneOnline(token: string, indice: number): Promise<{ rimossa: string; restanti: number }> {
+  const r = await fetch(`${URL_VISUAL}/lezioni/${indice}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return esito(r)
+}
+
+export async function listaApprendimentiOnline(token: string): Promise<string[]> {
+  const r = await fetch(`${URL_VISUAL}/apprendimenti`, { headers: { Authorization: `Bearer ${token}` } })
+  const j = await esito<{ report: string[] }>(r)
+  return j.report
+}
+
+export async function leggiApprendimentoOnline(token: string, nome: string): Promise<string> {
+  const r = await fetch(`${URL_VISUAL}/apprendimenti/${nome}`, { headers: { Authorization: `Bearer ${token}` } })
+  if (!r.ok) throw new Error(`report non disponibile (${r.status})`)
+  return r.text()
+}

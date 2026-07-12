@@ -228,8 +228,13 @@ export default function BancoVisualBlocco() {
             <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               Il documento ha <strong>{stima.blocchi.toLocaleString('it-IT')} blocchi</strong> →{' '}
               {stima.lotti} chiamate alla regia con <strong>{stima.modello}</strong>, ~{stima.visual_previsti} visual
-              previsti. {costo ? (
-                <>Tetto stimato: ~{costo.token.toLocaleString('it-IT')} token → <strong>circa ${costo.euro}</strong>. Confermi?</>
+              previsti.{' '}
+              {stima.loop_attivo && (
+                <>Il <strong>loop 6↔7 è attivo</strong> (max {stima.giri_max} giri col revisore; {stima.lezioni_in_memoria ?? 0} lezioni
+                già in memoria): un giro costa ~${costo?.euroGiro}, il tetto sotto è il caso peggiore.{' '}</>
+              )}
+              {costo ? (
+                <>Tetto stimato: <strong>fino a ${costo.euro}</strong>. Confermi?</>
               ) : (
                 <>Non conosco il prezzo di «{stima.modello}»: invio bloccato per prudenza.</>
               )}
@@ -268,6 +273,17 @@ export default function BancoVisualBlocco() {
                     </>
                   )}
                 </p>
+              )}
+
+              {(stato?.loop?.length ?? 0) > 0 && (
+                <div className="mt-3 space-y-1">
+                  {stato?.loop?.map((g) => (
+                    <p key={g.giro} className={`rounded-lg px-2.5 py-1.5 text-xs ${g.verdetto === 'APPROVATO' ? 'bg-green-50 text-green-800' : 'bg-rose-50 text-rose-800'}`}>
+                      Giro {g.giro}: <strong>{g.verdetto}</strong> — {g.gravi} gravi, {g.minori} minori
+                      {g.verdetto !== 'APPROVATO' && ` → ${g.lezioni} lezioni al Visual`}
+                    </p>
+                  ))}
+                </div>
               )}
 
               {stato?.qa && (

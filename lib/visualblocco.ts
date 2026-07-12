@@ -14,6 +14,10 @@ export interface StimaVisual {
   caratteri_sistema: number
   visual_previsti: number
   modello: string
+  loop_attivo?: boolean
+  giri_max?: number
+  pagine_stimate?: number
+  lezioni_in_memoria?: number
 }
 
 export interface StatoJobVisual {
@@ -30,6 +34,7 @@ export interface StatoJobVisual {
   }
   resa?: Record<string, unknown>
   qa?: { esiti: Record<string, boolean>; tutti_pass?: boolean; problemi?: string[] }
+  loop?: { giro: number; verdetto: string; gravi: number; minori: number; lezioni: number }[]
   verdetto?: string
   pdf?: string
   docx?: string
@@ -42,6 +47,7 @@ export const ETICHETTA_PASSO_VISUAL: Record<string, string> = {
   lettura: 'Lettura della struttura del documento',
   regia: 'Regia agentica (piano dei visual)',
   resa: 'Resa dei visual e composizione',
+  revisione_diagrammi: 'Revisione diagrammi (fase 7, loop)',
   controllo_qualita: 'Controlli automatici (leggibilità, contrasto)',
   completato: 'Completato',
   errore: 'Errore',
@@ -53,8 +59,9 @@ const PREZZI: Record<string, { input: number; output: number }> = {
 }
 
 /** Tetto di costo dai numeri VERI del server (con prompt caching attivo).
- *  null se il modello non è tra quelli di cui conosciamo il prezzo. */
-export function stimaCostoVisual(s: StimaVisual): { euro: string; token: number } | null {
+ *  Se il loop 6↔7 è attivo, il tetto include il caso peggiore: giri_max regie
+ *  + giri_max giudizi del revisore. null se il prezzo del modello è ignoto. */
+export function stimaCostoVisual(s: StimaVisual): { euro: string; token: number; euroGiro: string } | null {
   const prezzo = PREZZI[s.modello]
   if (!prezzo) return null
   const tokPrefisso = Math.round(s.caratteri_sistema / 3.3) + 2000 // sistema + schema strumento (cachati insieme)
@@ -64,8 +71,17 @@ export function stimaCostoVisual(s: StimaVisual): { euro: string; token: number 
     Math.round(s.caratteri_lotti / 3.3) +
     s.lotti * 200 // intestazione del lotto
   const tokOutput = s.lotti * 1800 // piano JSON, stima larga
-  const costo = (tokInput * prezzo.input + tokOutput * prezzo.output) / 1_000_000
-  return { euro: costo.toFixed(2), token: tokInput + tokOutput }
+  const tokGiro = tokInput + tokOutput
+  const costoGiro = (tokInput * prezzo.input + tokOutput * prezzo.output) / 1_000_000
+  if (!s.loop_attivo) return { euro: costoGiro.toFixed(2), token: tokGiro, euroGiro: costoGiro.toFixed(2) }
+  // giudizio del revisore: ~1.150 token/pagina di immagine + esiti
+  const pagine = s.pagine_stimate ?? Math.round(s.caratteri / 2300)
+  const lottiRev = Math.ceil(pagine / 10)
+  const tokGiudizio = pagine * 1150 + lottiRev * 1300
+  const costoGiudizio = (pagine * 1150 * prezzo.input + lottiRev * 1200 * prezzo.output) / 1_000_000
+  const giri = s.giri_max ?? 3
+  const costoTetto = giri * (costoGiro + costoGiudizio)
+  return { euro: costoTetto.toFixed(2), token: giri * (tokGiro + tokGiudizio), euroGiro: (costoGiro + costoGiudizio).toFixed(2) }
 }
 
 async function esito<T>(r: Response): Promise<T> {

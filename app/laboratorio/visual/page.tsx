@@ -24,6 +24,7 @@ import {
   scaricaUscitaVisual,
   statoJobVisual,
   stimaCostoVisual,
+  pngPaginaVisual,
   stimaVisual,
 } from '@/lib/visualblocco'
 
@@ -57,6 +58,7 @@ export default function BancoVisualBlocco() {
   const [daEliminare, setDaEliminare] = useState<number[]>([])
   const [istruzioni, setIstruzioni] = useState<Record<number, string>>({})
   const [trasformaIn, setTrasformaIn] = useState<Record<number, string>>({})
+  const [anteprime, setAnteprime] = useState<Record<number, string | null>>({})
   const [ritoccoInCorso, setRitoccoInCorso] = useState(false)
   const [reportGiro, setReportGiro] = useState('')
 
@@ -388,11 +390,12 @@ export default function BancoVisualBlocco() {
                   {piano && (
                     <>
                       <p className="mt-1 text-xs text-inchiostro/50">
-                        Spunta i visual da <strong>eliminare</strong> (rigenerazione gratuita) oppure scrivi
-                        un&apos;istruzione per <strong>modificarne</strong> uno (una chiamata mirata, pochi centesimi).
+                        I visual sono in ordine di pagina: <strong>👁 vedi</strong> apre la pagina del PDF così vedi
+                        esattamente il grafico di cui si parla. Spunta per <strong>eliminare</strong> (rigenerazione
+                        gratuita) oppure scrivi un&apos;istruzione per <strong>modificarne</strong> uno (pochi centesimi).
                       </p>
-                      <ul className="mt-3 max-h-96 space-y-1.5 overflow-y-auto">
-                        {piano.map((v) => (
+                      <ul className="mt-3 max-h-[32rem] space-y-1.5 overflow-y-auto">
+                        {[...piano].sort((a, b) => (a.pagina ?? 1e9) - (b.pagina ?? 1e9)).map((v) => (
                           <li key={v.indice} className="rounded-xl border border-linea bg-carta px-3 py-2 text-xs">
                             <div className="flex items-center gap-2">
                               <input
@@ -404,9 +407,37 @@ export default function BancoVisualBlocco() {
                                     : daEliminare.filter((x) => x !== v.indice))
                                 }
                               />
+                              <span className="w-14 shrink-0 rounded-full bg-inchiostro/5 px-2 py-0.5 text-center font-bold text-inchiostro/70">
+                                {v.pagina ? `pag. ${v.pagina}` : '—'}
+                              </span>
                               <span className="rounded-full bg-cyan-50 px-2 py-0.5 font-medium text-cyan-800">{v.tipo}</span>
                               <span className="truncate font-semibold text-inchiostro">{v.titolo || '(senza titolo)'}</span>
+                              {v.pagina && (
+                                <button
+                                  onClick={() => {
+                                    if (anteprime[v.indice]) {
+                                      URL.revokeObjectURL(anteprime[v.indice]!)
+                                      setAnteprime({ ...anteprime, [v.indice]: null })
+                                    } else {
+                                      pngPaginaVisual(token, jobId, v.pagina!)
+                                        .then((url) => setAnteprime((prev) => ({ ...prev, [v.indice]: url })))
+                                        .catch((e) => setErrore(String(e)))
+                                    }
+                                  }}
+                                  className="ml-auto shrink-0 rounded-lg border border-linea px-2 py-0.5 font-semibold text-inchiostro/60 hover:text-inchiostro"
+                                >
+                                  {anteprime[v.indice] ? 'chiudi' : '👁 vedi'}
+                                </button>
+                              )}
                             </div>
+                            {anteprime[v.indice] && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={anteprime[v.indice]!}
+                                alt={`Pagina ${v.pagina} del PDF`}
+                                className="mt-2 w-full rounded-lg border border-linea"
+                              />
+                            )}
                             <div className="mt-1.5 flex flex-wrap items-center gap-2">
                               <select
                                 value={trasformaIn[v.indice] ?? ''}

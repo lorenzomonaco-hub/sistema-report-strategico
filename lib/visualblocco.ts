@@ -156,6 +156,28 @@ export interface VoceePiano {
   tipo: string
   titolo: string
   ancora?: number
+  /** pagina del PDF finale su cui sta il visual (None se non ritrovato) */
+  pagina?: number | null
+}
+
+/** PNG di una pagina del PDF finale: il riferimento visivo dei ritocchi.
+ *  Ritorna un object URL da mettere in un <img> (da revocare quando si chiude). */
+export async function pngPaginaVisual(token: string, jobId: string, numero: number): Promise<string> {
+  const r = await fetch(`${URL_VISUAL}/jobs/${jobId}/pagina/${numero}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) throw new Error(`pagina non disponibile (${r.status})`)
+  return URL.createObjectURL(await r.blob())
+}
+
+/** Il responsabile aggiunge una lezione alla memoria del Visual (governance in entrata). */
+export async function aggiungiLezioneVisual(token: string, testo: string): Promise<{ lezioni: number }> {
+  const r = await fetch(`${URL_VISUAL}/lezioni`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lezione: testo }),
+  })
+  return esito(r)
 }
 
 export async function leggiPianoVisual(token: string, jobId: string): Promise<VoceePiano[]> {

@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { useApp } from '@/lib/store'
 import {
   CHIAVE_TOKEN_VISUAL,
+  aggiungiLezioneVisual,
   cancellaLezioneOnline,
   leggiApprendimentoOnline,
   leggiLezioniOnline,
@@ -42,6 +43,7 @@ function MemoriaVisualOnline() {
   const [aperto, setAperto] = useState('')
   const [contenuto, setContenuto] = useState('')
   const [errore, setErrore] = useState('')
+  const [nuovaLezione, setNuovaLezione] = useState('')
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- token condiviso dei blocchi
@@ -93,6 +95,26 @@ function MemoriaVisualOnline() {
       {lezioni && (
         <div className="mt-4">
           <h3 className="text-sm font-bold text-inchiostro">Lezioni attive ({lezioni.length}) — caricate da ogni regia</h3>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={nuovaLezione}
+              onChange={(e) => setNuovaLezione(e.target.value)}
+              maxLength={500}
+              placeholder="Aggiungi una regola tua, es. «Meno tabelle: preferisci sempre grafici e cards»"
+              className="flex-1 rounded-xl border border-cyan-200 bg-carta px-3 py-2 text-xs focus:border-petrolio focus:outline-none"
+            />
+            <button
+              disabled={nuovaLezione.trim().length < 10}
+              onClick={() => {
+                aggiungiLezioneVisual(token, nuovaLezione.trim())
+                  .then(() => { setNuovaLezione(''); carica(token) })
+                  .catch((e) => setErrore(String(e)))
+              }}
+              className="shrink-0 rounded-xl bg-cyan-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-cyan-800 disabled:opacity-30"
+            >
+              + Aggiungi
+            </button>
+          </div>
           <ul className="mt-2 max-h-72 space-y-1.5 overflow-y-auto">
             {lezioni.map((l, i) => (
               <li key={i} className="flex items-start gap-2 rounded-xl border border-cyan-100 bg-carta px-3 py-2 text-xs leading-5 text-inchiostro/80">

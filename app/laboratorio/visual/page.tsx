@@ -35,6 +35,13 @@ const VERDETTO_STILE: Record<string, string> = {
   DA_CONTROLLARE_A_MANO: 'border-amber-200 bg-amber-50 text-amber-800',
 }
 
+/** Le 17 famiglie di visual, per la tendina «Trasforma in…» dei ritocchi. */
+const FAMIGLIE_VISUAL = [
+  'cards', 'confronto', 'matrice', 'flusso', 'timeline', 'barre', 'callout',
+  'gerarchia', 'quadranti', 'dashboard', 'torta', 'anello', 'colonne', 'area',
+  'ishikawa', 'corsie', 'rete',
+]
+
 export default function BancoVisualBlocco() {
   const [token, setToken] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -49,6 +56,7 @@ export default function BancoVisualBlocco() {
   const [piano, setPiano] = useState<VoceePiano[] | null>(null)
   const [daEliminare, setDaEliminare] = useState<number[]>([])
   const [istruzioni, setIstruzioni] = useState<Record<number, string>>({})
+  const [trasformaIn, setTrasformaIn] = useState<Record<number, string>>({})
   const [ritoccoInCorso, setRitoccoInCorso] = useState(false)
   const [reportGiro, setReportGiro] = useState('')
 
@@ -399,7 +407,34 @@ export default function BancoVisualBlocco() {
                               <span className="rounded-full bg-cyan-50 px-2 py-0.5 font-medium text-cyan-800">{v.tipo}</span>
                               <span className="truncate font-semibold text-inchiostro">{v.titolo || '(senza titolo)'}</span>
                             </div>
-                            <div className="mt-1.5 flex gap-2">
+                            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                              <select
+                                value={trasformaIn[v.indice] ?? ''}
+                                onChange={(e) => setTrasformaIn({ ...trasformaIn, [v.indice]: e.target.value })}
+                                className="shrink-0 rounded-lg border border-linea bg-carta px-2 py-1 text-xs focus:border-petrolio focus:outline-none"
+                              >
+                                <option value="">Trasforma in…</option>
+                                {FAMIGLIE_VISUAL.filter((f) => f !== v.tipo).map((f) => (
+                                  <option key={f} value={f}>{f}</option>
+                                ))}
+                              </select>
+                              <button
+                                disabled={!trasformaIn[v.indice] || ritoccoInCorso}
+                                onClick={() => {
+                                  setRitoccoInCorso(true)
+                                  setErrore('')
+                                  modificaVisual(token, jobId, v.indice,
+                                    `Trasformalo in «${trasformaIn[v.indice]}»: stessa posizione (stessa ancora) e stessi contenuti/dati presi dal testo, riadattati alla nuova famiglia. Se la nuova famiglia richiede valori numerici (torta/anello/colonne/area) usa SOLO numeri presenti nel testo.`)
+                                    .then(() => leggiPianoVisual(token, jobId).then(setPiano))
+                                    .then(() => statoJobVisual(token, jobId).then(setStato))
+                                    .then(() => setTrasformaIn({ ...trasformaIn, [v.indice]: '' }))
+                                    .catch((e) => setErrore(String(e)))
+                                    .finally(() => setRitoccoInCorso(false))
+                                }}
+                                className="shrink-0 rounded-lg bg-cyan-700 px-3 py-1 text-xs font-semibold text-white transition hover:bg-cyan-800 disabled:opacity-30"
+                              >
+                                Trasforma (~$0,03)
+                              </button>
                               <input
                                 value={istruzioni[v.indice] ?? ''}
                                 onChange={(e) => setIstruzioni({ ...istruzioni, [v.indice]: e.target.value })}

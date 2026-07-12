@@ -5,7 +5,7 @@
 // viaggia solo verso il worker.
 
 export const URL_WORKER = 'https://blocco-impaginazione-production.up.railway.app'
-export const CHIAVE_TOKEN_WORKER = 'worker-grafica-token'
+export const CHIAVE_TOKEN_WORKER = 'blocchi-worker-token'
 
 export interface PassoJob {
   passo: string

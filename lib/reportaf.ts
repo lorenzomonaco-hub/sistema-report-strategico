@@ -3,7 +3,7 @@
 // destinatario/candidato/ruolo/relazione. Il token resta nel browser.
 
 export const URL_REPORT_AF = 'https://blocco-report-af-production.up.railway.app'
-export const CHIAVE_TOKEN_REPORT_AF = 'blocco-report-af-token'
+export const CHIAVE_TOKEN_REPORT_AF = 'blocchi-worker-token'
 
 export interface PassoJobAF {
   passo: string

@@ -4,7 +4,7 @@
 // chiamata API): mai dalla dimensione del file.
 
 export const URL_VISUAL = 'https://blocco-visual-production.up.railway.app'
-export const CHIAVE_TOKEN_VISUAL = 'blocco-visual-token'
+export const CHIAVE_TOKEN_VISUAL = 'blocchi-worker-token'
 
 export interface StimaVisual {
   blocchi: number

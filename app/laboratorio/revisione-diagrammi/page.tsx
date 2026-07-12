@@ -41,7 +41,7 @@ export default function BancoRevisioneDiagrammi() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- lettura iniziale da localStorage
-    setToken(localStorage.getItem(CHIAVE_TOKEN_REVISIONE) ?? '')
+    setToken(localStorage.getItem(CHIAVE_TOKEN_REVISIONE) ?? localStorage.getItem('worker-grafica-token') ?? localStorage.getItem('blocco-report-af-token') ?? localStorage.getItem('blocco-visual-token') ?? '')
     // eslint-disable-next-line react-hooks/set-state-in-effect -- ripresa ultimo job del banco
     setJobId(localStorage.getItem(CHIAVE_ULTIMO_JOB))
   }, [])

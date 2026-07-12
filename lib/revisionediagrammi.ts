@@ -3,7 +3,7 @@
 // problemi e LEZIONI per il loop con il Visual. Stima gratuita dal server.
 
 export const URL_REVISIONE = 'https://blocco-revisione-diagrammi-production.up.railway.app'
-export const CHIAVE_TOKEN_REVISIONE = 'blocco-revisione-diagrammi-token'
+export const CHIAVE_TOKEN_REVISIONE = 'blocchi-worker-token'
 
 export interface StimaRevisione {
   pagine: number

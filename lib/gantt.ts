@@ -57,6 +57,8 @@ export interface TrattoGantt {
 export interface GanttPratica {
   pratica: Pratica
   tratti: TrattoGantt[]
+  /** avanzamento 0-100: quota (pesata sulle durate) delle fasi già percorse */
+  percento: number
   /** consegna prevista ricalcolata da oggi (reale + fasi restanti) */
   consegnaPrevista: number
   /** consegna che era attesa alla creazione (creazione + durate standard) */
@@ -130,5 +132,10 @@ export function calcolaGantt(
   const giorniInFase = Math.max(0, Math.floor((adesso - Date.parse(ultimoTimbro.dataOra)) / GIORNO_MS))
   const faseInRitardo = !completata && giorniInFase > (durate[pratica.faseCorrente] ?? 1)
 
-  return { pratica, tratti, consegnaPrevista, consegnaOriginale, giorniRitardo, giorniInFase, faseInRitardo, completata }
+  // avanzamento: quota delle durate previste già alle spalle (fasi prima della corrente)
+  const totale = ordine.reduce((s, id) => s + (durate[id] ?? 0), 0) || 1
+  const percorse = ordine.slice(0, Math.max(0, idxCorrente)).reduce((s, id) => s + (durate[id] ?? 0), 0)
+  const percento = completata ? 100 : Math.round((percorse / totale) * 100)
+
+  return { pratica, tratti, percento, consegnaPrevista, consegnaOriginale, giorniRitardo, giorniInFase, faseInRitardo, completata }
 }

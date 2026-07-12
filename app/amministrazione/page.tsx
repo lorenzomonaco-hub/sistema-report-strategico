@@ -1,10 +1,13 @@
 'use client'
 
 // ─── Quadro Amministrativo ───
-// Riepilogo cumulativo di TUTTI i clienti in pipeline + Gantt che si aggiorna
-// da solo con l'avanzamento reale (timbri del blocco dati) e proietta la
-// consegna prevista con le durate standard per fase (da tarare insieme).
-// L'accesso è protetto da password dedicata (cancello nel server, non qui).
+// Gantt costruito sull'anatomia classica dei project manager (TeamGantt,
+// Asana, ProjectManager, Wrike): tabella dei progetti a SINISTRA e timeline a
+// DESTRA sulle stesse righe; asse temporale in alto con griglia verticale;
+// UNA barra per riga (avanzamento = riempimento più scuro della stessa
+// tinta); milestone a rombo = consegna promessa; linea «Oggi»; colori SOLO di
+// stato (verde-petrolio in linea, rosso in ritardo). Ordinamento richiesto da
+// Lorenzo: consegna più vicina in alto.
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
@@ -17,6 +20,8 @@ const GIORNO_MS = 86_400_000
 
 const dataBreve = (ms: number) =>
   new Date(ms).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })
+
+const LARGHEZZA_TABELLA = 300 // px della colonna-tabella a sinistra
 
 function IndicatoreSync({ stato }: { stato: 'in-corso' | 'online' | 'offline' }) {
   const stile = {
@@ -32,44 +37,64 @@ function IndicatoreSync({ stato }: { stato: 'in-corso' | 'online' | 'offline' })
   )
 }
 
-/** Una riga del Gantt: intestazione pratica + barra a tratti su asse temporale. */
-function RigaGantt({ g, da, ampiezza, adesso }: { g: GanttPratica; da: number; ampiezza: number; adesso: number }) {
-  const pct = (ms: number) => Math.max(0, Math.min(100, ((ms - da) / ampiezza) * 100))
+/** La riga del Gantt: cella-tabella a sinistra + barra sulla timeline a destra. */
+function RigaGantt({ g, pct }: { g: GanttPratica; pct: (ms: number) => number }) {
   const fase = faseById(g.pratica.faseCorrente)
+  const inizio = g.tratti[0]?.inizio ?? Date.parse(g.pratica.dataCreazione)
+  const tardi = g.giorniRitardo > 0
+  const sinistra = pct(inizio)
+  const destra = pct(g.consegnaPrevista)
+  const promessa = pct(g.consegnaOriginale)
+  const larghezza = Math.max(destra - sinistra, 0.8)
+  // il riempimento avanzamento occupa il tratto già percorso della barra
+  const percorso = FASI.slice(0, FASI.findIndex((f) => f.id === g.pratica.faseCorrente))
+  const tintaBarra = g.completata ? 'bg-green-600/25' : tardi ? 'bg-rose-500/20' : 'bg-petrolio/20'
+  const tintaPieno = g.completata ? 'bg-green-600' : tardi ? 'bg-rose-600' : 'bg-petrolio'
+
   return (
-    <div className={`rounded-xl border p-3 ${g.giorniRitardo > 0 ? 'border-rose-300 bg-rose-50/40' : 'border-linea bg-carta'}`}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="font-display text-sm font-bold tracking-tight text-inchiostro">{g.pratica.azienda}</span>
-        <span className="text-xs text-inchiostro/50">{g.pratica.cliente} · tutor {g.pratica.tutor}</span>
-        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${fase.badge}`}>{fase.label}</span>
-        {g.faseInRitardo && !g.completata && (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
-            in questa fase da {g.giorniInFase} gg
+    <div className="grid border-b border-linea/70 last:border-b-0 hover:bg-inchiostro/[0.025]"
+         style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr` }}>
+      {/* tabella: chi è, dove sta, quando consegna */}
+      <div className="border-r border-linea px-3 py-2.5">
+        <div className="flex items-baseline gap-2">
+          <span className="font-display truncate text-sm font-bold tracking-tight text-inchiostro">
+            {g.pratica.azienda}
           </span>
-        )}
-        <span className="ml-auto text-xs text-inchiostro/60">
+          <span className="shrink-0 text-[11px] font-bold text-inchiostro/50">{g.percento}%</span>
+        </div>
+        <div className="mt-0.5 truncate text-[11px] text-inchiostro/45">
+          {g.pratica.cliente} · {g.pratica.tutor}
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${fase.badge}`}>{fase.label}</span>
           {g.completata ? (
-            <span className="font-semibold text-green-700">consegnato</span>
-          ) : g.giorniRitardo > 0 ? (
-            <span className="font-semibold text-rose-700">
-              consegna prevista {dataBreve(g.consegnaPrevista)} — {g.giorniRitardo} gg di ritardo
-            </span>
+            <span className="text-[11px] font-semibold text-green-700">consegnato</span>
           ) : (
-            <>consegna prevista <span className="font-semibold text-inchiostro">{dataBreve(g.consegnaPrevista)}</span></>
+            <span className={`text-[11px] ${tardi ? 'font-semibold text-rose-700' : 'text-inchiostro/55'}`}>
+              consegna {dataBreve(g.consegnaPrevista)}{tardi ? ` · +${g.giorniRitardo} gg` : ''}
+            </span>
           )}
-        </span>
+          {g.faseInRitardo && !g.completata && (
+            <span className="text-[10px] font-semibold text-amber-700">ferma da {g.giorniInFase} gg</span>
+          )}
+        </div>
       </div>
-      <div className="relative mt-2 h-6 overflow-hidden rounded-lg bg-inchiostro/5">
-        {g.tratti.map((t, i) => (
-          <div
-            key={i}
-            title={`${t.label}: ${dataBreve(t.inizio)} → ${dataBreve(t.fine)}${t.reale ? '' : ' (prevista)'}`}
-            className={`absolute top-0.5 bottom-0.5 rounded ${t.dot} ${t.reale ? '' : 'opacity-30'} ${t.inCorso ? 'animate-pulse' : ''}`}
-            style={{ left: `${pct(t.inizio)}%`, width: `${Math.max(0.6, pct(t.fine) - pct(t.inizio))}%` }}
-          />
-        ))}
-        {/* linea di oggi */}
-        <div className="absolute top-0 bottom-0 w-px bg-inchiostro/70" style={{ left: `${pct(adesso)}%` }} />
+
+      {/* timeline: UNA barra, riempimento = avanzamento, rombo = consegna promessa */}
+      <div className="relative h-full min-h-[62px]"
+           title={`${g.pratica.azienda} — ${g.percento}% · fase: ${fase.label}` +
+                  `\nAvvio ${dataBreve(inizio)} → consegna prevista ${dataBreve(g.consegnaPrevista)}` +
+                  `\nConsegna promessa ${dataBreve(g.consegnaOriginale)}${tardi ? ` (sforata di ${g.giorniRitardo} gg)` : ''}` +
+                  (percorso.length ? `\nFasi percorse: ${percorso.map((f) => f.label).join(' → ')}` : '')}>
+        <div className={`absolute top-1/2 h-4 -translate-y-1/2 rounded-full ${tintaBarra}`}
+             style={{ left: `${sinistra}%`, width: `${larghezza}%` }}>
+          <div className={`h-full rounded-full ${tintaPieno}`} style={{ width: `${g.percento}%` }} />
+        </div>
+        {/* rombo: la consegna promessa alla creazione */}
+        {!g.completata && (
+          <div className="absolute top-1/2 z-10 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 border border-carta bg-inchiostro"
+               style={{ left: `${promessa}%` }} />
+        )}
       </div>
     </div>
   )
@@ -98,7 +123,8 @@ export default function Amministrazione() {
     const filtrate = state.pratiche.filter((p) => !filtroTutor || p.tutor === filtroTutor)
     return filtrate
       .map((p) => calcolaGantt(p, cronologia, durate, adesso))
-      .sort((a, b) => b.giorniRitardo - a.giorniRitardo || a.consegnaPrevista - b.consegnaPrevista)
+      // regola di Lorenzo (e dei PM): chi consegna prima sta in alto
+      .sort((a, b) => a.consegnaPrevista - b.consegnaPrevista)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- adesso volutamente fuori dalle dipendenze
   }, [state.pratiche, cronologia, durate, filtroTutor])
 
@@ -106,19 +132,30 @@ export default function Amministrazione() {
   const completate = gantt.filter((g) => g.completata)
   const inRitardo = attive.filter((g) => g.giorniRitardo > 0)
 
-  // finestra temporale del Gantt: dal primo inizio alla consegna più lontana
+  // finestra temporale: dal primo avvio alla consegna più lontana, con respiro
   const daListe = attive.length ? attive : gantt
   const da = daListe.length
-    ? Math.min(...daListe.map((g) => g.tratti[0]?.inizio ?? adesso), adesso) - GIORNO_MS
+    ? Math.min(...daListe.map((g) => g.tratti[0]?.inizio ?? adesso), adesso) - GIORNO_MS * 2
     : adesso - GIORNO_MS * 7
   const a = daListe.length
-    ? Math.max(...daListe.map((g) => g.consegnaPrevista), adesso) + GIORNO_MS
+    ? Math.max(...daListe.map((g) => g.consegnaPrevista), adesso) + GIORNO_MS * 3
     : adesso + GIORNO_MS * 7
   const ampiezza = Math.max(a - da, GIORNO_MS * 7)
+  const pct = (ms: number) => Math.max(0, Math.min(100, ((ms - da) / ampiezza) * 100))
 
-  // tacche settimanali sull'asse
-  const tacche: number[] = []
-  for (let t = Math.ceil(da / (GIORNO_MS * 7)) * GIORNO_MS * 7; t < a; t += GIORNO_MS * 7) tacche.push(t)
+  // griglia: tacche settimanali + etichette dei mesi
+  const settimane: number[] = []
+  for (let t = Math.ceil(da / (GIORNO_MS * 7)) * GIORNO_MS * 7; t < a; t += GIORNO_MS * 7) settimane.push(t)
+  const mesi: { inizio: number; label: string }[] = []
+  {
+    const d = new Date(da)
+    d.setDate(1)
+    d.setHours(0, 0, 0, 0)
+    while (d.getTime() < a) {
+      mesi.push({ inizio: d.getTime(), label: d.toLocaleDateString('it-IT', { month: 'long', year: undefined }) })
+      d.setMonth(d.getMonth() + 1)
+    }
+  }
 
   // distribuzione per fase (solo attive)
   const perFase = FASI.filter((f) => f.id !== 'completata').map((f) => ({
@@ -231,10 +268,26 @@ export default function Amministrazione() {
               ⚙ Durate previste per fase
             </button>
           </div>
-          <p className="mt-1 text-xs text-inchiostro/40">
-            Tratti pieni = percorso reale (timbri del server) · tratti tenui = previsione con le durate standard ·
-            linea scura = oggi. Le durate sono una prima stima: le tariamo insieme quando il processo è a regime.
-          </p>
+
+          {/* legenda */}
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-inchiostro/55">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-6 rounded-full bg-petrolio" /> avanzamento
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-6 rounded-full bg-petrolio/20" /> lavoro previsto
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-6 rounded-full bg-rose-500/30" /> in ritardo
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rotate-45 bg-inchiostro" /> consegna promessa
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-3 w-0.5 bg-ambra" /> oggi
+            </span>
+            <span className="ml-auto">consegna più vicina in alto</span>
+          </div>
 
           {pannelloDurate && (
             <div className="mt-3 rounded-2xl border border-linea bg-carta p-4 shadow-sm">
@@ -259,41 +312,81 @@ export default function Amministrazione() {
                   </label>
                 ))}
               </div>
+              <p className="mt-2 text-[11px] text-inchiostro/45">
+                Prima stima: le tariamo insieme quando il processo è a regime.
+              </p>
               <button
                 onClick={() => { salvaDurate(durate); setPannelloDurate(false) }}
-                className="mt-3 rounded-lg bg-petrolio px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                className="mt-2 rounded-lg bg-petrolio px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
               >
                 Salva durate
               </button>
             </div>
           )}
 
-          {/* asse temporale */}
-          <div className="relative mt-4 h-5">
-            {tacche.map((t) => (
-              <span
-                key={t}
-                className="absolute -translate-x-1/2 text-[10px] text-inchiostro/40"
-                style={{ left: `${((t - da) / ampiezza) * 100}%` }}
-              >
-                {dataBreve(t)}
-              </span>
-            ))}
-          </div>
+          {/* il grafico: tabella a sinistra, timeline a destra, griglia condivisa */}
+          <div className="mt-3 overflow-x-auto rounded-2xl border border-linea bg-carta shadow-sm">
+            <div className="min-w-[880px]">
+              {/* intestazione: mesi + settimane */}
+              <div className="grid border-b border-linea bg-inchiostro/[0.03]"
+                   style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr` }}>
+                <div className="flex items-end border-r border-linea px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/40">
+                  Progetto · fase · consegna
+                </div>
+                <div className="relative h-11">
+                  {mesi.map((m) => (
+                    <span key={m.inizio}
+                          className="absolute top-1 text-[10px] font-bold uppercase tracking-wider text-inchiostro/50"
+                          style={{ left: `${Math.max(pct(m.inizio), 0.4)}%` }}>
+                      {m.label}
+                    </span>
+                  ))}
+                  {settimane.map((t) => (
+                    <span key={t} className="absolute bottom-0.5 -translate-x-1/2 text-[10px] text-inchiostro/40"
+                          style={{ left: `${pct(t)}%` }}>
+                      {new Date(t).getDate()}
+                    </span>
+                  ))}
+                  {/* etichetta Oggi nell'intestazione */}
+                  <span className="absolute top-1 -translate-x-1/2 rounded bg-ambra px-1 py-px text-[9px] font-bold uppercase text-white"
+                        style={{ left: `${pct(adesso)}%` }}>
+                    oggi
+                  </span>
+                </div>
+              </div>
 
-          <div className="mt-1 space-y-2">
-            {attive.map((g) => (
-              <RigaGantt key={g.pratica.id} g={g} da={da} ampiezza={ampiezza} adesso={adesso} />
-            ))}
-            {attive.length === 0 && (
-              <p className="rounded-xl border border-linea bg-carta p-6 text-center text-sm text-inchiostro/40">
-                Nessuna pratica in lavorazione{filtroTutor ? ` per ${filtroTutor}` : ''}.
-              </p>
-            )}
+              {/* corpo: griglia verticale + linea oggi dietro le righe */}
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-0 grid"
+                     style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr` }}>
+                  <div />
+                  <div className="relative">
+                    {settimane.map((t) => (
+                      <div key={t} className="absolute top-0 bottom-0 w-px bg-inchiostro/[0.06]"
+                           style={{ left: `${pct(t)}%` }} />
+                    ))}
+                    {mesi.map((m) => (
+                      <div key={m.inizio} className="absolute top-0 bottom-0 w-px bg-inchiostro/[0.14]"
+                           style={{ left: `${pct(m.inizio)}%` }} />
+                    ))}
+                    <div className="absolute top-0 bottom-0 z-10 w-0.5 bg-ambra" style={{ left: `${pct(adesso)}%` }} />
+                  </div>
+                </div>
+
+                {attive.map((g) => (
+                  <RigaGantt key={g.pratica.id} g={g} pct={pct} />
+                ))}
+                {attive.length === 0 && (
+                  <p className="p-8 text-center text-sm text-inchiostro/40">
+                    Nessuna pratica in lavorazione{filtroTutor ? ` per ${filtroTutor}` : ''}.
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
           {completate.length > 0 && (
-            <div className="mt-6">
+            <div className="mt-5">
               <button
                 onClick={() => setMostraCompletate(!mostraCompletate)}
                 className="text-xs font-semibold text-inchiostro/50 hover:text-inchiostro"
@@ -301,10 +394,12 @@ export default function Amministrazione() {
                 {mostraCompletate ? '▾' : '▸'} Consegnate ({completate.length})
               </button>
               {mostraCompletate && (
-                <div className="mt-2 space-y-2">
-                  {completate.map((g) => (
-                    <RigaGantt key={g.pratica.id} g={g} da={da} ampiezza={ampiezza} adesso={adesso} />
-                  ))}
+                <div className="mt-2 overflow-x-auto rounded-2xl border border-linea bg-carta shadow-sm">
+                  <div className="min-w-[880px]">
+                    {completate.map((g) => (
+                      <RigaGantt key={g.pratica.id} g={g} pct={pct} />
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

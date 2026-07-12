@@ -15,7 +15,12 @@ import {
   StatoJobVisual,
   StimaVisual,
   URL_VISUAL,
+  VoceePiano,
   creaJobVisual,
+  eliminaERigenera,
+  leggiPianoVisual,
+  leggiReportGiro,
+  modificaVisual,
   scaricaUscitaVisual,
   statoJobVisual,
   stimaCostoVisual,
@@ -41,6 +46,11 @@ export default function BancoVisualBlocco() {
   const [stato, setStato] = useState<StatoJobVisual | null>(null)
   const [errore, setErrore] = useState('')
   const [avvioInCorso, setAvvioInCorso] = useState(false)
+  const [piano, setPiano] = useState<VoceePiano[] | null>(null)
+  const [daEliminare, setDaEliminare] = useState<number[]>([])
+  const [istruzioni, setIstruzioni] = useState<Record<number, string>>({})
+  const [ritoccoInCorso, setRitoccoInCorso] = useState(false)
+  const [reportGiro, setReportGiro] = useState('')
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- lettura iniziale da localStorage
@@ -331,6 +341,112 @@ export default function BancoVisualBlocco() {
                 >
                   ⬇ Scarica il report illustrato ({stato.pdf ? 'PDF' : 'Word'})
                 </button>
+              )}
+
+              {stato?.fase === 'completato' && (stato.loop?.length ?? 0) > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {stato.loop?.map((g) => (
+                    <button
+                      key={g.giro}
+                      onClick={() => leggiReportGiro(token, jobId, g.giro).then(setReportGiro).catch((e) => setErrore(String(e)))}
+                      className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-medium text-inchiostro/60 transition hover:border-petrolio/40 hover:text-petrolio"
+                    >
+                      📋 Report revisore — giro {g.giro}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {reportGiro && (
+                <pre className="mt-3 max-h-80 overflow-y-auto rounded-xl bg-linea/30 p-4 text-xs leading-5 whitespace-pre-wrap text-inchiostro/80">
+                  {reportGiro}
+                </pre>
+              )}
+
+              {/* ✏️ Ritocchi del responsabile: elimina (gratis) o modifica su istruzione */}
+              {stato?.fase === 'completato' && stato.pdf && (
+                <div className="mt-5 rounded-2xl border border-linea bg-carta p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-bold text-inchiostro">✏️ Ritocchi del responsabile</h3>
+                    {!piano && (
+                      <button
+                        onClick={() => leggiPianoVisual(token, jobId).then(setPiano).catch((e) => setErrore(String(e)))}
+                        className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 transition hover:border-petrolio/40 hover:text-petrolio"
+                      >
+                        Mostra i visual del documento
+                      </button>
+                    )}
+                  </div>
+                  {piano && (
+                    <>
+                      <p className="mt-1 text-xs text-inchiostro/50">
+                        Spunta i visual da <strong>eliminare</strong> (rigenerazione gratuita) oppure scrivi
+                        un&apos;istruzione per <strong>modificarne</strong> uno (una chiamata mirata, pochi centesimi).
+                      </p>
+                      <ul className="mt-3 max-h-96 space-y-1.5 overflow-y-auto">
+                        {piano.map((v) => (
+                          <li key={v.indice} className="rounded-xl border border-linea bg-carta px-3 py-2 text-xs">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={daEliminare.includes(v.indice)}
+                                onChange={(e) =>
+                                  setDaEliminare(e.target.checked
+                                    ? [...daEliminare, v.indice]
+                                    : daEliminare.filter((x) => x !== v.indice))
+                                }
+                              />
+                              <span className="rounded-full bg-cyan-50 px-2 py-0.5 font-medium text-cyan-800">{v.tipo}</span>
+                              <span className="truncate font-semibold text-inchiostro">{v.titolo || '(senza titolo)'}</span>
+                            </div>
+                            <div className="mt-1.5 flex gap-2">
+                              <input
+                                value={istruzioni[v.indice] ?? ''}
+                                onChange={(e) => setIstruzioni({ ...istruzioni, [v.indice]: e.target.value })}
+                                placeholder="Istruzione di modifica (es. «trasformalo in grafico a colonne»)"
+                                maxLength={500}
+                                className="w-full rounded-lg border border-linea bg-carta px-2 py-1 text-xs focus:border-petrolio focus:outline-none"
+                              />
+                              <button
+                                disabled={!(istruzioni[v.indice] ?? '').trim() || ritoccoInCorso}
+                                onClick={() => {
+                                  setRitoccoInCorso(true)
+                                  setErrore('')
+                                  modificaVisual(token, jobId, v.indice, (istruzioni[v.indice] ?? '').trim())
+                                    .then(() => leggiPianoVisual(token, jobId).then(setPiano))
+                                    .then(() => statoJobVisual(token, jobId).then(setStato))
+                                    .catch((e) => setErrore(String(e)))
+                                    .finally(() => setRitoccoInCorso(false))
+                                }}
+                                className="shrink-0 rounded-lg bg-amber-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-amber-700 disabled:opacity-30"
+                              >
+                                Modifica (~$0,03)
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                      <button
+                        disabled={daEliminare.length === 0 || ritoccoInCorso}
+                        onClick={() => {
+                          setRitoccoInCorso(true)
+                          setErrore('')
+                          eliminaERigenera(token, jobId, daEliminare)
+                            .then(() => {
+                              setDaEliminare([])
+                              return leggiPianoVisual(token, jobId).then(setPiano)
+                            })
+                            .then(() => statoJobVisual(token, jobId).then(setStato))
+                            .catch((e) => setErrore(String(e)))
+                            .finally(() => setRitoccoInCorso(false))
+                        }}
+                        className="mt-3 w-full rounded-xl bg-petrolio px-4 py-2 text-sm font-semibold text-white transition hover:bg-petrolio-scuro disabled:opacity-30"
+                      >
+                        {ritoccoInCorso ? 'Rigenero…' : `🗑 Elimina ${daEliminare.length} visual e rigenera il PDF (gratis)`}
+                      </button>
+                    </>
+                  )}
+                </div>
               )}
             </>
           )}

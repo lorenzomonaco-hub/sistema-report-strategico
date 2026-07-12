@@ -148,3 +148,49 @@ export async function scaricaUscitaVisual(token: string, jobId: string, formato:
   a.click()
   URL.revokeObjectURL(url)
 }
+
+// ─── Ritocchi del responsabile (dopo il loop) ───
+
+export interface VoceePiano {
+  indice: number
+  tipo: string
+  titolo: string
+  ancora?: number
+}
+
+export async function leggiPianoVisual(token: string, jobId: string): Promise<VoceePiano[]> {
+  const r = await fetch(`${URL_VISUAL}/jobs/${jobId}/piano`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  const j = await esito<{ visual: VoceePiano[] }>(r)
+  return j.visual
+}
+
+/** Elimina i visual selezionati e rigenera il PDF: solo resa, ZERO costo API. */
+export async function eliminaERigenera(token: string, jobId: string, indici: number[]): Promise<{ visual_rimasti: number; eliminati: number; pagine: number }> {
+  const r = await fetch(`${URL_VISUAL}/jobs/${jobId}/rendi`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ elimina: indici }),
+  })
+  return esito(r)
+}
+
+/** Modifica un visual su istruzione: UNA chiamata mirata (~$0,02-0,05). */
+export async function modificaVisual(token: string, jobId: string, indice: number, istruzione: string): Promise<{ fase: string; pagine: number }> {
+  const r = await fetch(`${URL_VISUAL}/jobs/${jobId}/visual/${indice}/modifica`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ istruzione }),
+  })
+  return esito(r)
+}
+
+/** Il report .md del revisore per un giro del loop. */
+export async function leggiReportGiro(token: string, jobId: string, giro: number): Promise<string> {
+  const r = await fetch(`${URL_VISUAL}/jobs/${jobId}/report/${giro}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) throw new Error(`report non disponibile (${r.status})`)
+  return r.text()
+}

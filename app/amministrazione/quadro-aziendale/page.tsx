@@ -10,8 +10,8 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import {
   AGENTE_GRAFICI, AGENTE_IMPAG, AGENTE_TESTO, DAY, EROG_ANOMALIE, EROG_CLIENTI,
-  EROG_PER_STADIO, EROG_STADI, EROG_TOT, FULLAI_AGENTE, FULLAI_INTERAZIONE, GEN,
-  MEDIANA_STAGE2_RECENTE, MEDIANA_STAGE2_STORICO, MEDIANA_STAGE3_RECENTE,
+  EROG_OGGI, EROG_PER_STADIO, EROG_STADI, EROG_TOT, FULLAI_AGENTE, FULLAI_INTERAZIONE, GEN,
+  GIORNO_MS, MEDIANA_STAGE2_RECENTE, MEDIANA_STAGE2_STORICO, MEDIANA_STAGE3_RECENTE,
   MEDIANA_STAGE3_STORICO, MEDIANA_STAGE4_RECENTE, MEDIANA_STAGE4_STORICO, N_FUTURI,
   REVG, REVI, REVT, RigaErog, Schedule, STIMA_LARGA_STAGE2, STIMA_LARGA_STAGE3,
   STIMA_LARGA_STAGE4, StadioErog, VENDITE_MENSILI, fmtData, fmtHM, schedule,
@@ -82,6 +82,34 @@ function RigaBarra({ titolo, sottotitolo, startPct, endPct, bg, testo, etichetta
   )
 }
 
+/** Asse a calendario (giorni di calendario, non lavorativi): serve per il Gantt di consegna reale. */
+function AssiCalendario({ maxDate }: { maxDate: Date }) {
+  const totalDays = Math.max(1, Math.round((maxDate.getTime() - EROG_OGGI.getTime()) / GIORNO_MS))
+  const n = Math.min(6, Math.max(1, totalDays))
+  const seen = new Set<number>()
+  const tacche: { pct: number; label: string }[] = []
+  for (let i = 0; i <= n; i++) {
+    const d = Math.max(0, Math.round((totalDays * i) / n))
+    if (seen.has(d)) continue
+    seen.add(d)
+    tacche.push({ pct: (d / totalDays) * 100, label: fmtData(new Date(EROG_OGGI.getTime() + d * GIORNO_MS)) })
+  }
+  return (
+    <div className="grid border-b border-linea bg-inchiostro/[0.03]" style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr` }}>
+      <div className="flex items-end border-r border-linea px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/40">
+        Cliente
+      </div>
+      <div className="relative h-8">
+        <span className="absolute bottom-1.5 left-0 text-[10px] font-bold text-petrolio-scuro">oggi</span>
+        {tacche.map((t, i) => (
+          <span key={i} className="absolute bottom-1.5 -translate-x-1/2 text-[10px] text-inchiostro/45"
+                style={{ left: `${t.pct}%` }}>{t.label}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function Assi({ maxDays, workdayFn }: { maxDays: number; workdayFn: (n: number) => Date }) {
   const n = Math.min(5, Math.max(1, maxDays - 1))
   const seen = new Set<number>()
@@ -142,6 +170,7 @@ function RigaStadi({ r }: { r: RigaErog }) {
         <p className="flex items-center gap-1.5 truncate text-[13px] font-bold text-inchiostro">
           {r.nome}
           {r.daVerificare && <span className="shrink-0 rounded bg-amber-100 px-1.5 py-px text-[9px] font-bold text-amber-800">DA VERIFICARE</span>}
+          {r.dataApprox && <span className="shrink-0 rounded bg-amber-100 px-1.5 py-px text-[9px] font-bold text-amber-800">DATA STIMATA</span>}
         </p>
         <p className="truncate text-[11px] text-inchiostro/45">{r.azienda} · {r.tutor}</p>
       </div>
@@ -158,6 +187,50 @@ function RigaStadi({ r }: { r: RigaErog }) {
         ) : (
           <p className="text-[11px] text-inchiostro/40">consegna non stimabile</p>
         )}
+      </div>
+    </div>
+  )
+}
+
+type StimaRiga = { r: RigaErog; data: Date; giorniRitardo: number }
+
+/** Gantt reale di consegna: una barra per cliente, da oggi alla data stimata (a maglie larghe), se resta tutto umano. */
+function GanttConsegneUmano() {
+  const righe: StimaRiga[] = EROG_CLIENTI
+    .map((r) => {
+      const s = stimaConsegna(r)
+      return s ? { r, data: s.data, giorniRitardo: s.giorniRitardo } : null
+    })
+    .filter((x): x is StimaRiga => x !== null)
+    .sort((a, b) => a.data.getTime() - b.data.getTime())
+
+  const maxDate = righe.reduce((m, x) => (x.data > m ? x.data : m), EROG_OGGI)
+  const totalDays = Math.max(1, Math.round((maxDate.getTime() - EROG_OGGI.getTime()) / GIORNO_MS))
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-3">
+        <h3 className="font-display text-xl font-bold tracking-tight text-inchiostro">Quando consegniamo, cliente per cliente</h3>
+        <p className="text-[11px] text-inchiostro/45">{righe.length} clienti con una data stimabile su {EROG_TOT}, dal più vicino al più lontano — resta tutto umano</p>
+      </div>
+      <div className="mt-2 overflow-x-auto rounded-2xl border border-linea bg-carta shadow-sm">
+        <div className="min-w-[760px]">
+          <AssiCalendario maxDate={maxDate} />
+          {righe.map(({ r, data, giorniRitardo }, i) => {
+            const overdue = giorniRitardo > 0
+            const rawDays = Math.round((data.getTime() - EROG_OGGI.getTime()) / GIORNO_MS)
+            const endPct = overdue ? 1.5 : Math.max((rawDays / totalDays) * 100, 1.5)
+            const c = STADIO_COLORE[r.stadio]
+            return (
+              <RigaBarra key={r.nome + r.azienda + i} zebra={i % 2 === 0}
+                titolo={r.nome} sottotitolo={`${r.azienda} · ${EROG_STADI[r.stadio - 1].label}`}
+                startPct={0} endPct={endPct}
+                bg={overdue ? 'bg-rose-500' : c.barra} testo={overdue ? 'text-rose-700' : c.testo}
+                etichetta={fmtData(data)}
+                tag={overdue ? `+${giorniRitardo}gg ritardo` : r.daVerificare ? 'da verificare' : r.dataApprox ? 'data stimata' : undefined} />
+            )
+          })}
+        </div>
       </div>
     </div>
   )
@@ -228,6 +301,8 @@ function SezioneErogazione() {
           ))}
         </div>
       </div>
+
+      <GanttConsegneUmano />
 
       <div>
         <div className="flex flex-wrap items-center gap-3">

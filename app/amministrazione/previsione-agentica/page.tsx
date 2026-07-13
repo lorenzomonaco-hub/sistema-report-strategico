@@ -8,7 +8,7 @@
 
 import Link from 'next/link'
 import {
-  EROG_CLIENTI, EROG_STADI, EROG_TOT, GIORNI_AGENTE_RESTANTI, RigaErog,
+  EROG_CLIENTI, EROG_OGGI, EROG_STADI, EROG_TOT, GIORNI_AGENTE_RESTANTI, GIORNO_MS, RigaErog,
   STIMA_LARGA_STAGE2, STIMA_LARGA_STAGE3, STIMA_LARGA_STAGE4, StadioErog,
   fmtData, stimaConsegna, stimaConsegnaAgentica,
 } from '@/lib/quadroaziendale'
@@ -74,6 +74,100 @@ function RigaConfronto({ r }: { r: RigaErog }) {
   )
 }
 
+/** Asse a calendario condiviso dal Gantt di confronto. */
+function AssiConfronto({ maxDate }: { maxDate: Date }) {
+  const totalDays = Math.max(1, Math.round((maxDate.getTime() - EROG_OGGI.getTime()) / GIORNO_MS))
+  const n = Math.min(6, Math.max(1, totalDays))
+  const seen = new Set<number>()
+  const tacche: { pct: number; label: string }[] = []
+  for (let i = 0; i <= n; i++) {
+    const d = Math.max(0, Math.round((totalDays * i) / n))
+    if (seen.has(d)) continue
+    seen.add(d)
+    tacche.push({ pct: (d / totalDays) * 100, label: fmtData(new Date(EROG_OGGI.getTime() + d * GIORNO_MS)) })
+  }
+  return (
+    <div className="grid border-b border-linea bg-inchiostro/[0.03]" style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr` }}>
+      <div className="flex items-end border-r border-linea px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/40">
+        Cliente
+      </div>
+      <div className="relative h-8">
+        <span className="absolute bottom-1.5 left-0 text-[10px] font-bold text-petrolio-scuro">oggi</span>
+        {tacche.map((t, i) => (
+          <span key={i} className="absolute bottom-1.5 -translate-x-1/2 text-[10px] text-inchiostro/45"
+                style={{ left: `${t.pct}%` }}>{t.label}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Riga a due barre sovrapposte: sopra "resta umano" (tenue, lunga — o rossa se già in ritardo), sotto "agente da qui in poi" (piena, corta). */
+function RigaBarraDoppia({ r, humanPct, humanData, humanOverdue, agentPct, agentData, zebra }: {
+  r: RigaErog; humanPct: number; humanData: Date; humanOverdue: boolean; agentPct: number; agentData: Date; zebra: boolean
+}) {
+  return (
+    <div className={`grid items-center gap-3 border-b border-linea/70 last:border-b-0 ${zebra ? 'bg-inchiostro/[0.02]' : ''}`}
+         style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr` }}>
+      <div className="border-r border-linea px-3 py-2">
+        <p className="truncate text-[12.5px] font-bold text-inchiostro">{r.nome}</p>
+        <p className="truncate text-[10.5px] text-inchiostro/45">{r.azienda} · {EROG_STADI[r.stadio - 1].label}</p>
+      </div>
+      <div className="relative h-11">
+        <div className={`absolute top-[28%] h-[7px] -translate-y-1/2 rounded-full ${humanOverdue ? 'bg-rose-400' : 'bg-inchiostro/15'}`} style={{ left: 0, width: `${Math.max(humanPct, 1.2)}%` }} />
+        <span className={`absolute top-[28%] -translate-y-1/2 whitespace-nowrap text-[9.5px] font-semibold ${humanOverdue ? 'text-rose-700' : 'text-inchiostro/45'}`}
+              style={{ left: `${Math.max(humanPct, 1.2)}%`, paddingLeft: 6 }}>{humanOverdue ? 'già in ritardo' : fmtData(humanData)}</span>
+        <div className="absolute top-[74%] h-[7px] -translate-y-1/2 rounded-full bg-petrolio" style={{ left: 0, width: `${Math.max(agentPct, 1.2)}%` }} />
+        <span className="absolute top-[74%] -translate-y-1/2 whitespace-nowrap text-[9.5px] font-bold text-petrolio-scuro"
+              style={{ left: `${Math.max(agentPct, 1.2)}%`, paddingLeft: 6 }}>{fmtData(agentData)}</span>
+      </div>
+    </div>
+  )
+}
+
+type ConfrontoRiga = { r: RigaErog; humanData: Date; humanOverdue: boolean; agentData: Date; risparmio: number }
+
+/** Gantt di confronto: per ogni cliente, la barra "resta umano" (tenue) contro "agente da qui in poi" (piena) — stesso asse. */
+function GanttConfronto() {
+  const righe: ConfrontoRiga[] = EROG_CLIENTI
+    .map((r) => {
+      const baseline = stimaConsegna(r)
+      const agentica = stimaConsegnaAgentica(r)
+      if (!baseline || agentica?.tipo !== 'data') return null
+      return { r, humanData: baseline.data, humanOverdue: baseline.giorniRitardo > 0, agentData: agentica.data, risparmio: Math.max(agentica.giorniRisparmiati, 0) }
+    })
+    .filter((x): x is ConfrontoRiga => x !== null)
+    .sort((a, b) => a.humanData.getTime() - b.humanData.getTime())
+
+  const maxDate = righe.reduce((m, x) => (x.humanData > m ? x.humanData : m), EROG_OGGI)
+  const totalDays = Math.max(1, Math.round((maxDate.getTime() - EROG_OGGI.getTime()) / GIORNO_MS))
+  const pct = (d: Date) => Math.max((Math.round((d.getTime() - EROG_OGGI.getTime()) / GIORNO_MS) / totalDays) * 100, 0)
+
+  return (
+    <div className="mt-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <h3 className="font-display text-xl font-bold tracking-tight text-inchiostro">Il vantaggio, in un colpo d&apos;occhio</h3>
+        <div className="ml-auto flex items-center gap-4 text-[11px] text-inchiostro/55">
+          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-4 rounded-full bg-inchiostro/15" />resta umano</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-4 rounded-full bg-rose-400" />resta umano, già in ritardo</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-4 rounded-full bg-petrolio" />agente da qui in poi</span>
+        </div>
+      </div>
+      <p className="mt-1 text-[11px] text-inchiostro/45">{righe.length} clienti con una data stimabile su {EROG_TOT}, dal più vicino al più lontano</p>
+      <div className="mt-2 overflow-x-auto rounded-2xl border border-linea bg-carta shadow-sm">
+        <div className="min-w-[760px]">
+          <AssiConfronto maxDate={maxDate} />
+          {righe.map((x, i) => (
+            <RigaBarraDoppia key={x.r.nome + x.r.azienda + i} r={x.r} zebra={i % 2 === 0}
+              humanPct={x.humanOverdue ? 1.2 : pct(x.humanData)} humanData={x.humanData} humanOverdue={x.humanOverdue}
+              agentPct={pct(x.agentData)} agentData={x.agentData} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PrevisioneAgentica() {
   const conData = EROG_CLIENTI
     .map((r) => ({ r, a: stimaConsegnaAgentica(r) }))
@@ -125,6 +219,8 @@ export default function PrevisioneAgentica() {
             </Carta>
           </div>
         </div>
+
+        <GanttConfronto />
 
         <div className="mt-6">
           <h3 className="font-display text-xl font-bold tracking-tight text-inchiostro">Cliente per cliente</h3>

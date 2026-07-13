@@ -1,10 +1,11 @@
 // ─── Quadro Aziendale ───
 // Due code distinte: i clienti già in erogazione (dati reali dal file di
-// Grippo, 13 lug 2026) e i 58 progetti futuri in attesa di produzione
-// (modello a leve: quante persone, chi assorbe la revisione/grafica).
+// Grippo, verificato 14 lug 2026 contro il foglio maestro aggiornato) e i 58
+// progetti futuri in attesa di produzione (modello a leve: quante persone,
+// chi assorbe la revisione/grafica).
 
 export const GIORNO_MS = 86_400_000
-const OGGI = new Date(2026, 6, 13) // lunedì 13 luglio 2026
+const OGGI = new Date(2026, 6, 14) // martedì 14 luglio 2026
 
 const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic']
 
@@ -161,6 +162,7 @@ export type RigaErog = {
   stadio: StadioErog
   dataStadio?: string // data del passaggio più recente, se nota
   daVerificare?: boolean // fonti in conflitto, vedi nota
+  dataApprox?: boolean // la casella del foglio è spuntata ma senza data: uso la data promessa più vicina, vedi nota
 }
 
 // Durate empiriche (giorni lavorativi) dal foglio "CONSULENZE FRANK - Report in
@@ -359,7 +361,7 @@ export const EROG_CLIENTI: RigaErog[] = [
   // ---- stadio 3: revisione Grippo (12) ----
   { nome: 'Agostino Romano', azienda: 'Romano SPA (Food truck)', tutor: 'Anissia Cabiddu', servizio: 'Piano Mktg', stadio: 3, dataStadio: '03/06' },
   { nome: 'Daniele Sciannimanico', azienda: 'Scianni SRL', tutor: 'Sabrina Piazzolla', servizio: 'Strategica + Upsell', stadio: 3, dataStadio: '28/05' },
-  { nome: 'Davide Ghelardi', azienda: 'Ristora SAS', tutor: 'Anissia Cabiddu', servizio: 'Strategica', stadio: 3 },
+  { nome: 'Davide Ghelardi', azienda: 'Ristora SAS', tutor: 'Anissia Cabiddu', servizio: 'Strategica', stadio: 3, dataStadio: '09/06', dataApprox: true },
   { nome: 'Filippo Griggio', azienda: 'Car For Life SRL', tutor: 'Silvia Andreani', servizio: 'Piano Mktg', stadio: 3, dataStadio: '18/06' },
   { nome: 'Gabriele Cascone', azienda: 'Studio di Architettura', tutor: 'Sabrina Piazzolla', servizio: 'Strategica', stadio: 3, dataStadio: '03/06' },
   { nome: 'Giovanni Mazzamati', azienda: '80 Fame SRL', tutor: 'Andrea Busellu', servizio: 'Strategica', stadio: 3, dataStadio: '22/06' },
@@ -372,7 +374,7 @@ export const EROG_CLIENTI: RigaErog[] = [
 
   // ---- stadio 4: grafica, Valentino (9) ----
   { nome: 'Claudio Virdis', azienda: 'Gruppoconsilia SRL', tutor: 'Leonardo Mazzon', servizio: 'Strategica', stadio: 4, dataStadio: '06/07', daVerificare: true },
-  { nome: 'Davide Raimondi', azienda: 'DR Fasciaterapeuta STP', tutor: 'Cristian Frigerio', servizio: 'Piano Mktg', stadio: 4, dataStadio: '02/07' },
+  { nome: 'Davide Raimondi', azienda: 'DR Fasciaterapeuta STP', tutor: 'Cristian Frigerio', servizio: 'Piano Mktg', stadio: 4, dataStadio: '13/07' },
   { nome: 'Emanuele Soffiotto', azienda: "La Società dell'Allegria SRL", tutor: 'Matteo Novati', servizio: 'Piano Mktg', stadio: 4, dataStadio: '08/07' },
   { nome: 'Francesco Surace', azienda: 'SF Dental SRL', tutor: 'Anissia Cabiddu', servizio: 'Piano Mktg', stadio: 4, dataStadio: '06/07' },
   { nome: 'Gaetano Rodittis', azienda: 'CTA SRL', tutor: 'Matteo Novati', servizio: 'Piano Mktg', stadio: 4, dataStadio: '09/07' },
@@ -391,6 +393,8 @@ export const EROG_ANOMALIE: { icona: string; testo: string }[] = [
   { icona: '⚠', testo: 'Maddalena Tessitore — in revisione, ma bloccata da oltre 5 mesi (arrivata 02/02, rimandata a Carlo per un check sulla fase 3). Fuori pattern, va sciolta a mano.' },
   { icona: '⚠', testo: "Gheorghe Cazan e Claudio Virdis compaiono con due progetti paralleli in fonti diverse — posizionati con la data più recente, ma vanno controllati a mano (marcati “da verificare”)." },
   { icona: '⚠', testo: '113 righe del foglio maestro hanno la casella "questionario lavorato" non spuntata pur avendo le fasi successive già completate — quasi certamente pratiche vecchie mai aggiornate, non lavoro reale. Escluse dal conteggio.' },
+  { icona: '⚠', testo: 'Davide Ghelardi — la casella "invio a Grippo" è spuntata ma senza data nel foglio. Uso 09/06 (la data promessa dal copy nella nota "questionario lavorato"), segnato "data stimata": è l\'unico cliente su 35 senza una data sorgente diretta.' },
+  { icona: '⚠', testo: 'Davide Raimondi — risulta inviato ai grafici due volte (02/07 e 13/07), segno di una rilavorazione. Uso la data più recente (13/07) come inizio dello stadio attuale.' },
 ]
 
 export const EROG_STADI = [

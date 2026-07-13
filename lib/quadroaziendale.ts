@@ -156,6 +156,60 @@ export type RigaErog = {
   daVerificare?: boolean // fonti in conflitto, vedi nota
 }
 
+// Mediane empiriche (giorni lavorativi) calcolate dalle date reali del foglio
+// "CONSULENZE FRANK - Report in lavorazione" (317 righe, 13 lug 2026):
+//  stage2 = QUESTIONARIO RICEVUTO → LAVORATO (scrittura copy) — mediana su 107 casi validi
+//  stage3 = INVIO → RICEVUTO da Grippo (revisione testo)      — mediana su 195 casi validi
+//  stage4 = INVIO → RICEVUTO dai grafici (Valentino)          — mediana su 198 casi validi
+// Nessuna stima per lo stadio 1: non esiste una data di "richiesta documenti" nel
+// foglio, quindi non c'è un punto di partenza da cui contare.
+export const MEDIANA_STAGE2 = 72
+export const MEDIANA_STAGE3 = 15
+export const MEDIANA_STAGE4 = 3
+
+function parseDataStadio(s: string): Date | null {
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})$/)
+  if (!m) return null
+  return new Date(2026, Number(m[2]) - 1, Number(m[1]))
+}
+
+function workdayAdd(d: Date, n: number): Date {
+  const r = new Date(d)
+  let added = 0
+  while (added < n) {
+    r.setDate(r.getDate() + 1)
+    if (r.getDay() !== 0 && r.getDay() !== 6) added++
+  }
+  return r
+}
+
+function workdaysBetween(d1: Date, d2: Date): number {
+  if (d2 < d1) return -workdaysBetween(d2, d1)
+  let n = 0
+  const d = new Date(d1)
+  while (d < d2) {
+    d.setDate(d.getDate() + 1)
+    if (d.getDay() !== 0 && d.getDay() !== 6) n++
+  }
+  return n
+}
+
+/** Data di consegna stimata dal passaggio corrente in avanti, con le mediane storiche. Nullo se non calcolabile. */
+export function stimaConsegna(r: RigaErog): { data: Date; giorniRitardo: number } | null {
+  if (!r.dataStadio) return null
+  const d0 = parseDataStadio(r.dataStadio)
+  if (!d0) return null
+  const restante =
+    r.stadio === 2 ? MEDIANA_STAGE2 + MEDIANA_STAGE3 + MEDIANA_STAGE4
+    : r.stadio === 3 ? MEDIANA_STAGE3 + MEDIANA_STAGE4
+    : r.stadio === 4 ? MEDIANA_STAGE4
+    : null
+  if (restante == null) return null
+  const data = workdayAdd(d0, restante)
+  const giorniRitardo = data < OGGI ? workdaysBetween(data, OGGI) : 0
+  return { data, giorniRitardo }
+}
+
 export const EROG_CLIENTI: RigaErog[] = [
   // ---- stadio 1: informazioni mancanti (52) ----
   { nome: 'Agostino Romano', azienda: 'Romano SPA', tutor: 'Anissia Cabiddu', servizio: '2 piani mktg', stadio: 1 },
@@ -243,7 +297,7 @@ export const EROG_CLIENTI: RigaErog[] = [
 
   // ---- stadio 4: grafica, Valentino (9) ----
   { nome: 'Claudio Virdis', azienda: 'Gruppoconsilia SRL', tutor: 'Leonardo Mazzon', servizio: 'Strategica', stadio: 4, dataStadio: '06/07', daVerificare: true },
-  { nome: 'Davide Raimondi', azienda: 'DR Fasciaterapeuta STP', tutor: 'Cristian Frigerio', servizio: 'Piano Mktg', stadio: 4, dataStadio: '02-13/07' },
+  { nome: 'Davide Raimondi', azienda: 'DR Fasciaterapeuta STP', tutor: 'Cristian Frigerio', servizio: 'Piano Mktg', stadio: 4, dataStadio: '02/07' },
   { nome: 'Emanuele Soffiotto', azienda: "La Società dell'Allegria SRL", tutor: 'Matteo Novati', servizio: 'Piano Mktg', stadio: 4, dataStadio: '08/07' },
   { nome: 'Francesco Surace', azienda: 'SF Dental SRL', tutor: 'Anissia Cabiddu', servizio: 'Piano Mktg', stadio: 4, dataStadio: '06/07' },
   { nome: 'Gaetano Rodittis', azienda: 'CTA SRL', tutor: 'Matteo Novati', servizio: 'Piano Mktg', stadio: 4, dataStadio: '09/07' },

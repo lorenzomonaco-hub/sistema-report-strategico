@@ -11,8 +11,8 @@ import { useMemo, useState } from 'react'
 import {
   AGENTE_GRAFICI, AGENTE_IMPAG, AGENTE_TESTO, DAY, EROG_ANOMALIE, EROG_CLIENTI,
   EROG_PER_STADIO, EROG_STADI, EROG_TOT, FULLAI_AGENTE, FULLAI_INTERAZIONE, GEN,
-  N_FUTURI, REVG, REVI, REVT, RigaErog, Schedule, StadioErog, fmtData, fmtHM,
-  schedule, workday,
+  MEDIANA_STAGE2, MEDIANA_STAGE3, MEDIANA_STAGE4, N_FUTURI, REVG, REVI, REVT,
+  RigaErog, Schedule, StadioErog, fmtData, fmtHM, schedule, stimaConsegna, workday,
 } from '@/lib/quadroaziendale'
 
 const LARGHEZZA_TABELLA = 260
@@ -131,9 +131,10 @@ function SegmentiStadi({ stadio }: { stadio: StadioErog }) {
 function RigaStadi({ r }: { r: RigaErog }) {
   const info = EROG_STADI[r.stadio - 1]
   const c = STADIO_COLORE[r.stadio]
+  const stima = stimaConsegna(r)
   return (
     <div className="grid items-center gap-3 border-b border-linea/70 px-3 py-2.5 last:border-b-0 hover:bg-inchiostro/[0.02]"
-         style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr 180px` }}>
+         style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr 210px` }}>
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 truncate text-[13px] font-bold text-inchiostro">
           {r.nome}
@@ -142,8 +143,18 @@ function RigaStadi({ r }: { r: RigaErog }) {
         <p className="truncate text-[11px] text-inchiostro/45">{r.azienda} · {r.tutor}</p>
       </div>
       <SegmentiStadi stadio={r.stadio} />
-      <div className={`text-right text-[11px] font-semibold ${c.testo}`}>
-        {info.label}{r.dataStadio ? <span className="text-inchiostro/40"> · {r.dataStadio}</span> : ''}
+      <div className="text-right">
+        <p className={`text-[11px] font-semibold ${c.testo}`}>{info.label}</p>
+        {stima ? (
+          <p className="text-[11px]">
+            <span className="font-bold text-inchiostro">consegna stimata {fmtData(stima.data)}</span>
+            {stima.giorniRitardo > 0 && (
+              <span className="ml-1 rounded bg-rose-100 px-1 py-px text-[9px] font-bold text-rose-700">+{stima.giorniRitardo}gg ritardo</span>
+            )}
+          </p>
+        ) : (
+          <p className="text-[11px] text-inchiostro/40">consegna non stimabile</p>
+        )}
       </div>
     </div>
   )
@@ -157,6 +168,15 @@ function SezioneErogazione() {
         {EROG_STADI.map((s, i) => (
           <Statistica key={s.n} label={`${s.n} · ${s.label}`} valore={String(EROG_PER_STADIO[i])} sub={s.sub} tinta={STADIO_COLORE[s.n].testo} />
         ))}
+      </div>
+
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Quanto dura ogni passaggio, senza agenti (mediana storica)</h3>
+        <div className="mt-2 grid grid-cols-3 gap-3">
+          <Statistica label="2 · Il copy deve lavorarlo" valore={`${MEDIANA_STAGE2} gg`} sub="mediana su 107 casi validi — molto variabile (1–159 gg)" tinta={STADIO_COLORE[2].testo} />
+          <Statistica label="3 · Revisione Grippo" valore={`${MEDIANA_STAGE3} gg`} sub="mediana su 195 casi validi" tinta={STADIO_COLORE[3].testo} />
+          <Statistica label="4 · Grafica — Valentino" valore={`${MEDIANA_STAGE4} gg`} sub="mediana su 198 casi validi, stabile" tinta={STADIO_COLORE[4].testo} />
+        </div>
       </div>
 
       <div>
@@ -185,12 +205,14 @@ function SezioneErogazione() {
         <div className="mt-2 overflow-x-auto rounded-2xl border border-linea bg-carta shadow-sm">
           <div className="min-w-[760px]">
             <div className="grid items-center gap-3 border-b border-linea bg-inchiostro/[0.03] px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/40"
-                 style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr 180px` }}>
+                 style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr 210px` }}>
               <div>Cliente · azienda · tutor</div>
               <div>Passaggio 1 → 2 → 3 → 4</div>
-              <div className="text-right">Stadio attuale</div>
+              <div className="text-right">Stadio attuale · consegna stimata</div>
             </div>
-            {([1, 2, 3, 4] as StadioErog[]).map((stadioNum) => {
+            {/* attivi (2,3,4 — davvero in lavorazione da qualcuno) in alto; i bloccati per mancanza di
+                informazioni (1) in fondo, perché non sono "in produzione", sono in attesa del cliente */}
+            {([4, 3, 2, 1] as StadioErog[]).map((stadioNum) => {
               const righe = EROG_CLIENTI.filter((r) => r.stadio === stadioNum)
               const info = EROG_STADI[stadioNum - 1]
               return (
@@ -209,6 +231,8 @@ function SezioneErogazione() {
       <Carta className="text-xs leading-relaxed text-inchiostro/65">
         <p><b className="text-inchiostro">Da dove vengono questi dati.</b> Dal foglio &quot;CONSULENZE FRANK - Report in lavorazione&quot; (317 righe, copertura completa) più la coda di ingresso &quot;Questionari ricevuti da elaborare&quot;. Lo stadio di ognuno è determinato dalle spunte reali del foglio, non da una stima: questionario ricevuto → lavorato dal copy → inviato/ricevuto da Grippo (fase 4, revisione testo) → inviato/ricevuto dai grafici (fase 6, Valentino).</p>
         <p className="mt-2">Tre clienti (Andrea Novella, Massimiliano Rea, Nicolò Donnantuono) il foglio maestro li segnava ancora in stadio 1, ma la coda di ingresso ha date più recenti — spostati in stadio 2 perché quella fonte è più fresca. Stesso motivo per cui Alessio Barcello, presente in entrambe le fonti, resta in stadio 2.</p>
+        <p className="mt-2"><b className="text-inchiostro">Come calcolo la consegna stimata.</b> Dalle stesse righe storiche del foglio, chiuse per davvero, ho misurato quanto dura ogni passaggio senza l&apos;aiuto degli agenti: <b className="text-inchiostro">{MEDIANA_STAGE2} giorni lavorativi</b> mediana per la scrittura del copy, <b className="text-inchiostro">{MEDIANA_STAGE3}</b> per la revisione di Grippo, <b className="text-inchiostro">{MEDIANA_STAGE4}</b> per la grafica di Valentino. Per ogni cliente attivo prendo la data in cui è entrato nel suo stadio attuale e ci aggiungo le mediane dei passaggi che gli restano. Se il risultato è già nel passato, il cliente è oltre la mediana storica e lo segnalo in rosso con i giorni di ritardo — non è un errore di calcolo, è che quella pratica sta impiegando più del solito. Lo stadio 1 non ha una stima: il foglio non registra quando i documenti sono stati richiesti, solo quando arrivano.</p>
+        <p className="mt-2 text-inchiostro/50">La scrittura del copy ha una variabilità enorme (da 1 a 159 giorni lavorativi) — la mediana di {MEDIANA_STAGE2} giorni è un punto di partenza, non una promessa per un singolo cliente.</p>
       </Carta>
     </div>
   )

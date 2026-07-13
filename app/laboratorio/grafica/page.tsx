@@ -153,8 +153,17 @@ export default function BancoGrafica() {
           </div>
           <input
             type="file"
-            accept=".pdf"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null
+              const nome = (f?.name ?? '').toLowerCase()
+              if (f && !nome.endsWith('.docx') && !nome.endsWith('.pdf')) {
+                setErrore(`«${f.name}» non va bene: carica il Word (.docx) prodotto dalla fase 6 (o un PDF).`)
+                setFile(null)
+                return
+              }
+              setErrore('')
+              setFile(f)
+            }}
             className="mt-3 block w-full text-sm text-inchiostro/60 file:mr-3 file:rounded-xl file:border-0 file:bg-petrolio file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-petrolio-scuro"
           />
         </section>
@@ -177,7 +186,7 @@ export default function BancoGrafica() {
               </button>
             )}
           </div>
-          {!jobId && <p className="mt-2 text-sm text-inchiostro/50">Servono: token, cliente e un PDF.</p>}
+          {!jobId && <p className="mt-2 text-sm text-inchiostro/50">Servono: token, cliente e il <strong>Word (.docx) della fase 6</strong> (con i visual già dentro).</p>}
 
           {jobId && (
             <>

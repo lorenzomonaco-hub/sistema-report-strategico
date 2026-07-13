@@ -1,4 +1,4 @@
-import { Fase, FaseId, Pratica } from './types'
+import { ASSESSFIRST_TIPI, Fase, FaseId, Pratica } from './types'
 
 /** Le 11 fasi della pipeline v2, in ordine.
  *  Tocchi umani: Tutor (1-2), Copy (checkpoint-copy e approvazione-finale).
@@ -45,17 +45,24 @@ export const statoCommerciale = (id: FaseId): { label: string; badge: string } =
 
 /** Stato della cartella cliente: cosa c'è e cosa manca per «Cliente pronto».
  *  Nel flusso v2 carica TUTTO il tutor (anche gli AssessFirst). */
+/** I 4 AssessFirst di una persona sono tutti presenti? */
+export function assessFirstCompleti(p: Pratica, nome: string): boolean {
+  return ASSESSFIRST_TIPI.every((s) =>
+    p.allegati.some((a) => a.tipo === 'assessfirst' && a.dipendente === nome && a.sottotipo === s)
+  )
+}
+
 export function statoCartella(p: Pratica) {
   const ha = (tipo: string) => p.allegati.some((a) => a.tipo === tipo)
-  const assessFatti = p.dipendenti.filter((d) => p.allegati.some((a) => a.tipo === 'assessfirst' && a.dipendente === d.nome))
+  const personeComplete = p.dipendenti.filter((d) => assessFirstCompleti(p, d.nome))
   const voci = [
-    { chiave: 'questionario', label: 'Questionario compilato', responsabile: 'Tutor', fatto: ha('questionario') },
-    { chiave: 'trascrizione', label: 'Trascrizione analisi', responsabile: 'Tutor', fatto: ha('trascrizione') },
+    { chiave: 'questionario', label: 'Questionario aziendale', responsabile: 'Venditore', fatto: ha('questionario') },
+    { chiave: 'trascrizione', label: 'Trascrizione analisi', responsabile: 'Venditore', fatto: ha('trascrizione') },
     {
       chiave: 'assessfirst',
-      label: `AssessFirst dipendenti (${assessFatti.length}/${p.dipendenti.length})`,
-      responsabile: 'Tutor',
-      fatto: p.dipendenti.length > 0 && assessFatti.length === p.dipendenti.length,
+      label: `AssessFirst per persona — 4 file a testa (${personeComplete.length}/${p.dipendenti.length} complete)`,
+      responsabile: 'Venditore',
+      fatto: p.dipendenti.length > 0 && personeComplete.length === p.dipendenti.length,
     },
   ]
   return { voci, completa: voci.every((v) => v.fatto) }

@@ -40,9 +40,19 @@ export interface DocumentoAllegato {
   dataCaricamento: string
   /** per gli AssessFirst: il dipendente a cui si riferisce il test */
   dipendente?: string
-  /** contenuto visualizzabile del documento (demo) */
+  /** per gli AssessFirst: quale dei 4 (SWIPE | DRIVE | BRAIN | Comportamenti) */
+  sottotipo?: string
+  /** id del file REALE nello storage del blocco dati (persiste fino alla 4a) */
+  fileId?: string
+  /** dimensione in byte del file caricato */
+  dimensione?: number
+  /** contenuto visualizzabile del documento (demo/legacy) */
   contenuto?: string
 }
+
+/** I 4 documenti AssessFirst che il venditore carica per ogni persona. */
+export const ASSESSFIRST_TIPI = ['SWIPE', 'DRIVE', 'BRAIN', 'Comportamenti chiave'] as const
+export type AssessFirstTipo = (typeof ASSESSFIRST_TIPI)[number]
 
 export interface VersioneDocumento {
   id: string
@@ -67,12 +77,28 @@ export type TipoLavoro = 'branding' | 'consulenza'
 /** Qualifica della persona che fa il test AssessFirst: decide il registro del report 4a. */
 export type Qualifica = 'titolare' | 'socio' | 'dipendente'
 
+/** I ruoli selezionabili dal tutor (menù a tendina). Estendibile: Lorenzo ne
+ *  aggiungerà altri. «Altro» abilita un campo libero. */
+export const RUOLI = ['Imprenditore', 'Socio', 'Venditore', 'Marketing', 'Segretaria', 'Altro'] as const
+export type Ruolo = (typeof RUOLI)[number]
+
+/** Dal ruolo deriviamo la qualifica che serve al 4a (casi a/b/c):
+ *  Imprenditore = titolare, Socio = socio, tutti gli altri = dipendente. */
+export function qualificaDaRuolo(ruolo: string): Qualifica {
+  const r = (ruolo || '').trim().toLowerCase()
+  if (r === 'imprenditore') return 'titolare'
+  if (r === 'socio') return 'socio'
+  return 'dipendente'
+}
+
 /** Persona registrata dal tutor alla vendita: da qui il 4a deriva tutto in automatico. */
 export interface PersonaAF {
   /** nome e cognome ESATTI (finiscono nell'intestazione del report) */
   nome: string
+  /** email personale della persona */
+  email: string
   qualifica: Qualifica
-  /** ruolo operativo reale, es. «Venditore», «Responsabile produzione» */
+  /** ruolo operativo scelto dal menù (o testo libero se «Altro») */
   ruolo: string
 }
 

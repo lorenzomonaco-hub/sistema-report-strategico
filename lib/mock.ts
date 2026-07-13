@@ -1,5 +1,5 @@
 import {
-  PersonaAF, AppState, DocumentoAllegato, Pratica } from './types'
+  PersonaAF, AppState, ASSESSFIRST_TIPI, DocumentoAllegato, Pratica } from './types'
 
 // ─── Contenuti documento di esempio (demo) ───
 
@@ -143,8 +143,8 @@ const alQuestionario = (data: string): DocumentoAllegato => ({
 const alTrascrizione = (data: string): DocumentoAllegato => ({
   id: `al-t-${data}`, nome: 'Trascrizione analisi.pdf', tipo: 'trascrizione', caricatoDa: 'Giulia T. (Tutor)', dataCaricamento: data, contenuto: TRASCRIZIONE_MOCK,
 })
-const alAssess = (dip: string, data: string): DocumentoAllegato => ({
-  id: `al-a-${dip}-${data}`, nome: `AssessFirst - ${dip}.pdf`, tipo: 'assessfirst', caricatoDa: 'Giulia T. (Tutor)', dataCaricamento: data, dipendente: dip, contenuto: ASSESSFIRST_MOCK(dip),
+const alAssess = (dip: string, data: string, sottotipo = 'SWIPE'): DocumentoAllegato => ({
+  id: `al-a-${dip}-${sottotipo}-${data}`, nome: `AssessFirst ${sottotipo} - ${dip}.pdf`, tipo: 'assessfirst', sottotipo, caricatoDa: 'Giulia T. (Tutor)', dataCaricamento: data, dipendente: dip, contenuto: ASSESSFIRST_MOCK(dip),
 })
 const alReportAF = (dip: string, data: string): DocumentoAllegato => ({
   id: `al-r-${dip}-${data}`, nome: `Report AssessFirst - ${dip}.pdf`, tipo: 'report-af', caricatoDa: 'Agente Report AF', dataCaricamento: data, dipendente: dip, contenuto: REPORT_IRENE_MOCK,
@@ -152,7 +152,8 @@ const alReportAF = (dip: string, data: string): DocumentoAllegato => ({
 
 // ─── Pratiche di esempio ───
 
-const pers = (nome: string, qualifica: PersonaAF['qualifica'], ruolo: string): PersonaAF => ({ nome, qualifica, ruolo })
+const pers = (nome: string, qualifica: PersonaAF['qualifica'], ruolo: string): PersonaAF =>
+  ({ nome, email: `${nome.toLowerCase().replace(/\s+/g, '.')}@esempio.it`, qualifica, ruolo })
 
 const p = (
   id: string,
@@ -182,7 +183,8 @@ const p = (
 const cartellaCompleta = (dipendenti: string[], data: string): DocumentoAllegato[] => [
   alQuestionario(data),
   alTrascrizione(data),
-  ...dipendenti.map((d) => alAssess(d, data)),
+  // i 4 AssessFirst per ogni persona (SWIPE/DRIVE/BRAIN/Comportamenti chiave)
+  ...dipendenti.flatMap((d) => ASSESSFIRST_TIPI.map((s) => alAssess(d, data, s))),
 ]
 
 const cartellaConReportAF = (dipendenti: string[], data: string): DocumentoAllegato[] => [

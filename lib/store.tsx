@@ -5,18 +5,15 @@
 // pipeline v2 — ogni step autonomo qui è un'azione "simula avanzamento".
 
 import React, { createContext, useContext, useEffect, useReducer, useRef } from 'react'
-import { AppState, Apprendimento, FaseId, PersonaAF, Pratica, VersioneDocumento, relazioneAF } from './types'
+import { AppState, Apprendimento, DocumentoAllegato, FaseId, PersonaAF, Pratica, VersioneDocumento, relazioneAF } from './types'
 import { CronologiaFasi, leggiStatoCondiviso, scriviStatoCondiviso, tokenDati } from './datiblocco'
 import { documentiTutorPronti, faseSuccessiva, faseById } from './fasi'
 import { batteriaIdPerTipo, batteriaPerTipo, ETICHETTA_TIPO } from './batterie'
 import {
-  ASSESSFIRST_MOCK,
-  QUESTIONARIO_MOCK,
   REPORT_AI_MOCK,
   REPORT_IRENE_MOCK,
   REPORT_VISUAL_MOCK,
   SEED_STATE,
-  TRASCRIZIONE_MOCK,
 } from './mock'
 
 // v4: pipeline v2 — eliminati i compartimenti 4/5, tutor carica tutto,
@@ -46,8 +43,8 @@ type Azione =
   | { type: 'RESET' }
   | { type: 'CREA_PRATICA'; azienda: string; cliente: string; email: string; dipendenti: PersonaAF[] }
   | { type: 'INVIA_ASSESSMENT'; praticaId: string }
-  | { type: 'CARICA_QUESTIONARIO_TRASCRIZIONE'; praticaId: string }
-  | { type: 'CARICA_ASSESSFIRST'; praticaId: string; dipendenti: string[] }
+  | { type: 'REGISTRA_ALLEGATO'; praticaId: string; allegato: DocumentoAllegato }
+  | { type: 'RIMUOVI_ALLEGATO'; praticaId: string; allegatoId: string }
   | { type: 'MODIFICA_REPORT_AF'; praticaId: string; allegatoId: string; contenuto: string }
   | { type: 'CONFERMA_REPORT_AF'; praticaId: string }
   | { type: 'CLIENTE_PRONTO'; praticaId: string }
@@ -171,13 +168,15 @@ function reducer(state: AppState, azione: Azione): AppState {
         tutor: 'Giulia T.',
         dipendenti: azione.dipendenti,
         tipoLavoro: null,
-        faseCorrente: 'vendita',
+        // La registrazione porta dritto alla raccolta documenti (fase 2):
+        // il venditore carica subito i file, senza passaggi intermedi.
+        faseCorrente: 'raccolta-documenti',
         dataCreazione: adesso,
         allegati: [],
         versioni: [],
         storico: [
-          { fase: 'vendita', azione: 'Vendita registrata dal tutor', autore: 'Giulia T. (Tutor)', dataOra: adesso },
-          { fase: 'vendita', azione: 'Email di notifica inviata a tutor e Irene (simulata)', autore: 'Sistema', dataOra: adesso },
+          { fase: 'vendita', azione: 'Cliente registrato dal tutor (fase 1)', autore: 'Giulia T. (Tutor)', dataOra: adesso },
+          { fase: 'raccolta-documenti', azione: 'In attesa dei documenti (questionario, trascrizione, AssessFirst)', autore: 'Sistema', dataOra: adesso },
         ],
       }
       return { ...state, pratiche: [nuova, ...state.pratiche] }
@@ -193,38 +192,28 @@ function reducer(state: AppState, azione: Azione): AppState {
         ],
       }))
 
-    case 'CARICA_QUESTIONARIO_TRASCRIZIONE':
-      return aggiornaPratica(state, azione.praticaId, (p) => ({
-        ...p,
-        allegati: [
-          ...p.allegati.filter((a) => a.tipo !== 'questionario' && a.tipo !== 'trascrizione'),
-          { id: `al-${uid()}`, nome: 'Questionario compilato.pdf', tipo: 'questionario', caricatoDa: 'Giulia T. (Tutor)', dataCaricamento: ora(), contenuto: QUESTIONARIO_MOCK },
-          { id: `al-${uid()}`, nome: 'Trascrizione analisi.pdf', tipo: 'trascrizione', caricatoDa: 'Giulia T. (Tutor)', dataCaricamento: ora(), contenuto: TRASCRIZIONE_MOCK },
-        ],
-        storico: [...p.storico, { fase: 'raccolta-documenti', azione: 'Questionario e trascrizione caricati', autore: 'Giulia T. (Tutor)', dataOra: ora() }],
-      }))
+    case 'REGISTRA_ALLEGATO':
+      // Registra il riferimento a un file REALE appena caricato nello storage.
+      // Se esiste già un allegato dello stesso tipo/dipendente/sottotipo, lo
+      // sostituisce (ri-caricamento): niente doppioni.
+      return aggiornaPratica(state, azione.praticaId, (p) => {
+        const a = azione.allegato
+        const stesso = (x: DocumentoAllegato) =>
+          x.tipo === a.tipo && (x.dipendente ?? '') === (a.dipendente ?? '') && (x.sottotipo ?? '') === (a.sottotipo ?? '')
+        return {
+          ...p,
+          allegati: [...p.allegati.filter((x) => !stesso(x)), a],
+          storico: [
+            ...p.storico,
+            { fase: p.faseCorrente, azione: `Caricato: ${a.nome}${a.dipendente ? ` (${a.dipendente})` : ''}`, autore: 'Venditore', dataOra: ora() },
+          ],
+        }
+      })
 
-    case 'CARICA_ASSESSFIRST':
+    case 'RIMUOVI_ALLEGATO':
       return aggiornaPratica(state, azione.praticaId, (p) => ({
         ...p,
-        allegati: [
-          ...p.allegati,
-          ...azione.dipendenti
-            .filter((d) => !p.allegati.some((a) => a.tipo === 'assessfirst' && a.dipendente === d))
-            .map((d) => ({
-              id: `al-${uid()}`,
-              nome: `AssessFirst - ${d}.pdf`,
-              tipo: 'assessfirst' as const,
-              caricatoDa: 'Giulia T. (Tutor)',
-              dataCaricamento: ora(),
-              dipendente: d,
-              contenuto: ASSESSFIRST_MOCK(d),
-            })),
-        ],
-        storico: [
-          ...p.storico,
-          { fase: 'raccolta-documenti', azione: `AssessFirst caricati (${azione.dipendenti.length} dipendenti)`, autore: 'Giulia T. (Tutor)', dataOra: ora() },
-        ],
+        allegati: p.allegati.filter((x) => x.id !== azione.allegatoId),
       }))
 
     case 'MODIFICA_REPORT_AF':
@@ -412,8 +401,8 @@ interface StoreContextValue {
   cronologia: CronologiaFasi
   creaPratica: (dati: { azienda: string; cliente: string; email: string; dipendenti: PersonaAF[] }) => void
   inviaAssessment: (praticaId: string) => void
-  caricaQuestionarioTrascrizione: (praticaId: string) => void
-  caricaAssessFirst: (praticaId: string, dipendenti: string[]) => void
+  registraAllegato: (praticaId: string, allegato: DocumentoAllegato) => void
+  rimuoviAllegato: (praticaId: string, allegatoId: string) => void
   modificaReportAF: (praticaId: string, allegatoId: string, contenuto: string) => void
   confermaReportAF: (praticaId: string) => void
   clientePronto: (praticaId: string) => void
@@ -546,8 +535,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     cronologia,
     creaPratica: (dati) => dispatch({ type: 'CREA_PRATICA', ...dati }),
     inviaAssessment: (praticaId) => dispatch({ type: 'INVIA_ASSESSMENT', praticaId }),
-    caricaQuestionarioTrascrizione: (praticaId) => dispatch({ type: 'CARICA_QUESTIONARIO_TRASCRIZIONE', praticaId }),
-    caricaAssessFirst: (praticaId, dipendenti) => dispatch({ type: 'CARICA_ASSESSFIRST', praticaId, dipendenti }),
+    registraAllegato: (praticaId, allegato) => dispatch({ type: 'REGISTRA_ALLEGATO', praticaId, allegato }),
+    rimuoviAllegato: (praticaId, allegatoId) => dispatch({ type: 'RIMUOVI_ALLEGATO', praticaId, allegatoId }),
     modificaReportAF: (praticaId, allegatoId, contenuto) => dispatch({ type: 'MODIFICA_REPORT_AF', praticaId, allegatoId, contenuto }),
     confermaReportAF: (praticaId) => dispatch({ type: 'CONFERMA_REPORT_AF', praticaId }),
     clientePronto: (praticaId) => dispatch({ type: 'CLIENTE_PRONTO', praticaId }),

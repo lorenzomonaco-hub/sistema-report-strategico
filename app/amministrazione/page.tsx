@@ -193,6 +193,9 @@ export default function Amministrazione() {
           </div>
           <div className="ml-auto flex items-center gap-2">
             <IndicatoreSync stato={sincronizzazione} />
+            <Link href="/amministrazione/quadro-aziendale" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
+              Quadro Aziendale →
+            </Link>
             <Link href="/" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
               ← Home
             </Link>

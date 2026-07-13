@@ -156,16 +156,52 @@ export type RigaErog = {
   daVerificare?: boolean // fonti in conflitto, vedi nota
 }
 
-// Mediane empiriche (giorni lavorativi) calcolate dalle date reali del foglio
-// "CONSULENZE FRANK - Report in lavorazione" (317 righe, 13 lug 2026):
-//  stage2 = QUESTIONARIO RICEVUTO → LAVORATO (scrittura copy) — mediana su 107 casi validi
-//  stage3 = INVIO → RICEVUTO da Grippo (revisione testo)      — mediana su 195 casi validi
-//  stage4 = INVIO → RICEVUTO dai grafici (Valentino)          — mediana su 198 casi validi
-// Nessuna stima per lo stadio 1: non esiste una data di "richiesta documenti" nel
-// foglio, quindi non c'è un punto di partenza da cui contare.
-export const MEDIANA_STAGE2 = 72
-export const MEDIANA_STAGE3 = 15
-export const MEDIANA_STAGE4 = 3
+// Durate empiriche (giorni lavorativi) dal foglio "CONSULENZE FRANK - Report in
+// lavorazione" (317 righe, aggiornato al 13 lug 2026 ore 14:04):
+//  stage2 = QUESTIONARIO RICEVUTO → INVIO A GRIPPO (scrittura copy)
+//  stage3 = INVIO → RICEVUTO da Grippo (revisione testo, fase 4)
+//  stage4 = INVIO → RICEVUTO dai grafici (Valentino, fase 6)
+// Nota: il segnale giusto per "il copy ha finito" è INVIO A GRIPPO, non
+// QUESTIONARIO LAVORATO — quella casella non viene più aggiornata da fine
+// novembre 2025 (abbandonata nell'uso), avrebbe dato numeri falsati.
+// Nessuna stima per lo stadio 1: non esiste una data di "richiesta documenti",
+// quindi non c'è un punto di partenza da cui contare — dipende dal cliente.
+export const MEDIANA_STAGE2_STORICO = 57   // n=199, tutto lo storico
+export const MEDIANA_STAGE2_RECENTE = 70   // n=66, ultimi 90gg — si è allungato
+export const MEDIANA_STAGE3_STORICO = 15   // n=195
+export const MEDIANA_STAGE3_RECENTE = 21   // n=73 — anche questo si è allungato
+export const MEDIANA_STAGE4_STORICO = 3    // n=192
+export const MEDIANA_STAGE4_RECENTE = 3    // n=69 — stabile, Valentino tiene il passo
+
+// Stime "a maglie larghe" per il Gantt di consegna: 75° percentile degli ultimi
+// 90 giorni, non la mediana. Solo 1 caso su 4, di recente, ha superato questa
+// soglia — una promessa pensata per essere rispettata, non per essere ottimistica.
+export const STIMA_LARGA_STAGE2 = 94
+export const STIMA_LARGA_STAGE3 = 28
+export const STIMA_LARGA_STAGE4 = 4
+// Tempo agente per i passaggi successivi a quello in corso (generazione esclusa,
+// resta sempre umana per chi ha già iniziato): revisione 35m + grafici 10m +
+// impaginazione 2m, sempre sotto l'ora — arrotondato a favore della prudenza.
+export const GIORNI_AGENTE_RESTANTI = 1
+
+// Vendite reali (fatture) e questionari ricevuti, mese per mese — dallo stesso
+// foglio, colonne DATA FATTURA e QUESTIONARIO RICEVUTO, tutte le 317 righe
+// (storiche incluse, serve a vedere l'andamento nel tempo).
+export const VENDITE_MENSILI: { mese: string; vendite: number; questionari: number }[] = [
+  { mese: '2025-07', vendite: 69, questionari: 50 },
+  { mese: '2025-08', vendite: 36, questionari: 34 },
+  { mese: '2025-09', vendite: 13, questionari: 27 },
+  { mese: '2025-10', vendite: 16, questionari: 15 },
+  { mese: '2025-11', vendite: 16, questionari: 19 },
+  { mese: '2025-12', vendite: 16, questionari: 8 },
+  { mese: '2026-01', vendite: 10, questionari: 9 },
+  { mese: '2026-02', vendite: 9, questionari: 15 },
+  { mese: '2026-03', vendite: 21, questionari: 25 },
+  { mese: '2026-04', vendite: 2, questionari: 10 },
+  { mese: '2026-05', vendite: 4, questionari: 3 },
+  { mese: '2026-06', vendite: 4, questionari: 1 },
+  { mese: '2026-07', vendite: 4, questionari: 0 }, // parziale, solo fino al 13
+]
 
 function parseDataStadio(s: string): Date | null {
   const m = s.match(/^(\d{1,2})\/(\d{1,2})$/)
@@ -194,20 +230,49 @@ function workdaysBetween(d1: Date, d2: Date): number {
   return n
 }
 
-/** Data di consegna stimata dal passaggio corrente in avanti, con le mediane storiche. Nullo se non calcolabile. */
+function restanteUmano(stadio: StadioErog): number | null {
+  return stadio === 2 ? STIMA_LARGA_STAGE2 + STIMA_LARGA_STAGE3 + STIMA_LARGA_STAGE4
+    : stadio === 3 ? STIMA_LARGA_STAGE3 + STIMA_LARGA_STAGE4
+    : stadio === 4 ? STIMA_LARGA_STAGE4
+    : null
+}
+
+/** Data di consegna stimata "a maglie larghe" (75° percentile recente) se tutto resta umano da qui in avanti. */
 export function stimaConsegna(r: RigaErog): { data: Date; giorniRitardo: number } | null {
   if (!r.dataStadio) return null
   const d0 = parseDataStadio(r.dataStadio)
   if (!d0) return null
-  const restante =
-    r.stadio === 2 ? MEDIANA_STAGE2 + MEDIANA_STAGE3 + MEDIANA_STAGE4
-    : r.stadio === 3 ? MEDIANA_STAGE3 + MEDIANA_STAGE4
-    : r.stadio === 4 ? MEDIANA_STAGE4
-    : null
+  const restante = restanteUmano(r.stadio)
   if (restante == null) return null
   const data = workdayAdd(d0, restante)
   const giorniRitardo = data < OGGI ? workdaysBetween(data, OGGI) : 0
   return { data, giorniRitardo }
+}
+
+/**
+ * Data di consegna se il passaggio in corso resta alla persona che lo sta già
+ * facendo (non le si toglie il lavoro), ma tutti i passaggi successivi li fa
+ * l'agente. Per lo stadio 1 non c'è una data di partenza: si segnala solo che,
+ * una volta ricevute le informazioni, il resto lo fa l'agente in ~1 giorno.
+ */
+export function stimaConsegnaAgentica(r: RigaErog):
+  | { tipo: 'data'; data: Date; giorniRisparmiati: number }
+  | { tipo: 'condizionale'; giorniDopoInfo: number }
+  | null {
+  if (r.stadio === 1) return { tipo: 'condizionale', giorniDopoInfo: GIORNI_AGENTE_RESTANTI }
+  if (!r.dataStadio) return null
+  const d0 = parseDataStadio(r.dataStadio)
+  if (!d0) return null
+  const stimaStadioCorrente =
+    r.stadio === 2 ? STIMA_LARGA_STAGE2 : r.stadio === 3 ? STIMA_LARGA_STAGE3 : STIMA_LARGA_STAGE4
+  const fineUmana = workdayAdd(d0, stimaStadioCorrente)
+  // Se il passaggio umano, con la stima larga, dovrebbe già essere finito, l'agente
+  // parte da oggi (il giorno in cui lo attiveremo) — non da una data passata.
+  const partenzaAgente = fineUmana < OGGI ? OGGI : fineUmana
+  const data = workdayAdd(partenzaAgente, GIORNI_AGENTE_RESTANTI)
+  const baseline = stimaConsegna(r)
+  const giorniRisparmiati = baseline ? workdaysBetween(data, baseline.data) : 0
+  return { tipo: 'data', data, giorniRisparmiati }
 }
 
 export const EROG_CLIENTI: RigaErog[] = [

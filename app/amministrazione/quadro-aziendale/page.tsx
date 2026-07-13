@@ -11,8 +11,11 @@ import { useMemo, useState } from 'react'
 import {
   AGENTE_GRAFICI, AGENTE_IMPAG, AGENTE_TESTO, DAY, EROG_ANOMALIE, EROG_CLIENTI,
   EROG_PER_STADIO, EROG_STADI, EROG_TOT, FULLAI_AGENTE, FULLAI_INTERAZIONE, GEN,
-  MEDIANA_STAGE2, MEDIANA_STAGE3, MEDIANA_STAGE4, N_FUTURI, REVG, REVI, REVT,
-  RigaErog, Schedule, StadioErog, fmtData, fmtHM, schedule, stimaConsegna, workday,
+  MEDIANA_STAGE2_RECENTE, MEDIANA_STAGE2_STORICO, MEDIANA_STAGE3_RECENTE,
+  MEDIANA_STAGE3_STORICO, MEDIANA_STAGE4_RECENTE, MEDIANA_STAGE4_STORICO, N_FUTURI,
+  REVG, REVI, REVT, RigaErog, Schedule, STIMA_LARGA_STAGE2, STIMA_LARGA_STAGE3,
+  STIMA_LARGA_STAGE4, StadioErog, VENDITE_MENSILI, fmtData, fmtHM, schedule,
+  stimaConsegna, workday,
 } from '@/lib/quadroaziendale'
 
 const LARGHEZZA_TABELLA = 260
@@ -171,11 +174,46 @@ function SezioneErogazione() {
       </div>
 
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Quanto dura ogni passaggio, senza agenti (mediana storica)</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Quanto dura ogni passaggio, senza agenti — storico vs ultimi 90gg</h3>
         <div className="mt-2 grid grid-cols-3 gap-3">
-          <Statistica label="2 · Il copy deve lavorarlo" valore={`${MEDIANA_STAGE2} gg`} sub="mediana su 107 casi validi — molto variabile (1–159 gg)" tinta={STADIO_COLORE[2].testo} />
-          <Statistica label="3 · Revisione Grippo" valore={`${MEDIANA_STAGE3} gg`} sub="mediana su 195 casi validi" tinta={STADIO_COLORE[3].testo} />
-          <Statistica label="4 · Grafica — Valentino" valore={`${MEDIANA_STAGE4} gg`} sub="mediana su 198 casi validi, stabile" tinta={STADIO_COLORE[4].testo} />
+          <Statistica label="2 · Il copy deve lavorarlo" valore={`${MEDIANA_STAGE2_STORICO} → ${MEDIANA_STAGE2_RECENTE} gg`} sub="mediana: si è allungato, tanto (1–159 gg)" tinta={STADIO_COLORE[2].testo} />
+          <Statistica label="3 · Revisione Grippo" valore={`${MEDIANA_STAGE3_STORICO} → ${MEDIANA_STAGE3_RECENTE} gg`} sub="mediana: anche questo si è allungato" tinta={STADIO_COLORE[3].testo} />
+          <Statistica label="4 · Grafica — Valentino" valore={`${MEDIANA_STAGE4_STORICO} → ${MEDIANA_STAGE4_RECENTE} gg`} sub="mediana: stabile, tiene il passo" tinta={STADIO_COLORE[4].testo} />
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-display text-xl font-bold tracking-tight text-inchiostro">Cosa dicono davvero questi numeri</h3>
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          <Carta>
+            <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Le vendite sono crollate, non la produzione</p>
+            <div className="mt-2 space-y-1">
+              {VENDITE_MENSILI.map((m) => {
+                const maxV = Math.max(...VENDITE_MENSILI.map((x) => x.vendite))
+                return (
+                  <div key={m.mese} className="flex items-center gap-2 text-[11px]">
+                    <span className="w-14 shrink-0 text-inchiostro/50">{m.mese}</span>
+                    <div className="h-3 flex-1 overflow-hidden rounded-full bg-inchiostro/[0.05]">
+                      <div className="h-full rounded-full bg-petrolio" style={{ width: `${(m.vendite / maxV) * 100}%` }} />
+                    </div>
+                    <span className="w-8 shrink-0 text-right font-bold tabular-nums text-petrolio-scuro">{m.vendite}</span>
+                  </div>
+                )
+              })}
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-inchiostro/60">
+              Da <b className="text-inchiostro">69 vendite/mese</b> (luglio 2025, il picco) a <b className="text-inchiostro">2-4/mese</b> negli ultimi quattro mesi — oltre il 90% in meno. Luglio 2026 è parziale (solo fino al 13). Non è un buco nei dati: sia le fatture sia i questionari ricevuti mostrano lo stesso calo, sostenuto da quasi un anno.
+            </p>
+          </Carta>
+          <Carta>
+            <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Perché la coda si è svuotata, e cosa nasconde</p>
+            <p className="mt-2 text-[12.5px] leading-relaxed text-inchiostro/75">
+              La lista d&apos;attesa è calata perché <b className="text-inchiostro">sono arrivati molti meno clienti nuovi</b>, non perché il team ha smaltito più in fretta. Anzi: chi entra oggi in produzione aspetta di più di chi entrava un anno fa (57→70gg sulla scrittura, 15→21gg su Grippo).
+            </p>
+            <p className="mt-2 text-[12.5px] leading-relaxed text-inchiostro/75">
+              Il team lavora a un ritmo sano — circa <b className="text-inchiostro">5-6 passaggi a settimana</b> per ogni stadio — ma con meno vendite il calo dell&apos;ingorgo maschera un problema di capacità che c&apos;è comunque: se le vendite ripartono, la coda si riforma agli stessi ritmi lenti di prima, perché il collo di bottiglia (scrittura e revisione) non si è risolto, si è solo visto di meno.
+            </p>
+          </Carta>
         </div>
       </div>
 
@@ -229,10 +267,17 @@ function SezioneErogazione() {
       </div>
 
       <Carta className="text-xs leading-relaxed text-inchiostro/65">
-        <p><b className="text-inchiostro">Da dove vengono questi dati.</b> Dal foglio &quot;CONSULENZE FRANK - Report in lavorazione&quot; (317 righe, copertura completa) più la coda di ingresso &quot;Questionari ricevuti da elaborare&quot;. Lo stadio di ognuno è determinato dalle spunte reali del foglio, non da una stima: questionario ricevuto → lavorato dal copy → inviato/ricevuto da Grippo (fase 4, revisione testo) → inviato/ricevuto dai grafici (fase 6, Valentino).</p>
+        <p><b className="text-inchiostro">Da dove vengono questi dati.</b> Dal foglio &quot;CONSULENZE FRANK - Report in lavorazione&quot; (317 righe, copertura completa) più la coda di ingresso &quot;Questionari ricevuti da elaborare&quot;. Lo stadio di ognuno è determinato dalle spunte reali del foglio, non da una stima: questionario ricevuto → inviato/ricevuto da Grippo (fase 4, revisione testo) → inviato/ricevuto dai grafici (fase 6, Valentino). Il segnale di &quot;copy finito&quot; è la data di invio a Grippo, non &quot;questionario lavorato&quot; — quella casella è abbandonata da fine novembre 2025, avrebbe dato numeri sbagliati.</p>
         <p className="mt-2">Tre clienti (Andrea Novella, Massimiliano Rea, Nicolò Donnantuono) il foglio maestro li segnava ancora in stadio 1, ma la coda di ingresso ha date più recenti — spostati in stadio 2 perché quella fonte è più fresca. Stesso motivo per cui Alessio Barcello, presente in entrambe le fonti, resta in stadio 2.</p>
-        <p className="mt-2"><b className="text-inchiostro">Come calcolo la consegna stimata.</b> Dalle stesse righe storiche del foglio, chiuse per davvero, ho misurato quanto dura ogni passaggio senza l&apos;aiuto degli agenti: <b className="text-inchiostro">{MEDIANA_STAGE2} giorni lavorativi</b> mediana per la scrittura del copy, <b className="text-inchiostro">{MEDIANA_STAGE3}</b> per la revisione di Grippo, <b className="text-inchiostro">{MEDIANA_STAGE4}</b> per la grafica di Valentino. Per ogni cliente attivo prendo la data in cui è entrato nel suo stadio attuale e ci aggiungo le mediane dei passaggi che gli restano. Se il risultato è già nel passato, il cliente è oltre la mediana storica e lo segnalo in rosso con i giorni di ritardo — non è un errore di calcolo, è che quella pratica sta impiegando più del solito. Lo stadio 1 non ha una stima: il foglio non registra quando i documenti sono stati richiesti, solo quando arrivano.</p>
-        <p className="mt-2 text-inchiostro/50">La scrittura del copy ha una variabilità enorme (da 1 a 159 giorni lavorativi) — la mediana di {MEDIANA_STAGE2} giorni è un punto di partenza, non una promessa per un singolo cliente.</p>
+        <p className="mt-2"><b className="text-inchiostro">Come calcolo la consegna stimata — a maglie larghe apposta.</b> Non uso la mediana (la sfora la metà dei casi): uso il <b className="text-inchiostro">75° percentile degli ultimi 90 giorni</b> — <b className="text-inchiostro">{STIMA_LARGA_STAGE2} giorni lavorativi</b> per la scrittura del copy, <b className="text-inchiostro">{STIMA_LARGA_STAGE3}</b> per Grippo, <b className="text-inchiostro">{STIMA_LARGA_STAGE4}</b> per la grafica. Solo 1 caso su 4, di recente, ha sfondato questa soglia: è una promessa pensata per essere rispettata, non una stima ottimistica. Per ogni cliente attivo prendo la data in cui è entrato nel suo stadio e ci aggiungo queste soglie per i passaggi che gli restano. Se il risultato è già nel passato, il cliente è oltre anche questa soglia larga e lo segnalo in rosso — è un caso davvero fuori norma, non un arrotondamento. Lo stadio 1 non ha una stima: il foglio non registra quando i documenti sono stati richiesti, solo quando arrivano.</p>
+      </Carta>
+
+      <Carta className="bg-petrolio/10">
+        <p className="text-xs font-semibold uppercase text-petrolio-scuro">E se agentizzassimo da qui in avanti?</p>
+        <p className="mt-1 text-[12.5px] text-petrolio-scuro/80">Senza toccare il lavoro di chi lo sta già facendo: il passaggio in corso resta alla persona, solo quelli successivi li fa l&apos;agente.</p>
+        <Link href="/amministrazione/previsione-agentica" className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-petrolio px-4 py-2 text-xs font-semibold text-white hover:opacity-90">
+          Vedi la previsione agentica →
+        </Link>
       </Carta>
     </div>
   )

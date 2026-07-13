@@ -12,7 +12,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { CHIAVE_TOKEN_DATI } from '@/lib/datiblocco'
-import { FASI, faseById } from '@/lib/fasi'
+import { FASI, faseById, statoCartella } from '@/lib/fasi'
 import { calcolaGantt, DURATE_STANDARD, GanttPratica, leggiDurate, salvaDurate } from '@/lib/gantt'
 import { useApp } from '@/lib/store'
 
@@ -40,6 +40,9 @@ function IndicatoreSync({ stato }: { stato: 'in-corso' | 'online' | 'offline' })
 /** La riga del Gantt: cella-tabella a sinistra + barra sulla timeline a destra. */
 function RigaGantt({ g, pct }: { g: GanttPratica; pct: (ms: number) => number }) {
   const fase = faseById(g.pratica.faseCorrente)
+  const inRaccolta = g.pratica.faseCorrente === 'vendita' || g.pratica.faseCorrente === 'raccolta-documenti'
+  const cart = inRaccolta ? statoCartella(g.pratica) : null
+  const docFatti = cart ? cart.voci.filter((v) => v.fatto).length : 0
   const inizio = g.tratti[0]?.inizio ?? Date.parse(g.pratica.dataCreazione)
   const tardi = g.giorniRitardo > 0
   const sinistra = pct(inizio)
@@ -67,6 +70,14 @@ function RigaGantt({ g, pct }: { g: GanttPratica; pct: (ms: number) => number })
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${fase.badge}`}>{fase.label}</span>
+          {cart && !cart.completa && (
+            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-800">
+              documenti {docFatti}/3 — incompleti
+            </span>
+          )}
+          {cart && cart.completa && (
+            <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">documenti completi</span>
+          )}
           {g.completata ? (
             <span className="text-[11px] font-semibold text-green-700">consegnato</span>
           ) : (
@@ -163,6 +174,11 @@ export default function Amministrazione() {
     conta: attive.filter((g) => g.pratica.faseCorrente === f.id).length,
   }))
 
+  // in attesa documenti: registrate ma senza tutti i file (il PM le tiene d'occhio)
+  const inRaccolta = (p: (typeof attive)[number]['pratica']) =>
+    p.faseCorrente === 'vendita' || p.faseCorrente === 'raccolta-documenti'
+  const inAttesaDoc = attive.filter((g) => inRaccolta(g.pratica) && !statoCartella(g.pratica).completa)
+
   if (!pronto) return null
 
   return (
@@ -209,9 +225,10 @@ export default function Amministrazione() {
         )}
 
         {/* Riepilogo cumulativo */}
-        <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
           {[
             ['In lavorazione', String(attive.length), 'text-inchiostro'],
+            ['In attesa documenti', String(inAttesaDoc.length), inAttesaDoc.length ? 'text-indigo-700' : 'text-inchiostro'],
             ['In ritardo', String(inRitardo.length), inRitardo.length ? 'text-rose-700' : 'text-inchiostro'],
             ['Ferme oltre il previsto', String(attive.filter((g) => g.faseInRitardo).length), 'text-amber-700'],
             ['Consegnate', String(completate.length), 'text-green-700'],

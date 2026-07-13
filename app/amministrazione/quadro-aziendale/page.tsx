@@ -9,10 +9,10 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import {
-  AGENTE_GRAFICI, AGENTE_IMPAG, AGENTE_TESTO, DAY, EROG_ANCHE_REV_N, EROG_ANOMALIE,
-  EROG_GENERAZIONE, EROG_GRAFICA, EROG_MAX, EROG_OGGI, EROG_SOLO_GRAFICA_N,
-  FULLAI_AGENTE, FULLAI_INTERAZIONE, GEN, GIORNO_MS, N_FUTURI, REVG, REVI, REVT,
-  Schedule, fmtData, fmtHM, schedule, workday,
+  AGENTE_GRAFICI, AGENTE_IMPAG, AGENTE_TESTO, DAY, EROG_ANOMALIE, EROG_CLIENTI,
+  EROG_PER_STADIO, EROG_STADI, EROG_TOT, FULLAI_AGENTE, FULLAI_INTERAZIONE, GEN,
+  N_FUTURI, REVG, REVI, REVT, RigaErog, Schedule, StadioErog, fmtData, fmtHM,
+  schedule, workday,
 } from '@/lib/quadroaziendale'
 
 const LARGHEZZA_TABELLA = 260
@@ -108,25 +108,55 @@ function Assi({ maxDays, workdayFn }: { maxDays: number; workdayFn: (n: number) 
 // SEZIONE "IN EROGAZIONE"
 // ============================================================
 
-function SezioneErogazione() {
-  const spanDays = Math.round((EROG_MAX.getTime() - EROG_OGGI.getTime()) / GIORNO_MS)
-  const xpos = (d: Date) => Math.min(97, Math.max(2, ((d.getTime() - EROG_OGGI.getTime()) / GIORNO_MS / spanDays) * 100))
+const STADIO_COLORE: Record<StadioErog, { barra: string; barraDone: string; testo: string; bg: string }> = {
+  1: { barra: 'bg-rose-500', barraDone: 'bg-rose-500/25', testo: 'text-rose-700', bg: 'bg-rose-50' },
+  2: { barra: 'bg-petrolio', barraDone: 'bg-petrolio/25', testo: 'text-petrolio-scuro', bg: 'bg-petrolio/10' },
+  3: { barra: 'bg-teal-600', barraDone: 'bg-teal-600/25', testo: 'text-teal-700', bg: 'bg-teal-50' },
+  4: { barra: 'bg-indigo-600', barraDone: 'bg-indigo-600/25', testo: 'text-indigo-700', bg: 'bg-indigo-50' },
+}
 
+/** I 4 segmenti fissi del flusso: quelli passati sono pieni tenui, quello attuale acceso, i futuri vuoti. */
+function SegmentiStadi({ stadio }: { stadio: StadioErog }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {([1, 2, 3, 4] as StadioErog[]).map((n) => {
+        const c = STADIO_COLORE[n]
+        const cls = n === stadio ? c.barra : n < stadio ? c.barraDone : 'bg-inchiostro/[0.07]'
+        return <div key={n} className={`h-2.5 flex-1 rounded-full transition-colors ${cls}`} />
+      })}
+    </div>
+  )
+}
+
+function RigaStadi({ r }: { r: RigaErog }) {
+  const info = EROG_STADI[r.stadio - 1]
+  const c = STADIO_COLORE[r.stadio]
+  return (
+    <div className="grid items-center gap-3 border-b border-linea/70 px-3 py-2.5 last:border-b-0 hover:bg-inchiostro/[0.02]"
+         style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr 180px` }}>
+      <div className="min-w-0">
+        <p className="flex items-center gap-1.5 truncate text-[13px] font-bold text-inchiostro">
+          {r.nome}
+          {r.daVerificare && <span className="shrink-0 rounded bg-amber-100 px-1.5 py-px text-[9px] font-bold text-amber-800">DA VERIFICARE</span>}
+        </p>
+        <p className="truncate text-[11px] text-inchiostro/45">{r.azienda} · {r.tutor}</p>
+      </div>
+      <SegmentiStadi stadio={r.stadio} />
+      <div className={`text-right text-[11px] font-semibold ${c.testo}`}>
+        {info.label}{r.dataStadio ? <span className="text-inchiostro/40"> · {r.dataStadio}</span> : ''}
+      </div>
+    </div>
+  )
+}
+
+function SezioneErogazione() {
   return (
     <div className="mt-6 space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Statistica label="32 clienti realmente attivi" valore="7 ago – 17 ago" sub="finestra stimata per chiudere la coda attuale" tinta="text-petrolio-scuro" grande />
-        <Statistica label="Pattern generazione" valore="22 gg" sub="mediana lead time, ultimi 90gg (storico: 16gg)" />
-        <Statistica label="Pattern grafica" valore="3 gg" sub="mediana lead time, stabile" />
-        <Statistica label="Ritmo squadra" valore="~5,6/sett" sub="consegne grafica storiche, ultime 8 settimane" />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <Carta className="bg-petrolio/10"><p className="text-xs font-semibold uppercase text-petrolio-scuro">Aspettano la generazione</p><p className="font-display mt-1 text-3xl font-bold text-petrolio-scuro">{EROG_GENERAZIONE.length}</p><p className="mt-1 text-[11px] text-petrolio-scuro/80">1 già in scrittura · 9 non assegnati</p></Carta>
-        <Carta className="bg-amber-50"><p className="text-xs font-semibold uppercase text-amber-800">In revisione (bloccata)</p><p className="font-display mt-1 text-3xl font-bold text-amber-800">1</p><p className="mt-1 text-[11px] text-amber-800/80">anomalia — vedi sotto</p></Carta>
-        <Carta className="bg-violet-50"><p className="text-xs font-semibold uppercase text-violet-700">Testo da revisionare + grafica</p><p className="font-display mt-1 text-3xl font-bold text-violet-700">{EROG_ANCHE_REV_N}</p><p className="mt-1 text-[11px] text-violet-700/80">già dai grafici, senza segnale di testo chiuso</p></Carta>
-        <Carta className="bg-indigo-50"><p className="text-xs font-semibold uppercase text-indigo-700">Manca solo la grafica</p><p className="font-display mt-1 text-3xl font-bold text-indigo-700">{EROG_SOLO_GRAFICA_N}</p><p className="mt-1 text-[11px] text-indigo-700/80">testo consegnato/revisionato</p></Carta>
-        <Carta className="bg-rose-50"><p className="text-xs font-semibold uppercase text-rose-700">Sospesi</p><p className="font-display mt-1 text-3xl font-bold text-rose-700">2</p><p className="mt-1 text-[11px] text-rose-700/80">stand-by / da rifare — esclusi</p></Carta>
+        <Statistica label={`${EROG_TOT} clienti realmente attivi`} valore="4 passaggi fissi" sub="stesso flusso per ogni progetto, dati reali" tinta="text-petrolio-scuro" grande />
+        {EROG_STADI.map((s, i) => (
+          <Statistica key={s.n} label={`${s.n} · ${s.label}`} valore={String(EROG_PER_STADIO[i])} sub={s.sub} tinta={STADIO_COLORE[s.n].testo} />
+        ))}
       </div>
 
       <div>
@@ -142,33 +172,43 @@ function SezioneErogazione() {
       </div>
 
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Gantt — stima di consegna, 32 clienti attivi</h3>
+        <div className="flex flex-wrap items-center gap-3">
+          <h3 className="font-display text-xl font-bold tracking-tight text-inchiostro">Il flusso, cliente per cliente</h3>
+          <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-inchiostro/55">
+            {EROG_STADI.map((s) => (
+              <span key={s.n} className="inline-flex items-center gap-1.5">
+                <span className={`h-2 w-4 rounded-full ${STADIO_COLORE[s.n].barra}`} />{s.n}. {s.label}
+              </span>
+            ))}
+          </div>
+        </div>
         <div className="mt-2 overflow-x-auto rounded-2xl border border-linea bg-carta shadow-sm">
-          <div className="min-w-[720px]">
-            <Assi maxDays={spanDays} workdayFn={(n) => new Date(EROG_OGGI.getTime() + (n / spanDays) * (EROG_MAX.getTime() - EROG_OGGI.getTime()))} />
-            {EROG_GRAFICA.map((r, i) => (
-              <RigaBarra key={r.nome + i} zebra={i % 2 === 0}
-                titolo={r.nome} sottotitolo={`${r.contesto} · ${r.tutor}`}
-                startPct={2} endPct={xpos(r.data)}
-                bg={r.ancheRevisione ? 'bg-violet-500' : 'bg-indigo-500'}
-                testo={r.ancheRevisione ? 'text-violet-700' : 'text-indigo-700'}
-                etichetta={fmtData(r.data)} tag={r.ancheRevisione ? '+revisione testo' : undefined} />
-            ))}
-            {EROG_GENERAZIONE.map((r, i) => (
-              <RigaBarra key={r.nome + i} zebra={i % 2 === 0}
-                titolo={r.nome} sottotitolo={`${r.contesto} · ${r.tutor}`}
-                startPct={2} endPct={xpos(r.grafica)}
-                bg="bg-petrolio" testo="text-petrolio-scuro"
-                etichetta={fmtData(r.grafica)} tag={r.ipotetico ? 'se assegnato oggi' : undefined} />
-            ))}
+          <div className="min-w-[760px]">
+            <div className="grid items-center gap-3 border-b border-linea bg-inchiostro/[0.03] px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/40"
+                 style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr 180px` }}>
+              <div>Cliente · azienda · tutor</div>
+              <div>Passaggio 1 → 2 → 3 → 4</div>
+              <div className="text-right">Stadio attuale</div>
+            </div>
+            {([1, 2, 3, 4] as StadioErog[]).map((stadioNum) => {
+              const righe = EROG_CLIENTI.filter((r) => r.stadio === stadioNum)
+              const info = EROG_STADI[stadioNum - 1]
+              return (
+                <div key={stadioNum}>
+                  <div className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ${STADIO_COLORE[stadioNum].bg} ${STADIO_COLORE[stadioNum].testo}`}>
+                    {stadioNum} · {info.label} ({righe.length})
+                  </div>
+                  {righe.map((r, i) => <RigaStadi key={r.nome + r.azienda + i} r={r} />)}
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
 
       <Carta className="text-xs leading-relaxed text-inchiostro/65">
-        <p><b className="text-inchiostro">Come ho calcolato queste date.</b> Dal file di Grippo ho estratto 53 righe ancora aperte (senza data di &quot;Graficato il&quot;); 21 sono scarti — voci di agosto 2025 mai chiuse ma quasi certamente già risolte, duplicati di clienti chiusi altrove nel file, o righe che sono etichette/istruzioni interne, non clienti. Restano 32 clienti realmente in coda.</p>
-        <p className="mt-2">Per ognuno ho letto le note in &quot;Assegnato a&quot; per capire lo stadio reale, e ho usato le date storiche di consegna come pattern empirico: <b className="text-inchiostro">mediana 22 giorni lavorativi</b> da assegnazione a testo consegnato (ultimi 90gg — nello storico completo era 16, la coda si è allungata), <b className="text-inchiostro">mediana 3 giorni</b> da testo consegnato a grafica finita. Le 19 persone in coda da Alessio sono ordinate per data di consegna del testo e distanziate al ritmo storico di ~5,6 consegne/settimana. I 9 clienti non ancora assegnati sono uno scenario &quot;se partono oggi&quot;.</p>
-        <p className="mt-2">Dentro i 19 &quot;aspettano la grafica&quot; non sono tutti uguali: per <b className="text-inchiostro">{EROG_SOLO_GRAFICA_N}</b> il testo ha un segnale chiaro di chiusura (data di consegna o &quot;revisionato&quot; in nota). Per gli altri <b className="text-inchiostro">{EROG_ANCHE_REV_N}</b> (in viola, tag &quot;+revisione testo&quot;) la nota dice solo &quot;inviato ad Alessio&quot;, senza conferma che il testo sia chiuso — vale la pena controllarli uno per uno.</p>
+        <p><b className="text-inchiostro">Da dove vengono questi dati.</b> Dal foglio &quot;CONSULENZE FRANK - Report in lavorazione&quot; (317 righe, copertura completa) più la coda di ingresso &quot;Questionari ricevuti da elaborare&quot;. Lo stadio di ognuno è determinato dalle spunte reali del foglio, non da una stima: questionario ricevuto → lavorato dal copy → inviato/ricevuto da Grippo (fase 4, revisione testo) → inviato/ricevuto dai grafici (fase 6, Valentino).</p>
+        <p className="mt-2">Tre clienti (Andrea Novella, Massimiliano Rea, Nicolò Donnantuono) il foglio maestro li segnava ancora in stadio 1, ma la coda di ingresso ha date più recenti — spostati in stadio 2 perché quella fonte è più fresca. Stesso motivo per cui Alessio Barcello, presente in entrambe le fonti, resta in stadio 2.</p>
       </Carta>
     </div>
   )
@@ -331,7 +371,7 @@ export default function QuadroAziendale() {
   const [scope, setScope] = useState<Scope>('erogazione')
 
   const titoli: Record<Scope, [string, string]> = {
-    erogazione: ['Quanto tempo serve per erogare i clienti aperti?', '32 clienti realmente in lavorazione oggi, secondo il file di Grippo. Nessuna ipotesi: solo pattern storici.'],
+    erogazione: ['Dove sono, oggi, i clienti aperti?', `${EROG_TOT} clienti realmente attivi, stesso flusso a 4 passaggi per ognuno — dati reali dal foglio maestro, non stime.`],
     futuri: ['Quante persone servono per smaltire i 58 progetti in coda?', 'Muovi le leve: chi scrive, chi revisiona il testo, chi revisiona la grafica. Il Gantt si ricalcola da solo.'],
     entrambi: ['Erogazione oggi + coda futura: il quadro completo', 'Prima i clienti già in lavorazione (dati reali), poi i 58 in attesa (modello a leve).'],
   }

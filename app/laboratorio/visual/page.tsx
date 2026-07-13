@@ -47,7 +47,7 @@ export default function BancoVisualBlocco() {
   const [token, setToken] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [titolo, setTitolo] = useState('')
-  const [formato, setFormato] = useState<'pdf' | 'docx'>('pdf')
+  const [formato, setFormato] = useState<'pdf' | 'docx'>('docx')
   const [stima, setStima] = useState<StimaVisual | null>(null)
   const [stimaInCorso, setStimaInCorso] = useState(false)
   const [jobId, setJobId] = useState<string | null>(null)
@@ -188,8 +188,8 @@ export default function BancoVisualBlocco() {
               <label className="mb-1 block text-xs font-medium text-inchiostro/60">Formato di uscita</label>
               <select value={formato} onChange={(e) => setFormato(e.target.value as 'pdf' | 'docx')}
                 className="w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm focus:border-petrolio focus:outline-none">
-                <option value="pdf">PDF — motore pastello (consigliato)</option>
-                <option value="docx">Word — stampi nativi</option>
+                <option value="docx">Word (.docx) — grafici e diagrammi nativi (consigliato)</option>
+                <option value="pdf">PDF — motore pastello (sperimentale)</option>
               </select>
             </div>
           </div>
@@ -508,7 +508,7 @@ export default function BancoVisualBlocco() {
                         }}
                         className="mt-3 w-full rounded-xl bg-petrolio px-4 py-2 text-sm font-semibold text-white transition hover:bg-petrolio-scuro disabled:opacity-30"
                       >
-                        {ritoccoInCorso ? 'Rigenero…' : `🗑 Elimina ${daEliminare.length} visual e rigenera il PDF (gratis)`}
+                        {ritoccoInCorso ? 'Rigenero…' : `🗑 Elimina ${daEliminare.length} visual e rigenera il documento (gratis)`}
                       </button>
                     </>
                   )}

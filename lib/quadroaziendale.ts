@@ -140,9 +140,16 @@ export function schedule(copyCount: number, grippoOn: boolean, valentinoOn: bool
 // Report in lavorazione" + "Questionari ricevuti da elaborare" (13 lug 2026)
 // I 4 passaggi di Lorenzo, con la spunta esatta che li determina:
 //  1. Informazioni mancanti  — questionario non ricevuto
-//  2. Il copy deve lavorarlo — questionario ricevuto, non lavorato
+//  2. Il copy scrive + Caputo (slide) — questionario ricevuto, non ancora da Grippo
 //  3. Revisione Grippo       — lavorato, non ancora tornato da Grippo (fase 4)
 //  4. Grafica (Valentino)    — tornato da Grippo, non ancora dai grafici (fase 6)
+//
+// Nota su Caputo: confermato (verbale riunione 1 lug 2026 con Alessio Caputo)
+// che tra la scrittura del copy e la revisione Grippo c'è un passaggio reale —
+// Caputo divide il testo in 5 parti, genera le slide e le monta/seleziona a
+// mano — ma il foglio maestro non lo traccia con una colonna o data propria
+// (verificato: zero menzioni di "Caputo"/"slide" in 317 righe). Il suo lavoro
+// è quindi compreso, non scomponibile, dentro la finestra "stadio 2".
 // ============================================================
 
 export type StadioErog = 1 | 2 | 3 | 4
@@ -158,7 +165,7 @@ export type RigaErog = {
 
 // Durate empiriche (giorni lavorativi) dal foglio "CONSULENZE FRANK - Report in
 // lavorazione" (317 righe, aggiornato al 13 lug 2026 ore 14:04):
-//  stage2 = QUESTIONARIO RICEVUTO → INVIO A GRIPPO (scrittura copy)
+//  stage2 = QUESTIONARIO RICEVUTO → INVIO A GRIPPO (copy scrive + Caputo monta slide)
 //  stage3 = INVIO → RICEVUTO da Grippo (revisione testo, fase 4)
 //  stage4 = INVIO → RICEVUTO dai grafici (Valentino, fase 6)
 // Nota: il segnale giusto per "il copy ha finito" è INVIO A GRIPPO, non
@@ -166,6 +173,9 @@ export type RigaErog = {
 // novembre 2025 (abbandonata nell'uso), avrebbe dato numeri falsati.
 // Nessuna stima per lo stadio 1: non esiste una data di "richiesta documenti",
 // quindi non c'è un punto di partenza da cui contare — dipende dal cliente.
+// Stage2 include anche il passaggio di Caputo (crea e inserisce le slide):
+// il foglio non lo traccia separatamente, quindi 57-70gg è il tempo combinato
+// copy+Caputo, non solo la scrittura del testo.
 export const MEDIANA_STAGE2_STORICO = 57   // n=199, tutto lo storico
 export const MEDIANA_STAGE2_RECENTE = 70   // n=66, ultimi 90gg — si è allungato
 export const MEDIANA_STAGE3_STORICO = 15   // n=195
@@ -385,7 +395,7 @@ export const EROG_ANOMALIE: { icona: string; testo: string }[] = [
 
 export const EROG_STADI = [
   { n: 1 as StadioErog, label: 'Informazioni mancanti', sub: 'non possiamo procedere' },
-  { n: 2 as StadioErog, label: 'Il copy deve lavorarlo', sub: 'generazione del testo' },
+  { n: 2 as StadioErog, label: 'Copy scrive + Caputo (slide)', sub: 'testo e montaggio slide' },
   { n: 3 as StadioErog, label: 'Revisione Grippo', sub: 'fase 4 del sistema' },
   { n: 4 as StadioErog, label: 'Grafica — Valentino', sub: 'fase 6 del sistema' },
 ]

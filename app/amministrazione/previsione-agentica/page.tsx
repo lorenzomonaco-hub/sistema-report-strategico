@@ -112,8 +112,8 @@ export default function PrevisioneAgentica() {
           <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Come funziona il confronto</h3>
           <div className="mt-2 grid gap-3 sm:grid-cols-3">
             <Carta>
-              <p className="text-[11px] font-bold uppercase text-inchiostro/50">2 · In scrittura oggi</p>
-              <p className="mt-1 text-[12.5px] text-inchiostro/70">Il copy finisce di scriverlo (stima larga: {STIMA_LARGA_STAGE2}gg). Da lì, Grippo e Valentino sono agente: +{GIORNI_AGENTE_RESTANTI}gg.</p>
+              <p className="text-[11px] font-bold uppercase text-inchiostro/50">2 · Con copy o Caputo oggi</p>
+              <p className="mt-1 text-[12.5px] text-inchiostro/70">Il copy finisce di scriverlo e Caputo monta le slide (stima larga, tempo combinato: {STIMA_LARGA_STAGE2}gg). Da lì, Grippo e Valentino sono agente: +{GIORNI_AGENTE_RESTANTI}gg.</p>
             </Carta>
             <Carta>
               <p className="text-[11px] font-bold uppercase text-inchiostro/50">3 · In revisione oggi</p>
@@ -155,7 +155,8 @@ export default function PrevisioneAgentica() {
 
         <Carta className="mt-6 text-xs leading-relaxed text-inchiostro/65">
           <p><b className="text-inchiostro">Il vincolo di partenza.</b> Chi sta scrivendo, revisionando o graficando un report oggi lo finisce lui — non ha senso interrompere un lavoro a metà per darlo a un agente. La previsione &quot;agente da qui in poi&quot; sostituisce solo i passaggi che questa persona <b className="text-inchiostro">non ha ancora iniziato</b>.</p>
-          <p className="mt-2">Le stime del passaggio umano in corso sono le stesse &quot;a maglie larghe&quot; del Quadro Aziendale (75° percentile degli ultimi 90 giorni: {STIMA_LARGA_STAGE2}/{STIMA_LARGA_STAGE3}/{STIMA_LARGA_STAGE4} giorni lavorativi per copy/Grippo/grafica). Il tempo agente per tutto il resto — revisione testo, creazione grafici, impaginazione — è sempre sotto l&apos;ora: arrotondato a {GIORNI_AGENTE_RESTANTI} giorno lavorativo per prudenza, non perché ci metta davvero un giorno intero.</p>
+          <p className="mt-2">Le stime del passaggio umano in corso sono le stesse &quot;a maglie larghe&quot; del Quadro Aziendale (75° percentile degli ultimi 90 giorni: {STIMA_LARGA_STAGE2}/{STIMA_LARGA_STAGE3}/{STIMA_LARGA_STAGE4} giorni lavorativi per copy+Caputo/Grippo/grafica). Il tempo agente per tutto il resto — revisione testo, creazione grafici, impaginazione — è sempre sotto l&apos;ora: arrotondato a {GIORNI_AGENTE_RESTANTI} giorno lavorativo per prudenza, non perché ci metta davvero un giorno intero.</p>
+          <p className="mt-2"><b className="text-inchiostro">Nota su Caputo.</b> Tra la scrittura del copy e la revisione Grippo c&apos;è un passaggio reale — Alessio Caputo crea e monta le slide — ma il foglio maestro non lo traccia con una data propria (zero menzioni in 317 righe), quindi è compreso nello stadio 2 e non ha una stima agentica separata al suo interno.</p>
           <p className="mt-2">Per i {stadio1Count} clienti ancora in stadio 1 non c&apos;è una data di partenza (dipende da quando il cliente manda i documenti, non dal team) — ma una volta arrivate le informazioni, non c&apos;è nessun lavoro umano in corso da proteggere: possono essere pienamente agentizzati da subito, non solo dal passaggio successivo.</p>
         </Carta>
       </div>

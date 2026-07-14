@@ -39,10 +39,11 @@ function workdayAdd(base: Date, n: number): Date {
 type Fase = 1 | 2 | 3 | 4
 type Cliente = { nome: string; azienda: string; fase: Fase; nota?: string }
 
+// Ordine reale del flusso: scrittura → revisione Grippo → immagini Caputo → grafica.
 const FASE = {
   1: { label: 'Scrittura copy', barra: 'bg-petrolio', testo: 'text-petrolio-scuro', done: 'bg-petrolio/25' },
-  2: { label: 'Immagini Caputo', barra: 'bg-amber-500', testo: 'text-amber-700', done: 'bg-amber-500/25' },
-  3: { label: 'Revisione Grippo', barra: 'bg-teal-600', testo: 'text-teal-700', done: 'bg-teal-600/25' },
+  2: { label: 'Revisione Grippo', barra: 'bg-teal-600', testo: 'text-teal-700', done: 'bg-teal-600/25' },
+  3: { label: 'Immagini Caputo', barra: 'bg-amber-500', testo: 'text-amber-700', done: 'bg-amber-500/25' },
   4: { label: 'Grafica Valentino', barra: 'bg-indigo-600', testo: 'text-indigo-700', done: 'bg-indigo-600/25' },
 } as const
 
@@ -59,21 +60,22 @@ const CLIENTI: Cliente[] = [
   { nome: 'Matteo Tamburini', azienda: 'MT Service SRL', fase: 1 },
   { nome: 'Paolo Mastella', azienda: 'Prima Group SRL', fase: 1 },
   { nome: 'Nicolò Donnantuono', azienda: 'Pitwo SRL', fase: 1 },
-  // 11 in attesa revisione immagini Caputo
-  { nome: 'Simone Tomasini', azienda: 'Trillo Parrucchieri', fase: 2 },
-  { nome: 'Gabriele Cascone', azienda: 'Studio di Architettura', fase: 2 },
-  { nome: 'Agostino Romano', azienda: 'Romano SPA (Food truck)', fase: 2 },
-  { nome: 'Stefano Lazzarini', azienda: 'Cartaria Biellese SRL', fase: 2 },
-  { nome: 'Michele Brioni', azienda: '3B Leisure & Style SRL', fase: 2 },
-  { nome: 'Davide Ghelardi', azienda: 'Ristora SAS', fase: 2 },
-  { nome: 'Giuseppe Di Guida', azienda: 'Gruppo EGS SRL', fase: 2 },
-  { nome: 'Filippo Griggio', azienda: 'Car For Life SRL', fase: 2 },
-  { nome: 'Samuele Turcato', azienda: 'Costruzioni Venete SRL', fase: 2 },
-  { nome: 'Nicola Angius', azienda: 'Aquamea SRL', fase: 2 },
-  { nome: 'Rudy Luxardo', azienda: 'Sole 1936 SRL', fase: 2 },
-  // 2 in revisione Grippo
-  { nome: 'Daniele Sciannimanico', azienda: 'Scianni SRL', fase: 3, nota: 'chiude oggi' },
-  { nome: 'Giovanni Mazzamati', azienda: '80 Fame SRL', fase: 3, nota: 'chiude domani' },
+  // 2 in revisione Grippo (viene prima di Caputo)
+  { nome: 'Daniele Sciannimanico', azienda: 'Scianni SRL', fase: 2, nota: 'chiude oggi' },
+  { nome: 'Giovanni Mazzamati', azienda: '80 Fame SRL', fase: 2, nota: 'chiude domani' },
+  // 12 in attesa revisione immagini Caputo (dopo Grippo) — 11 + Imbriano
+  { nome: 'Simone Tomasini', azienda: 'Trillo Parrucchieri', fase: 3 },
+  { nome: 'Gabriele Cascone', azienda: 'Studio di Architettura', fase: 3 },
+  { nome: 'Agostino Romano', azienda: 'Romano SPA (Food truck)', fase: 3 },
+  { nome: 'Stefano Lazzarini', azienda: 'Cartaria Biellese SRL', fase: 3 },
+  { nome: 'Michele Brioni', azienda: '3B Leisure & Style SRL', fase: 3 },
+  { nome: 'Davide Ghelardi', azienda: 'Ristora SAS', fase: 3 },
+  { nome: 'Giuseppe Di Guida', azienda: 'Gruppo EGS SRL', fase: 3 },
+  { nome: 'Filippo Griggio', azienda: 'Car For Life SRL', fase: 3 },
+  { nome: 'Samuele Turcato', azienda: 'Costruzioni Venete SRL', fase: 3 },
+  { nome: 'Nicola Angius', azienda: 'Aquamea SRL', fase: 3 },
+  { nome: 'Rudy Luxardo', azienda: 'Sole 1936 SRL', fase: 3 },
+  { nome: 'Alessandro Imbriano', azienda: 'Vanda Omeopatici SRL', fase: 3, nota: 'appena passato da Grippo' },
   // 9 in grafica
   { nome: 'Claudio Virdis', azienda: 'Gruppoconsilia SRL', fase: 4 },
   { nome: 'Davide Raimondi', azienda: 'DR Fasciaterapeuta STP', fase: 4 },
@@ -96,20 +98,20 @@ function calcola(): Riga[] {
       let li = 0
       for (let l = 1; l < lanes.length; l++) if (lanes[l] < lanes[li]) li = l
       lanes[li] += SCRITTURA
-      const ggScritto = ceilDay(lanes[li])                 // quando è pronto e consegnato all'agente immagini
+      const ggScritto = ceilDay(lanes[li])                 // quando è pronto e passa all'agente
       const consegnaImg = workdayAdd(EROG_OGGI, ggScritto)
-      // da lì: immagini + testo + grafica (tutto agente) = 152' < 1 giorno
-      const consegna = workdayAdd(EROG_OGGI, ggScritto + ceilDay(IMMAGINI + GRIPPO + GRAFICA))
+      // da lì: testo + immagini + grafica (tutto agente) = 152' < 1 giorno
+      const consegna = workdayAdd(EROG_OGGI, ggScritto + ceilDay(GRIPPO + IMMAGINI + GRAFICA))
       return { c, consegna, consegnaImg }
     }
     if (c.fase === 2) {
-      // resta: immagini + testo + grafica (tutto agente) = 152' → 1 giorno
-      return { c, consegna: workdayAdd(EROG_OGGI, ceilDay(IMMAGINI + GRIPPO + GRAFICA)) }
+      // in revisione Grippo (umana, in chiusura: oggi=0 / domani=1), poi immagini + grafica (agente)
+      const ggGrippo = c.nota === 'chiude domani' ? 1 : 0
+      return { c, consegna: workdayAdd(EROG_OGGI, ggGrippo + ceilDay(IMMAGINI + GRAFICA)) }
     }
     if (c.fase === 3) {
-      // Grippo umano in chiusura (oggi=0 / domani=1), poi grafica agente
-      const ggGrippo = c.nota === 'chiude domani' ? 1 : 0
-      return { c, consegna: workdayAdd(EROG_OGGI, ggGrippo + ceilDay(GRAFICA)) }
+      // in attesa immagini Caputo: resta immagini + grafica (agente) = 57' → 1 giorno
+      return { c, consegna: workdayAdd(EROG_OGGI, ceilDay(IMMAGINI + GRAFICA)) }
     }
     // fase 4: resta solo la grafica (agente + revisione Valentino) = 32' → 1 giorno
     return { c, consegna: workdayAdd(EROG_OGGI, ceilDay(GRAFICA)) }
@@ -203,23 +205,23 @@ export default function PrevisioneAgentica() {
           <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">La pipeline — tempo per report</h3>
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <PassoCard n="1" titolo="Scrittura" tempo="4h" chi={`${N_COPY} copy in parallelo`} sub="unico passaggio ancora umano, 4h a report" />
-            <PassoCard n="2" titolo="Immagini" tempo={`${IMMAGINI}min`} chi="agente + Caputo" sub={`agente inserisce diagrammi e tabelle (${AG_IMMAGINI}') + revisione Caputo (${REV_IMMAGINI}')`} />
-            <PassoCard n="3" titolo="Revisione testo" tempo={`${GRIPPO}min`} chi="agente + Grippo/Tabita" sub={`agente revisiona (${AG_TESTO}') + controllo umano (${REV_TESTO}')`} />
+            <PassoCard n="2" titolo="Revisione testo" tempo={`${GRIPPO}min`} chi="agente + Grippo/Tabita" sub={`agente revisiona (${AG_TESTO}') + controllo umano (${REV_TESTO}')`} />
+            <PassoCard n="3" titolo="Immagini" tempo={`${IMMAGINI}min`} chi="agente + Caputo" sub={`agente inserisce diagrammi e tabelle (${AG_IMMAGINI}') + revisione Caputo (${REV_IMMAGINI}')`} />
             <PassoCard n="4" titolo="Grafica" tempo={`${GRAFICA}min`} chi="agente + Valentino" sub={`agente impagina (${AG_GRAFICA}') + revisione Valentino (${REV_GRAFICA}')`} />
           </div>
           <p className="mt-2 rounded-xl border border-linea bg-carta p-3 text-xs text-inchiostro/60">
-            Dopo la scrittura, l&apos;agente attraversa immagini + testo + grafica in <b className="text-inchiostro">{IMMAGINI + GRIPPO + GRAFICA} minuti</b> totali — meno di una giornata. Il collo di bottiglia resta la sola scrittura: {N_COPY} copy a 4h l&apos;uno smaltiscono i {perFase[0]} da scrivere in circa 2 giornate lavorative.
+            Dopo la scrittura, l&apos;agente attraversa testo + immagini + grafica in <b className="text-inchiostro">{GRIPPO + IMMAGINI + GRAFICA} minuti</b> totali — meno di una giornata. Il collo di bottiglia resta la sola scrittura: {N_COPY} copy a 4h l&apos;uno smaltiscono i {perFase[0]} da scrivere in circa 2 giornate lavorative.
           </p>
         </div>
 
         <div className="mt-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">I {perFase[0]} ancora da scrivere — quando passano all&apos;agente immagini</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">I {perFase[0]} ancora da scrivere — quando passano all&apos;agente</h3>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {scrittura.map((r, i) => (
               <div key={i} className="flex items-center justify-between gap-2 rounded-xl border border-linea bg-carta px-3 py-2 text-xs">
                 <span className="min-w-0 truncate font-semibold text-inchiostro">{r.c.nome}<span className="font-normal text-inchiostro/45"> · {r.c.azienda}</span></span>
                 <span className="shrink-0 text-right text-inchiostro/70">
-                  <span className="text-amber-700">→ agente {fmtData(r.consegnaImg!)}</span>
+                  <span className="text-teal-700">→ agente {fmtData(r.consegnaImg!)}</span>
                   <b className="ml-2 text-petrolio-scuro">consegna {fmtData(r.consegna)}</b>
                 </span>
               </div>
@@ -279,8 +281,8 @@ export default function PrevisioneAgentica() {
         </div>
 
         <div className="mt-6 rounded-2xl border border-linea bg-carta p-4 text-xs leading-relaxed text-inchiostro/65">
-          <p><b className="text-inchiostro">Come sono calcolate le date.</b> Oggi = {fmtData(EROG_OGGI)}. La scrittura è fatta da {N_COPY} copy in parallelo, 4h a report: i primi {N_COPY} sono pronti dopo 1 giornata lavorativa, gli altri dopo 2. Appena scritto, il report passa all&apos;agente immagini; da lì immagini ({IMMAGINI}&apos;) + testo ({GRIPPO}&apos;) + grafica ({GRAFICA}&apos;) si concludono nella stessa giornata. Chi è già in immagini/grafica salta i passaggi che ha superato; i 2 in revisione Grippo la chiudono oggi e domani (lavoro umano in corso, non lo tocchiamo), poi solo grafica.</p>
-          <p className="mt-2"><b className="text-inchiostro">Nota su Imbriano.</b> L&apos;ho tolto dalla scrittura come indicato (&quot;andato in revisione&quot;). I tuoi conti — 11 in immagini + 2 in Grippo — sono già pieni e coerenti (i 2 in Grippo sono Sciannimanico e Mazzamati, gli unici non nella lista immagini), quindi Imbriano non rientra in questi 32: dimmi tu in quale fase metterlo di preciso e lo aggiungo.</p>
+          <p><b className="text-inchiostro">Come sono calcolate le date.</b> Oggi = {fmtData(EROG_OGGI)}. Il flusso è: scrittura → revisione Grippo → immagini Caputo → grafica. La scrittura è fatta da {N_COPY} copy in parallelo, 4h a report: i primi {N_COPY} sono pronti dopo 1 giornata lavorativa, gli altri dopo 2. Appena scritto, il report entra nell&apos;agente; da lì testo ({GRIPPO}&apos;) + immagini ({IMMAGINI}&apos;) + grafica ({GRAFICA}&apos;) si concludono nella stessa giornata. Chi è più avanti salta i passaggi già superati; i 2 in revisione Grippo la chiudono oggi e domani (lavoro umano in corso, non lo tocchiamo), poi immagini e grafica con l&apos;agente.</p>
+          <p className="mt-2"><b className="text-inchiostro">Imbriano</b> è passato da Grippo ed è ora in attesa delle immagini di Caputo (fase 3) — clienti in erogazione totali: {CLIENTI.length}.</p>
         </div>
       </div>
     </div>

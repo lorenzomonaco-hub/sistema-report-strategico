@@ -1,0 +1,179 @@
+'use client'
+
+// ─── Umano ───
+// Gli 87 clienti reali in erogazione, oggi, se tutto resta umano — 4 passaggi
+// separati (non più "copy+Caputo" uniti): Carlo scrive, Caputo fa le slide,
+// Grippo o Tabita revisiona il testo, Valentino impagina. Copy e Caputo sono
+// puro tempo di lavorazione (ore); Grippo/Tabita e Valentino sono il dato
+// reale dal foglio (giorni, includono le code di oggi) — fonti citate sotto.
+
+import Link from 'next/link'
+import {
+  EROG_CLIENTI, EROG_OGGI, EROG_TOT, GIORNO_MS, MEDIANA_STAGE3_STORICO, MEDIANA_STAGE4_STORICO,
+  RigaErog, StadioErog, UMANO_GRIPPO_GG, UMANO_VALENTINO_GG, fmtData, stimaConsegnaUmanoV2,
+} from '@/lib/quadroaziendale'
+
+const LARGHEZZA_TABELLA = 260
+
+function Carta({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <div className={`rounded-2xl border border-linea bg-carta p-4 shadow-sm ${className}`}>{children}</div>
+}
+
+function Statistica({ label, valore, sub, tinta = 'text-inchiostro', grande = false }:
+  { label: string; valore: string; sub?: string; tinta?: string; grande?: boolean }) {
+  return (
+    <Carta className={grande ? 'bg-petrolio/10' : ''}>
+      <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">{label}</p>
+      <p className={`font-display mt-1 ${grande ? 'text-3xl' : 'text-2xl'} font-bold tracking-tight ${tinta}`}>{valore}</p>
+      {sub && <p className="mt-1 text-[11px] text-inchiostro/50">{sub}</p>}
+    </Carta>
+  )
+}
+
+const STADIO_INFO: Record<StadioErog, { label: string; testo: string }> = {
+  1: { label: 'Informazioni mancanti', testo: 'text-rose-700' },
+  2: { label: 'Copy e Caputo', testo: 'text-petrolio-scuro' },
+  3: { label: 'Revisione Grippo/Tabita', testo: 'text-teal-700' },
+  4: { label: 'Impaginazione Valentino', testo: 'text-indigo-700' },
+}
+
+type RigaGantt = { titolo: string; sottotitolo: string; data: Date; overdue: boolean; giorniRitardo: number; tag?: string }
+
+function RigaBarra({ r, maxDays, zebra }: { r: RigaGantt; maxDays: number; zebra: boolean }) {
+  const giorni = Math.round((r.data.getTime() - EROG_OGGI.getTime()) / GIORNO_MS)
+  const endPct = r.overdue ? 1.5 : Math.max((giorni / maxDays) * 100, 1.5)
+  const labLeft = endPct > (r.tag ? 48 : 74)
+  return (
+    <div className={`grid border-b border-linea/70 last:border-b-0 ${zebra ? 'bg-inchiostro/[0.02]' : ''}`}
+         style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr` }}>
+      <div className="border-r border-linea px-3 py-2">
+        <p className="truncate text-[12.5px] font-bold text-inchiostro">{r.titolo}</p>
+        <p className="truncate text-[10.5px] text-inchiostro/45">{r.sottotitolo}</p>
+      </div>
+      <div className="relative h-9">
+        <div className={`absolute top-1/2 h-[11px] -translate-y-1/2 rounded-full ${r.overdue ? 'bg-rose-500' : 'bg-petrolio'}`}
+             style={{ left: 0, width: `${endPct}%` }} />
+        <div className={`absolute top-1/2 flex -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded bg-carta px-1 text-[10.5px] font-bold tabular-nums ${r.overdue ? 'text-rose-700' : 'text-petrolio-scuro'}`}
+             style={labLeft ? { right: `${100 - endPct}%`, textAlign: 'right' } : { left: `${endPct}%`, paddingLeft: 6 }}>
+          <span>{r.overdue ? `+${r.giorniRitardo}gg ritardo` : fmtData(r.data)}</span>
+          {r.tag && <span className="rounded bg-amber-100 px-1 py-px text-[8.5px] font-bold text-amber-800">{r.tag}</span>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Assi({ maxDays }: { maxDays: number }) {
+  const n = Math.min(6, Math.max(1, maxDays))
+  const seen = new Set<number>()
+  const tacche: { pct: number; label: string }[] = []
+  for (let i = 0; i <= n; i++) {
+    const d = Math.max(0, Math.round((maxDays * i) / n))
+    if (seen.has(d)) continue
+    seen.add(d)
+    tacche.push({ pct: (d / maxDays) * 100, label: fmtData(new Date(EROG_OGGI.getTime() + d * GIORNO_MS)) })
+  }
+  return (
+    <div className="grid border-b border-linea bg-inchiostro/[0.03]" style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr` }}>
+      <div className="flex items-end border-r border-linea px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/40">
+        Cliente
+      </div>
+      <div className="relative h-8">
+        <span className="absolute bottom-1.5 left-0 text-[10px] font-bold text-petrolio-scuro">oggi</span>
+        {tacche.map((t, i) => (
+          <span key={i} className="absolute bottom-1.5 -translate-x-1/2 text-[10px] text-inchiostro/45" style={{ left: `${t.pct}%` }}>{t.label}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default function PrevisioneUmana() {
+  const righe = EROG_CLIENTI
+    .map((r) => {
+      const s = stimaConsegnaUmanoV2(r)
+      return s ? { r, data: s.data, overdue: s.giorniRitardo > 0, giorniRitardo: s.giorniRitardo } : null
+    })
+    .filter((x): x is { r: RigaErog; data: Date; overdue: boolean; giorniRitardo: number } => x !== null)
+    .sort((a, b) => a.data.getTime() - b.data.getTime())
+
+  const stadio1Count = EROG_CLIENTI.filter((r) => r.stadio === 1).length
+  const righeGantt: RigaGantt[] = righe.map(({ r, data, overdue, giorniRitardo }) => ({
+    titolo: r.nome, sottotitolo: `${r.azienda} · ${STADIO_INFO[r.stadio].label}`, data, overdue, giorniRitardo,
+    tag: r.daVerificare ? 'da verificare' : r.dataApprox ? 'data stimata' : undefined,
+  }))
+  const maxDate = righeGantt.reduce((m, x) => (x.data > m ? x.data : m), EROG_OGGI)
+  const maxDays = Math.max(1, Math.round((maxDate.getTime() - EROG_OGGI.getTime()) / GIORNO_MS))
+
+  return (
+    <div className="min-h-screen flex-1 sfondo-trama">
+      <div className="mx-auto max-w-6xl px-6 py-10">
+        <header className="flex flex-wrap items-center gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-ambra">Solo amministratori</p>
+            <h1 className="font-display mt-1 text-3xl font-bold tracking-tight text-inchiostro">Umano: il processo di oggi</h1>
+            <p className="mt-1 max-w-2xl text-sm text-inchiostro/55">
+              {EROG_TOT} clienti in erogazione, 4 passaggi separati — così come funzionano oggi, nessun agente da nessuna parte.
+            </p>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <Link href="/amministrazione/previsione-agentica" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
+              Pagina Human in the loop →
+            </Link>
+            <Link href="/amministrazione/quadro-aziendale" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
+              Quadro Aziendale
+            </Link>
+          </div>
+        </header>
+
+        <div className="mt-6">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">I 4 passaggi, uno per uno</h3>
+          <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Carta>
+              <p className="text-[11px] font-bold uppercase text-inchiostro/50">1 · Copy — Carlo</p>
+              <p className="font-display mt-1 text-2xl font-bold text-petrolio-scuro">4h</p>
+              <p className="mt-1 text-[11px] text-inchiostro/50">scrittura del testo, tempo di lavorazione puro</p>
+            </Carta>
+            <Carta>
+              <p className="text-[11px] font-bold uppercase text-inchiostro/50">2 · Slide — Caputo</p>
+              <p className="font-display mt-1 text-2xl font-bold text-amber-700">2h</p>
+              <p className="mt-1 text-[11px] text-inchiostro/50">crea e inserisce le slide, tempo di lavorazione puro</p>
+            </Carta>
+            <Carta>
+              <p className="text-[11px] font-bold uppercase text-inchiostro/50">3 · Revisione — Grippo/Tabita</p>
+              <p className="font-display mt-1 text-2xl font-bold text-teal-700">{UMANO_GRIPPO_GG}gg</p>
+              <p className="mt-1 text-[11px] text-inchiostro/50">dato reale, include le code — mediana storica {MEDIANA_STAGE3_STORICO}gg</p>
+            </Carta>
+            <Carta>
+              <p className="text-[11px] font-bold uppercase text-inchiostro/50">4 · Impaginazione — Valentino</p>
+              <p className="font-display mt-1 text-2xl font-bold text-indigo-700">{UMANO_VALENTINO_GG}gg</p>
+              <p className="mt-1 text-[11px] text-inchiostro/50">dato reale, include le code — mediana storica {MEDIANA_STAGE4_STORICO}gg</p>
+            </Carta>
+          </div>
+          <p className="mt-2 rounded-xl border border-linea bg-carta p-3 text-xs text-inchiostro/60">
+            <b className="text-inchiostro">Da dove vengono questi numeri.</b> Copy (4h) e Caputo (2h) sono il tempo di lavorazione puro — non includono l&apos;attesa in coda. Grippo/Tabita e Valentino sono invece il dato reale dal foglio &quot;CONSULENZE FRANK - Report in lavorazione&quot; (317 righe): colonne INVIO A GRIPPO → RICEVUTO DA GRIPPO (mediana ultimi 90 giorni, n=73 casi — chiunque abbia fatto la revisione, Grippo o Tabita) e INVIO A GRAFICI → RICEVUTO DA GRAFICI (mediana, n=69 casi, stabile). Sono giorni <b className="text-inchiostro">lavorativi</b> reali, non un tempo di lavorazione teorico: riflettono quanto ci mette oggi il team, code comprese.
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <h3 className="font-display text-xl font-bold tracking-tight text-inchiostro">Quando consegniamo, tutto umano</h3>
+          <p className="text-[11px] text-inchiostro/45">{righe.length} clienti con una data stimabile su {EROG_TOT} — i {stadio1Count} in stadio 1 restano esclusi finché non arrivano le informazioni</p>
+          <div className="mt-2 overflow-x-auto rounded-2xl border border-linea bg-carta shadow-sm">
+            <div className="min-w-[760px]">
+              <Assi maxDays={maxDays} />
+              {righeGantt.map((r, i) => <RigaBarra key={r.titolo + i} r={r} maxDays={maxDays} zebra={i % 2 === 0} />)}
+            </div>
+          </div>
+        </div>
+
+        <Carta className="mt-6 bg-petrolio/10 text-xs leading-relaxed text-petrolio-scuro/80">
+          <p className="text-xs font-semibold uppercase text-petrolio-scuro">E se un agente facesse il resto?</p>
+          <p className="mt-1">Stessi {EROG_TOT} clienti, ma con un agente che genera e un umano che controlla invece di rifare da zero.</p>
+          <Link href="/amministrazione/previsione-agentica" className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-petrolio px-4 py-2 text-xs font-semibold text-white hover:opacity-90">
+            Vedi human in the loop →
+          </Link>
+        </Carta>
+      </div>
+    </div>
+  )
+}

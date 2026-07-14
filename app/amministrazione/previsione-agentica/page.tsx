@@ -1,20 +1,18 @@
 'use client'
 
-// ─── Previsione Agentica ───
-// Un'unica lista di 145 clienti (87 in erogazione + 58 futuri in coda) e due
-// soli Gantt: "Umano" (tutto come oggi) e "Human in the loop" (i passaggi non
-// ancora iniziati li fa l'agente, ma uno specialista rivede sempre il suo
-// lavoro — Grippo il testo, Valentino l'impaginazione, Caputo le slide per i
-// futuri). Le leve si scelgono PRIMA di vedere i gantt, come nel calcolatore
-// Futuri. Il passaggio IN CORSO di un cliente in erogazione non si tocca mai:
-// non si toglie lavoro già iniziato.
+// ─── Human in the loop ───
+// Gli 87 clienti reali in erogazione (non i 58 futuri — quelli restano nel
+// calcolatore Futuri). L'agente genera, un umano controlla sempre: il
+// controllo dura sempre la stessa ora/mezz'ora, la leva sceglie solo CHI lo fa
+// (Grippo o Carlo per il testo, Valentino o Carlo per l'impaginazione, Caputo
+// manuale o assistito per le slide). Il passaggio IN CORSO di ogni cliente non
+// si tocca mai: non si toglie lavoro già iniziato.
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import {
-  AGENTE_IMPAG, AGENTE_SLIDE, AGENTE_TESTO, CAPUTO_MANUALE, EROG_CLIENTI, EROG_OGGI, EROG_STADI,
-  EROG_TOT, GIORNO_MS, N_FUTURI, REV_SLIDE, REVI, REVT, RigaErog, RigaFutura, StadioErog,
-  fmtData, futuriHITL, futuriUmano, stimaConsegna, stimaConsegnaAgentica,
+  EROG_CLIENTI, EROG_OGGI, EROG_TOT, GIORNO_MS, RigaErog, StadioErog,
+  fmtData, occupazioneHITL, stimaConsegnaHITL, stimaConsegnaUmanoV2,
 } from '@/lib/quadroaziendale'
 
 const LARGHEZZA_TABELLA = 260
@@ -48,17 +46,15 @@ function Opzione({ attiva, label, tinta, onClick }:
   )
 }
 
-const STADIO_COLORE: Record<StadioErog, { barra: string; testo: string }> = {
-  1: { barra: 'bg-rose-500', testo: 'text-rose-700' },
-  2: { barra: 'bg-petrolio', testo: 'text-petrolio-scuro' },
-  3: { barra: 'bg-teal-600', testo: 'text-teal-700' },
-  4: { barra: 'bg-indigo-600', testo: 'text-indigo-700' },
+const STADIO_INFO: Record<StadioErog, { label: string; barra: string; testo: string }> = {
+  1: { label: 'Informazioni mancanti', barra: 'bg-rose-500', testo: 'text-rose-700' },
+  2: { label: 'Copy e Caputo', barra: 'bg-petrolio', testo: 'text-petrolio-scuro' },
+  3: { label: 'Revisione Grippo/Tabita', barra: 'bg-teal-600', testo: 'text-teal-700' },
+  4: { label: 'Impaginazione Valentino', barra: 'bg-indigo-600', testo: 'text-indigo-700' },
 }
-const FUTURO_COLORE = { barra: 'bg-violet-500', testo: 'text-violet-700' }
 
-type RigaGantt = { titolo: string; sottotitolo: string; data: Date; overdue: boolean; bg: string; testo: string; tag?: string }
+type RigaGantt = { titolo: string; sottotitolo: string; data: Date; overdue: boolean; tag?: string }
 
-/** Riga del Gantt: nome+contesto a sinistra, una barra da oggi alla data a destra. */
 function RigaBarra({ r, maxDays, zebra }: { r: RigaGantt; maxDays: number; zebra: boolean }) {
   const giorni = Math.round((r.data.getTime() - EROG_OGGI.getTime()) / GIORNO_MS)
   const endPct = r.overdue ? 1.5 : Math.max((giorni / maxDays) * 100, 1.5)
@@ -71,9 +67,9 @@ function RigaBarra({ r, maxDays, zebra }: { r: RigaGantt; maxDays: number; zebra
         <p className="truncate text-[10.5px] text-inchiostro/45">{r.sottotitolo}</p>
       </div>
       <div className="relative h-9">
-        <div className={`absolute top-1/2 h-[11px] -translate-y-1/2 rounded-full ${r.overdue ? 'bg-rose-500' : r.bg}`}
+        <div className={`absolute top-1/2 h-[11px] -translate-y-1/2 rounded-full ${r.overdue ? 'bg-rose-500' : 'bg-petrolio'}`}
              style={{ left: 0, width: `${endPct}%` }} />
-        <div className={`absolute top-1/2 flex -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded bg-carta px-1 text-[10.5px] font-bold tabular-nums ${r.overdue ? 'text-rose-700' : r.testo}`}
+        <div className={`absolute top-1/2 flex -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded bg-carta px-1 text-[10.5px] font-bold tabular-nums ${r.overdue ? 'text-rose-700' : 'text-petrolio-scuro'}`}
              style={labLeft ? { right: `${100 - endPct}%`, textAlign: 'right' } : { left: `${endPct}%`, paddingLeft: 6 }}>
           <span>{r.overdue ? 'già in ritardo' : fmtData(r.data)}</span>
           {r.tag && <span className="rounded bg-amber-100 px-1 py-px text-[8.5px] font-bold text-amber-800">{r.tag}</span>}
@@ -108,78 +104,32 @@ function Assi({ maxDays }: { maxDays: number }) {
   )
 }
 
-/** Un gantt completo: clienti in erogazione (ordinati per data), poi i futuri in coda sotto. */
-function GanttSezione({ titolo, sub, erogazione, futuri }: {
-  titolo: string; sub: string
-  erogazione: { r: RigaErog; data: Date; overdue: boolean }[]
-  futuri: RigaFutura[]
-}) {
-  const righeErog: RigaGantt[] = erogazione.map(({ r, data, overdue }) => ({
-    titolo: r.nome, sottotitolo: `${r.azienda} · ${EROG_STADI[r.stadio - 1].label}`, data, overdue,
-    bg: STADIO_COLORE[r.stadio].barra, testo: STADIO_COLORE[r.stadio].testo,
-    tag: r.daVerificare ? 'da verificare' : r.dataApprox ? 'data stimata' : undefined,
-  }))
-  const righeFut: RigaGantt[] = [...futuri]
-    .sort((a, b) => a.data.getTime() - b.data.getTime())
-    .map((f) => ({
-      titolo: f.nome, sottotitolo: `${f.azienda} · nuovo`, data: f.data, overdue: false,
-      bg: FUTURO_COLORE.barra, testo: FUTURO_COLORE.testo, tag: f.rifare ? 'rifare' : undefined,
-    }))
-  const maxDate = [...righeErog, ...righeFut].reduce((m, x) => (x.data > m ? x.data : m), EROG_OGGI)
-  const maxDays = Math.max(1, Math.round((maxDate.getTime() - EROG_OGGI.getTime()) / GIORNO_MS))
-
-  return (
-    <div>
-      <div className="flex flex-wrap items-baseline gap-2">
-        <h3 className="font-display text-xl font-bold tracking-tight text-inchiostro">{titolo}</h3>
-        <p className="text-[11px] text-inchiostro/45">{sub}</p>
-      </div>
-      <div className="mt-2 overflow-x-auto rounded-2xl border border-linea bg-carta shadow-sm">
-        <div className="min-w-[760px]">
-          <Assi maxDays={maxDays} />
-          <div className="border-b border-linea bg-inchiostro/[0.03] px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-inchiostro/50">
-            In erogazione ({righeErog.length})
-          </div>
-          {righeErog.map((r, i) => <RigaBarra key={r.titolo + i} r={r} maxDays={maxDays} zebra={i % 2 === 0} />)}
-          <div className="border-b border-t border-linea bg-violet-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-violet-700">
-            {N_FUTURI} progetti futuri, in coda
-          </div>
-          {righeFut.map((r, i) => <RigaBarra key={r.titolo + i} r={r} maxDays={maxDays} zebra={i % 2 === 0} />)}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function PrevisioneAgentica() {
-  const [copyCount, setCopyCount] = useState(1)
   const [grippoOn, setGrippoOn] = useState(false)
   const [valentinoOn, setValentinoOn] = useState(false)
   const [caputoAgenteOn, setCaputoAgenteOn] = useState(false)
-  const [fullAiOn, setFullAiOn] = useState(false)
 
-  const erogUmano = useMemo(() => EROG_CLIENTI
-    .map((r) => { const s = stimaConsegna(r); return s ? { r, data: s.data, overdue: s.giorniRitardo > 0 } : null })
-    .filter((x): x is { r: RigaErog; data: Date; overdue: boolean } => x !== null)
+  const righe = useMemo(() => EROG_CLIENTI
+    .map((r) => {
+      const h = stimaConsegnaHITL(r)
+      if (!h || h.tipo === 'condizionale') return null
+      return { r, data: h.data, risparmio: Math.max(h.giorniRisparmiati, 0) }
+    })
+    .filter((x): x is { r: RigaErog; data: Date; risparmio: number } => x !== null)
     .sort((a, b) => a.data.getTime() - b.data.getTime()), [])
 
-  const erogHITL = useMemo(() => EROG_CLIENTI
-    .map((r) => {
-      const a = stimaConsegnaAgentica(r, grippoOn, valentinoOn)
-      return a?.tipo === 'data' ? { r, data: a.data, overdue: false, risparmio: Math.max(a.giorniRisparmiati, 0) } : null
-    })
-    .filter((x): x is { r: RigaErog; data: Date; overdue: boolean; risparmio: number } => x !== null)
-    .sort((a, b) => a.data.getTime() - b.data.getTime()), [grippoOn, valentinoOn])
+  const occupazione = useMemo(() => occupazioneHITL(EROG_CLIENTI, caputoAgenteOn), [caputoAgenteOn])
 
-  const futUmano = useMemo(() => futuriUmano(copyCount), [copyCount])
-  const futHITL = useMemo(() => futuriHITL(copyCount, grippoOn, valentinoOn, caputoAgenteOn, fullAiOn),
-    [copyCount, grippoOn, valentinoOn, caputoAgenteOn, fullAiOn])
-
-  const totaleRisparmiato = erogHITL.reduce((s, x) => s + x.risparmio, 0)
-  const mediaRisparmiata = erogHITL.length ? Math.round(totaleRisparmiato / erogHITL.length) : 0
+  const totaleRisparmiato = righe.reduce((s, x) => s + x.risparmio, 0)
+  const mediaRisparmiata = righe.length ? Math.round(totaleRisparmiato / righe.length) : 0
   const stadio1Count = EROG_CLIENTI.filter((r) => r.stadio === 1).length
-  const ultimoFuturoUmano = [...futUmano.righe].sort((a, b) => b.data.getTime() - a.data.getTime())[0]
-  const ultimoFuturoHITL = [...futHITL.righe].sort((a, b) => b.data.getTime() - a.data.getTime())[0]
+
+  const righeGantt: RigaGantt[] = righe.map(({ r, data }) => ({
+    titolo: r.nome, sottotitolo: `${r.azienda} · ${STADIO_INFO[r.stadio].label}`, data, overdue: data < EROG_OGGI,
+    tag: r.daVerificare ? 'da verificare' : r.dataApprox ? 'data stimata' : undefined,
+  }))
+  const maxDate = righeGantt.reduce((m, x) => (x.data > m ? x.data : m), EROG_OGGI)
+  const maxDays = Math.max(1, Math.round((maxDate.getTime() - EROG_OGGI.getTime()) / GIORNO_MS))
 
   return (
     <div className="min-h-screen flex-1 sfondo-trama">
@@ -187,88 +137,73 @@ export default function PrevisioneAgentica() {
         <header className="flex flex-wrap items-center gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-ambra">Solo amministratori</p>
-            <h1 className="font-display mt-1 text-3xl font-bold tracking-tight text-inchiostro">Previsione: umano vs human-in-the-loop</h1>
+            <h1 className="font-display mt-1 text-3xl font-bold tracking-tight text-inchiostro">Human in the loop: chi controlla l&apos;agente</h1>
             <p className="mt-1 max-w-2xl text-sm text-inchiostro/55">
-              {EROG_TOT} clienti in erogazione + {N_FUTURI} progetti futuri, un&apos;unica coda. Scegli le leve, poi guarda i due gantt: cosa succede se resta tutto umano, e cosa cambia se un agente lavora e uno specialista rivede sempre il suo output.
+              Gli stessi {EROG_TOT} clienti in erogazione della pagina Umano. L&apos;agente genera, un umano controlla sempre: il controllo dura uguale, la leva sceglie solo chi lo fa.
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <Link href="/amministrazione/previsione-umana" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
+              ← Pagina Umano
+            </Link>
             <Link href="/amministrazione/quadro-aziendale" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
-              ← Quadro Aziendale
+              Quadro Aziendale
             </Link>
           </div>
         </header>
 
         <div className="mt-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Le leve — scegli prima di vedere i gantt</h3>
-          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-5">
-            <Carta>
-              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-petrolio" />Chi scrive — copy</p>
-              <div className="space-y-1.5">
-                <Opzione attiva={copyCount === 1} label="Solo Carlo" tinta="bg-petrolio/10 text-petrolio-scuro" onClick={() => setCopyCount(1)} />
-                <Opzione attiva={copyCount === 2} label="Carlo + Paolo" tinta="bg-petrolio/10 text-petrolio-scuro" onClick={() => setCopyCount(2)} />
-              </div>
-            </Carta>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Le variabili — chi fa il controllo</h3>
+          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Carta>
               <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-amber-500" />Slide — Caputo</p>
               <div className="space-y-1.5">
                 <Opzione attiva={!caputoAgenteOn} label="Manuale — 2h" tinta="bg-amber-50 text-amber-700" onClick={() => setCaputoAgenteOn(false)} />
-                <Opzione attiva={caputoAgenteOn} label="Assistito da agente" tinta="bg-amber-50 text-amber-700" onClick={() => setCaputoAgenteOn(true)} />
+                <Opzione attiva={caputoAgenteOn} label="Assistito da agente — 25min" tinta="bg-amber-50 text-amber-700" onClick={() => setCaputoAgenteOn(true)} />
               </div>
             </Carta>
             <Carta>
-              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-teal-600" />Revisore testo — Grippo</p>
+              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-teal-600" />Controllo testo — chi lo fa</p>
               <div className="space-y-1.5">
-                <Opzione attiva={!grippoOn} label="Off — resta al copy" tinta="bg-teal-50 text-teal-700" onClick={() => setGrippoOn(false)} />
-                <Opzione attiva={grippoOn} label="On — assorbe la revisione" tinta="bg-teal-50 text-teal-700" onClick={() => setGrippoOn(true)} />
+                <Opzione attiva={!grippoOn} label="Carlo controlla" tinta="bg-teal-50 text-teal-700" onClick={() => setGrippoOn(false)} />
+                <Opzione attiva={grippoOn} label="Grippo/Tabita controlla" tinta="bg-teal-50 text-teal-700" onClick={() => setGrippoOn(true)} />
               </div>
             </Carta>
             <Carta>
-              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-indigo-600" />Impaginazione — Valentino</p>
+              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-indigo-600" />Controllo impaginazione — chi lo fa</p>
               <div className="space-y-1.5">
-                <Opzione attiva={!valentinoOn} label="Off — resta al copy" tinta="bg-indigo-50 text-indigo-700" onClick={() => setValentinoOn(false)} />
-                <Opzione attiva={valentinoOn} label="On — assorbe l'impaginazione" tinta="bg-indigo-50 text-indigo-700" onClick={() => setValentinoOn(true)} />
-              </div>
-            </Carta>
-            <Carta>
-              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-violet-600" />Generazione — Full AI</p>
-              <div className="space-y-1.5">
-                <Opzione attiva={!fullAiOn} label="Off — scrive il copy" tinta="bg-violet-50 text-violet-700" onClick={() => setFullAiOn(false)} />
-                <Opzione attiva={fullAiOn} label="On — genera l'AI" tinta="bg-violet-50 text-violet-700" onClick={() => setFullAiOn(true)} />
+                <Opzione attiva={!valentinoOn} label="Carlo controlla" tinta="bg-indigo-50 text-indigo-700" onClick={() => setValentinoOn(false)} />
+                <Opzione attiva={valentinoOn} label="Valentino controlla" tinta="bg-indigo-50 text-indigo-700" onClick={() => setValentinoOn(true)} />
               </div>
             </Carta>
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-inchiostro/45">
-            Copy e Full AI influenzano solo la coda dei {N_FUTURI} futuri (chi è già in erogazione ha già scritto). Caputo, invece, conta solo per i futuri: chi è già in stadio 2 ha il suo passaggio già compreso, indistinguibile, nella stima di quello stadio.
+            Il controllo dura sempre lo stesso tempo (35+60min per il testo, 2+30min per l&apos;impaginazione) sia che lo faccia lo specialista sia Carlo: la leva decide solo di chi è il tempo, non quanto ci mette — per questo il gantt sotto non cambia scegliendo chi controlla. Cambia invece l&apos;occupazione di ciascuno, qui sotto.
           </p>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Statistica label={`${EROG_TOT + N_FUTURI} clienti totali`} valore={`-${mediaRisparmiata}gg`} sub="risparmio medio in erogazione, human-in-the-loop vs umano" tinta="text-petrolio-scuro" grande />
-          <Statistica label="Passaggio in corso" valore="resta umano" sub="nessun lavoro tolto a chi lo sta già facendo" />
-          <Statistica label="Stadio 1 (informazioni mancanti)" valore={String(stadio1Count)} sub="non stimabile finché non arrivano le info" tinta="text-rose-700" />
-          <Statistica label={`Ultimo dei ${N_FUTURI} futuri`} valore={ultimoFuturoHITL ? fmtData(ultimoFuturoHITL.data) : '—'} sub={ultimoFuturoUmano ? `umano: ${fmtData(ultimoFuturoUmano.data)}` : ''} tinta="text-violet-700" />
+          <Statistica label={`${EROG_TOT} clienti attivi`} valore={`-${mediaRisparmiata}gg`} sub="risparmio medio vs la pagina Umano, sui clienti con una data stimabile" tinta="text-petrolio-scuro" grande />
+          <Statistica label="Caputo — occupazione" valore={`${occupazione.caputoGg}gg`} sub={caputoAgenteOn ? 'assistito da agente' : 'manuale, 2h a cliente'} tinta="text-amber-700" />
+          <Statistica label="Grippo/Tabita — occupazione" valore={`${occupazione.grippoGg}gg`} sub="se assorbe lui tutti i controlli testo" tinta="text-teal-700" />
+          <Statistica label="Valentino — occupazione" valore={`${occupazione.valentinoGg}gg`} sub="se assorbe lui tutti i controlli impaginazione" tinta="text-indigo-700" />
         </div>
 
-        <div className="mt-6 space-y-8">
-          <GanttSezione
-            titolo="Gantt 1 — Tutto umano"
-            sub="nessun agente da nessuna parte: dati reali per l'erogazione, stessa coda di oggi per i futuri"
-            erogazione={erogUmano}
-            futuri={futUmano.righe}
-          />
-          <GanttSezione
-            titolo="Gantt 2 — Human in the loop"
-            sub="l'agente lavora dal passaggio successivo a quello in corso, uno specialista rivede sempre il suo output"
-            erogazione={erogHITL}
-            futuri={futHITL.righe}
-          />
+        <div className="mt-6">
+          <h3 className="font-display text-xl font-bold tracking-tight text-inchiostro">Quando consegniamo, human in the loop</h3>
+          <p className="text-[11px] text-inchiostro/45">{righe.length} clienti con una data stimabile su {EROG_TOT} — i {stadio1Count} in stadio 1 restano esclusi finché non arrivano le informazioni</p>
+          <div className="mt-2 overflow-x-auto rounded-2xl border border-linea bg-carta shadow-sm">
+            <div className="min-w-[760px]">
+              <Assi maxDays={maxDays} />
+              {righeGantt.map((r, i) => <RigaBarra key={r.titolo + i} r={r} maxDays={maxDays} zebra={i % 2 === 0} />)}
+            </div>
+          </div>
         </div>
 
         <Carta className="mt-6 text-xs leading-relaxed text-inchiostro/65">
-          <p><b className="text-inchiostro">Il vincolo di partenza.</b> Chi sta scrivendo, revisionando o impaginando un report oggi lo finisce lui — non ha senso interrompere un lavoro a metà per darlo a un agente. Il gantt &quot;human in the loop&quot; sostituisce solo i passaggi che la persona in corso <b className="text-inchiostro">non ha ancora iniziato</b>: l&apos;agente genera la bozza, lo specialista (Grippo per il testo, Valentino per l&apos;impaginazione, Caputo per le slide dei futuri) la rivede invece di costruirla da zero.</p>
-          <p className="mt-2">Per i {stadio1Count} clienti ancora in stadio 1 non c&apos;è una data di partenza (dipende da quando il cliente manda i documenti, non dal team): restano esclusi da entrambi i gantt finché non arrivano le informazioni.</p>
-          <p className="mt-2"><b className="text-inchiostro">I {N_FUTURI} progetti futuri</b> vengono aggiunti in coda dopo l&apos;erogazione: prima Carlo (o Carlo+Paolo) li scrive nell&apos;ordine della schedulazione, poi attraversano slide→revisione→impaginazione — manuali nel gantt 1, assistiti secondo le leve scelte nel gantt 2. Non essendo ancora iniziati, per loro non c&apos;è nessun lavoro in corso da proteggere: possono partire assistiti fin dal primo passaggio.</p>
+          <p><b className="text-inchiostro">Il vincolo di partenza.</b> Chi sta scrivendo, revisionando o impaginando un report oggi lo finisce lui, alla velocità normale — non ha senso interrompere un lavoro a metà. L&apos;agente sostituisce solo i passaggi <b className="text-inchiostro">non ancora iniziati</b>: genera la bozza, un umano la controlla in 35+60 minuti (testo) o 2+30 minuti (impaginazione) invece di rifare tutto da zero.</p>
+          <p className="mt-2"><b className="text-inchiostro">Perché Caputo non cambia le date qui sopra.</b> Chi è oggi in "copy e Caputo" ha quel passaggio già in corso, protetto: la leva Caputo non lo tocca (conta solo per l&apos;occupazione, sopra, come proiezione in avanti). Cambia le date solo per i passaggi successivi al proprio, cioè controllo testo e impaginazione.</p>
+          <p className="mt-2">Per i {stadio1Count} clienti ancora in stadio 1 non c&apos;è una data di partenza (dipende da quando il cliente manda i documenti, non dal team).</p>
         </Carta>
       </div>
     </div>

@@ -349,11 +349,16 @@ function SezioneErogazione() {
       </Carta>
 
       <Carta className="bg-petrolio/10">
-        <p className="text-xs font-semibold uppercase text-petrolio-scuro">E se agentizzassimo da qui in avanti?</p>
-        <p className="mt-1 text-[12.5px] text-petrolio-scuro/80">Senza toccare il lavoro di chi lo sta già facendo: il passaggio in corso resta alla persona, solo quelli successivi li fa l&apos;agente.</p>
-        <Link href="/amministrazione/previsione-agentica" className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-petrolio px-4 py-2 text-xs font-semibold text-white hover:opacity-90">
-          Vedi la previsione agentica →
-        </Link>
+        <p className="text-xs font-semibold uppercase text-petrolio-scuro">Umano vs human in the loop</p>
+        <p className="mt-1 text-[12.5px] text-petrolio-scuro/80">Due pagine dedicate sugli stessi {EROG_TOT} clienti: il processo di oggi passaggio per passaggio, e cosa cambia se un agente genera e un umano controlla invece di rifare da zero — senza toccare il lavoro già in corso.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link href="/amministrazione/previsione-umana" className="inline-flex items-center gap-1.5 rounded-xl bg-petrolio px-4 py-2 text-xs font-semibold text-white hover:opacity-90">
+            Pagina Umano →
+          </Link>
+          <Link href="/amministrazione/previsione-agentica" className="inline-flex items-center gap-1.5 rounded-xl border border-petrolio bg-carta px-4 py-2 text-xs font-semibold text-petrolio-scuro hover:bg-petrolio/5">
+            Pagina Human in the loop →
+          </Link>
+        </div>
       </Carta>
     </div>
   )
@@ -400,16 +405,16 @@ function SezioneFuturi() {
         ]
       : [{ nm: '2. Slide — Caputo (manuale)', tm: fmtHM(CAPUTO_MANUALE), who: 'Caputo', bg: 'bg-amber-50', tinta: 'text-amber-700' }]),
     { nm: '3. Revisione testo (agente)', tm: `${AGENTE_TESTO}m`, who: 'agente', bg: 'bg-carta', tinta: 'text-inchiostro' },
-    { nm: '3b. Revisione testo', tm: grippoOn ? fmtHM(REVT * 0.1) : fmtHM(REVT), who: grippoOn ? 'Grippo (−90%)' : copyNomi, bg: grippoOn ? 'bg-teal-50' : 'bg-petrolio/10', tinta: grippoOn ? 'text-teal-700' : 'text-petrolio-scuro' },
+    { nm: '3b. Revisione testo', tm: fmtHM(REVT), who: grippoOn ? 'Grippo' : copyNomi, bg: grippoOn ? 'bg-teal-50' : 'bg-petrolio/10', tinta: grippoOn ? 'text-teal-700' : 'text-petrolio-scuro' },
     { nm: '4. Impaginazione (agente)', tm: `${AGENTE_IMPAG}m`, who: 'agente', bg: 'bg-carta', tinta: 'text-inchiostro' },
-    { nm: '4b. Rev. impaginazione', tm: valentinoOn ? fmtHM(REVI * 0.1) : fmtHM(REVI), who: valentinoOn ? 'Valentino (−90%)' : copyNomi, bg: valentinoOn ? 'bg-indigo-50' : 'bg-petrolio/10', tinta: valentinoOn ? 'text-indigo-700' : 'text-petrolio-scuro' },
+    { nm: '4b. Rev. impaginazione', tm: fmtHM(REVI), who: valentinoOn ? 'Valentino' : copyNomi, bg: valentinoOn ? 'bg-indigo-50' : 'bg-petrolio/10', tinta: valentinoOn ? 'text-indigo-700' : 'text-petrolio-scuro' },
   ]
 
   const agenteTot = AGENTE_TESTO + AGENTE_SLIDE + AGENTE_IMPAG + (fullAiOn ? FULLAI_AGENTE : 0)
   const agenteBreak = fullAiOn
     ? `${FULLAI_AGENTE}+${AGENTE_TESTO}+${AGENTE_SLIDE}+${AGENTE_IMPAG}`
     : `${AGENTE_TESTO}+${AGENTE_SLIDE}+${AGENTE_IMPAG}`
-  const tempoTotale = tempoTotaleReport(grippoOn, valentinoOn, caputoAgenteOn, fullAiOn)
+  const tempoTotale = tempoTotaleReport(caputoAgenteOn, fullAiOn)
 
   const maxDays = sch.totalDays
 

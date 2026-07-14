@@ -558,6 +558,9 @@ export default function QuadroAziendale() {
             <p className="mt-1 max-w-2xl text-sm text-inchiostro/55">{titoli[scope][1]}</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <Link href="/amministrazione/tutor" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
+              Clienti per tutor →
+            </Link>
             <Link href="/amministrazione" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
               ← Quadro Amministrativo
             </Link>

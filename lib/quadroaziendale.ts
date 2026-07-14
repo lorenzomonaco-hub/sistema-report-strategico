@@ -584,3 +584,38 @@ export const EROG_STADI = [
 ]
 
 export const EROG_OGGI = OGGI
+
+// ============================================================
+// VISTA PER TUTOR — stessi 87 clienti, raggruppati per tutor di riferimento.
+// ============================================================
+
+export function slugTutor(tutor: string): string {
+  return tutor
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // toglie accenti
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+export type RiepilogoTutor = {
+  tutor: string
+  slug: string
+  totale: number
+  perStadio: [number, number, number, number] // conteggio per stadio 1..4
+}
+
+export const TUTOR_LIST: RiepilogoTutor[] = Array.from(new Set(EROG_CLIENTI.map((r) => r.tutor)))
+  .sort((a, b) => a.localeCompare(b))
+  .map((tutor) => {
+    const clienti = EROG_CLIENTI.filter((r) => r.tutor === tutor)
+    const perStadio = [1, 2, 3, 4].map((s) => clienti.filter((r) => r.stadio === s).length) as [number, number, number, number]
+    return { tutor, slug: slugTutor(tutor), totale: clienti.length, perStadio }
+  })
+
+export function clientiPerTutor(tutor: string): RigaErog[] {
+  return EROG_CLIENTI.filter((r) => r.tutor === tutor)
+}
+
+export function tutorDaSlug(slug: string): string | null {
+  return TUTOR_LIST.find((t) => t.slug === slug)?.tutor ?? null
+}

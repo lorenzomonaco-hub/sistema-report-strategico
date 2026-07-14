@@ -304,32 +304,60 @@ export function stimaConsegna(r: RigaErog): { data: Date; giorniRitardo: number 
 // separati (copy, Caputo, Grippo/Tabita, Valentino), non più i 4 stadi uniti.
 // ============================================================
 
-function restanteUmanoV2(stadio: StadioErog): number {
-  let g = 0
-  if (stadio <= 2) g += minutesToWorkdays(GEN + CAPUTO_MANUALE) // 4h+2h di puro lavoro, ~1gg
-  if (stadio <= 3) g += UMANO_GRIPPO_GG
-  if (stadio <= 4) g += UMANO_VALENTINO_GG
-  return g
+export function minutesToWorkdays(min: number): number {
+  return Math.max(1, Math.ceil(min / DAY))
 }
 
-/** Come stimaConsegna, ma con copy e Caputo separati (4h+2h di lavorazione pura) invece
- * del dato empirico combinato — su richiesta esplicita di Lorenzo. */
+// Durate dei singoli passaggi, in giorni lavorativi.
+//  - Copy+Caputo: tempo di lavorazione puro (4h+2h) → ~1 giorno.
+//  - Grippo/Tabita e Valentino: dato reale dal foglio (settimane, code comprese).
+//  - Versioni agentiche (agente genera, umano controlla): sempre sotto l'ora → 1 giorno.
+const GG_COPY_CAPUTO = minutesToWorkdays(GEN + CAPUTO_MANUALE)
+const GG_TESTO_AGENTE = minutesToWorkdays(AGENTE_TESTO + REVT)
+const GG_IMPAG_AGENTE = minutesToWorkdays(AGENTE_IMPAG + REVI)
+
+/**
+ * Cammina i passaggi rimanenti in avanti dalla data d'ingresso nello stadio attuale.
+ * Ogni passaggio che finirebbe nel passato viene tirato fino a oggi: un lavoro scaduto
+ * si conclude "adesso", non ieri. Così la data di consegna è sempre realistica (mai nel
+ * passato) e l'ordine riflette quanto lavoro resta davvero — chi è più avanti consegna
+ * prima. È questo che prima mancava e sballava l'ordinamento.
+ */
+function consegnaAvanti(entry: Date, durateGg: number[]): Date {
+  let cursor = new Date(entry)
+  for (const g of durateGg) {
+    cursor = workdayAdd(cursor, g)
+    if (cursor < OGGI) cursor = new Date(OGGI)
+  }
+  return cursor
+}
+
+function durateUmano(stadio: StadioErog): number[] {
+  return stadio === 2 ? [GG_COPY_CAPUTO, UMANO_GRIPPO_GG, UMANO_VALENTINO_GG]
+    : stadio === 3 ? [UMANO_GRIPPO_GG, UMANO_VALENTINO_GG]
+    : [UMANO_VALENTINO_GG]
+}
+
+/** Consegna se resta tutto umano: copy+Caputo (lavorazione), poi Grippo/Tabita e Valentino
+ * (dato reale). Data sempre in avanti; `giorniRitardo` dice di quanto il piano originale è
+ * già stato sforato (info, non usato per l'ordine). */
 export function stimaConsegnaUmanoV2(r: RigaErog): { data: Date; giorniRitardo: number } | null {
-  if (!r.dataStadio) return null
+  if (r.stadio === 1 || !r.dataStadio) return null
   const d0 = parseDataStadio(r.dataStadio)
   if (!d0) return null
-  const data = workdayAdd(d0, restanteUmanoV2(r.stadio))
-  const giorniRitardo = data < OGGI ? workdaysBetween(data, OGGI) : 0
+  const durate = durateUmano(r.stadio)
+  const data = consegnaAvanti(d0, durate)
+  const naturale = durate.reduce((c, g) => workdayAdd(c, g), new Date(d0))
+  const giorniRitardo = naturale < OGGI ? workdaysBetween(naturale, OGGI) : 0
   return { data, giorniRitardo }
 }
 
 /**
- * Come stimaConsegnaUmanoV2, ma i passaggi STRETTAMENTE successivi a quello in corso
- * diventano "human in the loop": l'agente genera, un umano controlla (Grippo/Tabita o
- * Carlo per il testo, Valentino o Carlo per l'impaginazione) — il controllo dura sempre
- * uguale, la leva sceglie solo chi lo fa, non quanto ci mette. Il passaggio ATTUALE non
- * si tocca: resta umano, alla stessa velocità di stimaConsegnaUmanoV2 (non si toglie
- * lavoro già iniziato).
+ * Human in the loop: il passaggio ATTUALE resta alla persona che lo sta già facendo
+ * (non si toglie lavoro iniziato), ma TUTTI i passaggi successivi passano all'agente con
+ * controllo umano (~1 giorno l'uno). Es.: chi è in revisione Grippo → l'impaginazione la
+ * fa l'agente; chi è in scrittura copy → non passa più dalla revisione Grippo umana, va
+ * all'agente. Data sempre in avanti da oggi.
  */
 export function stimaConsegnaHITL(r: RigaErog):
   | { tipo: 'data'; data: Date; giorniRisparmiati: number }
@@ -339,92 +367,72 @@ export function stimaConsegnaHITL(r: RigaErog):
   if (!r.dataStadio) return null
   const d0 = parseDataStadio(r.dataStadio)
   if (!d0) return null
+  const durataCorrente = r.stadio === 2 ? GG_COPY_CAPUTO : r.stadio === 3 ? UMANO_GRIPPO_GG : UMANO_VALENTINO_GG
+  const succ: number[] = []
+  if (r.stadio < 3) succ.push(GG_TESTO_AGENTE)  // la revisione testo diventa agentica
+  if (r.stadio < 4) succ.push(GG_IMPAG_AGENTE)  // l'impaginazione diventa agentica
+  const data = consegnaAvanti(d0, [durataCorrente, ...succ])
   const baseline = stimaConsegnaUmanoV2(r)
-  let minutiSuccessivi = 0
-  if (r.stadio < 3) minutiSuccessivi += AGENTE_TESTO + REVT
-  if (r.stadio < 4) minutiSuccessivi += AGENTE_IMPAG + REVI
-  if (minutiSuccessivi === 0) {
-    // già sull'ultimo passaggio (impaginazione): nessuna trasformazione possibile
-    return baseline ? { tipo: 'data', data: baseline.data, giorniRisparmiati: 0 } : null
-  }
-  const durataStadioCorrente = r.stadio === 2 ? minutesToWorkdays(GEN + CAPUTO_MANUALE) : UMANO_GRIPPO_GG
-  const fineUmana = workdayAdd(d0, durataStadioCorrente)
-  const partenzaAgente = fineUmana < OGGI ? OGGI : fineUmana
-  const data = workdayAdd(partenzaAgente, minutesToWorkdays(minutiSuccessivi))
   const giorniRisparmiati = baseline ? workdaysBetween(data, baseline.data) : 0
   return { tipo: 'data', data, giorniRisparmiati }
 }
 
-export type OccupazioneRuoli = { caputoGg: number; grippoGg: number; valentinoGg: number }
+export type RigaAttesa = { r: RigaErog; data: Date }
 
-/** Carico di lavoro residuo (giorni-uomo) dei 3 ruoli sugli 87 clienti reali, nello
- * scenario Human-in-the-loop: quanti report devono ancora essere controllati da
- * ciascuno, moltiplicati per quanto dura il controllo (fisso, non dipende dalla leva). */
-export function occupazioneHITL(clienti: RigaErog[], caputoAgenteOn: boolean): OccupazioneRuoli {
+/**
+ * I clienti in stadio 1 (informazioni mancanti) non hanno una data di partenza propria:
+ * realisticamente il team li prende in carico quando ha liberato la coda attuale. Partono
+ * quindi dalla consegna dell'ultimo cliente già in lavorazione (`ancora`), poi vengono
+ * scritti in serie dal copy (o dal copy + un secondo) e attraversano i passaggi successivi.
+ * Con la generazione agentica il collo di bottiglia della scrittura sparisce (l'agente
+ * lavora anche di notte, in parallelo): la coda si smaltisce quasi tutta insieme.
+ */
+export function programmaAttesa(
+  clienti: RigaErog[],
+  ancora: Date,
+  opts: { hitl: boolean; copyCount: number; genAgentica: boolean; caputoAgente: boolean },
+): RigaAttesa[] {
+  const attesa = clienti.filter((r) => r.stadio === 1)
+  const minScrittura = opts.genAgentica
+    ? FULLAI_AGENTE + FULLAI_INTERAZIONE + (opts.caputoAgente ? AGENTE_SLIDE + REV_SLIDE : CAPUTO_MANUALE)
+    : GEN + CAPUTO_MANUALE
+  const ggSucc = opts.hitl ? GG_TESTO_AGENTE + GG_IMPAG_AGENTE : UMANO_GRIPPO_GG + UMANO_VALENTINO_GG
+  // Con l'agente-notte la capacità di scrittura è di fatto illimitata (tutti in parallelo);
+  // altrimenti è seriale sul numero di copy scelti.
+  const nLanes = opts.genAgentica ? Math.max(attesa.length, 1) : Math.max(1, opts.copyCount)
+  const lanes = new Array(nLanes).fill(0)
+  return attesa.map((r) => {
+    let li = 0
+    for (let l = 1; l < lanes.length; l++) if (lanes[l] < lanes[li]) li = l
+    lanes[li] += minScrittura
+    const ggScrittura = minutesToWorkdays(lanes[li])
+    return { r, data: workdayAdd(ancora, ggScrittura + ggSucc) }
+  })
+}
+
+export type OccupazioneRuoli = { caputoGg: number; grippoGg: number; valentinoGg: number; copyGg: number }
+
+/** Carico di lavoro residuo (giorni-uomo) dei ruoli sugli 87 clienti reali, nello scenario
+ * Human-in-the-loop. Il controllo dura sempre uguale; le leve decidono di CHI è il tempo:
+ * se lo specialista si inserisce nel flusso il carico è suo, altrimenti ricade sul copy. */
+export function occupazioneHITL(
+  clienti: RigaErog[],
+  opts: { caputoAgente: boolean; grippoOn: boolean; valentinoOn: boolean },
+): OccupazioneRuoli {
   // stadio 1 escluso: informazioni mancanti, nessun lavoro futuro certo da contare
   const daCaputo = clienti.filter((r) => r.stadio === 2).length
   const daGrippo = clienti.filter((r) => r.stadio === 2 || r.stadio === 3).length
   const daValentino = clienti.filter((r) => r.stadio >= 2).length
-  const caputoMin = daCaputo * (caputoAgenteOn ? REV_SLIDE : CAPUTO_MANUALE)
+  const caputoMin = daCaputo * (opts.caputoAgente ? REV_SLIDE : CAPUTO_MANUALE)
   const grippoMin = daGrippo * REVT
   const valentinoMin = daValentino * REVI
+  const gg = (m: number) => Math.round((m / DAY) * 10) / 10
   return {
-    caputoGg: Math.round((caputoMin / DAY) * 10) / 10,
-    grippoGg: Math.round((grippoMin / DAY) * 10) / 10,
-    valentinoGg: Math.round((valentinoMin / DAY) * 10) / 10,
+    caputoGg: gg(caputoMin),
+    grippoGg: gg(opts.grippoOn ? grippoMin : 0),
+    valentinoGg: gg(opts.valentinoOn ? valentinoMin : 0),
+    copyGg: gg((opts.grippoOn ? 0 : grippoMin) + (opts.valentinoOn ? 0 : valentinoMin)),
   }
-}
-
-export function minutesToWorkdays(min: number): number {
-  return Math.max(1, Math.ceil(min / DAY))
-}
-
-/**
- * Minuti restanti in modalità "human in the loop" per i passaggi ANCORA DA FARE
- * di un cliente già in erogazione — il passaggio ATTUALE non si tocca mai (non si
- * toglie lavoro già iniziato): resta umano, alla velocità reale già in corso.
- * Il passaggio di Caputo non è incluso qui apposta: per chi è già in stadio 2 il
- * suo tempo è dentro STIMA_LARGA_STAGE2, indistinguibile dalla scrittura — la leva
- * Caputo si applica solo ai clienti non ancora iniziati (futuri).
- */
-function minutiRestantiErogazioneHITL(stadio: StadioErog): number {
-  let m = 0
-  if (stadio < 3) m += AGENTE_TESTO + REVT
-  if (stadio < 4) m += AGENTE_IMPAG + REVI
-  return m
-}
-
-/**
- * Data di consegna se il passaggio in corso resta alla persona che lo sta già
- * facendo (non le si toglie il lavoro), ma tutti i passaggi successivi li fa
- * l'agente con controllo umano (human in the loop) — il controllo dura sempre
- * la stessa ora/mezz'ora sia che lo faccia Grippo/Valentino sia che lo faccia
- * Carlo, quindi la data non dipende da chi lo fa. Per lo stadio 1 non c'è una
- * data di partenza: non si può stimare finché non arrivano le informazioni.
- */
-export function stimaConsegnaAgentica(r: RigaErog):
-  | { tipo: 'data'; data: Date; giorniRisparmiati: number }
-  | { tipo: 'condizionale' }
-  | null {
-  if (r.stadio === 1) return { tipo: 'condizionale' }
-  if (!r.dataStadio) return null
-  const d0 = parseDataStadio(r.dataStadio)
-  if (!d0) return null
-  const baseline = stimaConsegna(r)
-  const minutiRestanti = minutiRestantiErogazioneHITL(r.stadio)
-  if (minutiRestanti === 0) {
-    // già sull'ultimo passaggio (Valentino): nessuna trasformazione possibile, resta la stima umana
-    return baseline ? { tipo: 'data', data: baseline.data, giorniRisparmiati: 0 } : null
-  }
-  const stimaStadioCorrente =
-    r.stadio === 2 ? STIMA_LARGA_STAGE2 : r.stadio === 3 ? STIMA_LARGA_STAGE3 : STIMA_LARGA_STAGE4
-  const fineUmana = workdayAdd(d0, stimaStadioCorrente)
-  // Se il passaggio umano, con la stima larga, dovrebbe già essere finito, l'agente
-  // parte da oggi (il giorno in cui lo attiveremo) — non da una data passata.
-  const partenzaAgente = fineUmana < OGGI ? OGGI : fineUmana
-  const data = workdayAdd(partenzaAgente, minutesToWorkdays(minutiRestanti))
-  const giorniRisparmiati = baseline ? workdaysBetween(data, baseline.data) : 0
-  return { tipo: 'data', data, giorniRisparmiati }
 }
 
 export type RigaFutura = { nome: string; azienda: string; rifare: boolean; data: Date }

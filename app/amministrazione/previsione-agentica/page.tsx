@@ -46,14 +46,27 @@ function Opzione({ attiva, label, tinta, onClick }:
   )
 }
 
-const STADIO_INFO: Record<StadioErog, { label: string; barra: string; testo: string }> = {
-  1: { label: 'Informazioni mancanti', barra: 'bg-rose-500', testo: 'text-rose-700' },
-  2: { label: 'Copy e Caputo', barra: 'bg-petrolio', testo: 'text-petrolio-scuro' },
-  3: { label: 'Revisione Grippo/Tabita', barra: 'bg-teal-600', testo: 'text-teal-700' },
-  4: { label: 'Impaginazione Valentino', barra: 'bg-indigo-600', testo: 'text-indigo-700' },
+const STADIO_INFO: Record<StadioErog, { label: string; barra: string; barraDone: string; testo: string }> = {
+  1: { label: 'Informazioni mancanti', barra: 'bg-rose-500', barraDone: 'bg-rose-500/25', testo: 'text-rose-700' },
+  2: { label: 'Copy e Caputo', barra: 'bg-petrolio', barraDone: 'bg-petrolio/25', testo: 'text-petrolio-scuro' },
+  3: { label: 'Revisione Grippo/Tabita', barra: 'bg-teal-600', barraDone: 'bg-teal-600/25', testo: 'text-teal-700' },
+  4: { label: 'Impaginazione Valentino', barra: 'bg-indigo-600', barraDone: 'bg-indigo-600/25', testo: 'text-indigo-700' },
 }
 
-type RigaGantt = { titolo: string; sottotitolo: string; data: Date; overdue: boolean; tag?: string }
+/** I 4 segmenti fissi del flusso: quelli passati sono pieni tenui, quello attuale acceso, i futuri vuoti. */
+function SegmentiStadi({ stadio }: { stadio: StadioErog }) {
+  return (
+    <div className="mt-1 flex items-center gap-1">
+      {([1, 2, 3, 4] as StadioErog[]).map((n) => {
+        const c = STADIO_INFO[n]
+        const cls = n === stadio ? c.barra : n < stadio ? c.barraDone : 'bg-inchiostro/[0.07]'
+        return <div key={n} className={`h-1.5 flex-1 rounded-full transition-colors ${cls}`} />
+      })}
+    </div>
+  )
+}
+
+type RigaGantt = { titolo: string; sottotitolo: string; stadio: StadioErog; data: Date; overdue: boolean; tag?: string }
 
 function RigaBarra({ r, maxDays, zebra }: { r: RigaGantt; maxDays: number; zebra: boolean }) {
   const giorni = Math.round((r.data.getTime() - EROG_OGGI.getTime()) / GIORNO_MS)
@@ -65,6 +78,7 @@ function RigaBarra({ r, maxDays, zebra }: { r: RigaGantt; maxDays: number; zebra
       <div className="border-r border-linea px-3 py-2">
         <p className="truncate text-[12.5px] font-bold text-inchiostro">{r.titolo}</p>
         <p className="truncate text-[10.5px] text-inchiostro/45">{r.sottotitolo}</p>
+        <SegmentiStadi stadio={r.stadio} />
       </div>
       <div className="relative h-9">
         <div className={`absolute top-1/2 h-[11px] -translate-y-1/2 rounded-full ${r.overdue ? 'bg-rose-500' : 'bg-petrolio'}`}
@@ -105,6 +119,7 @@ function Assi({ maxDays }: { maxDays: number }) {
 }
 
 export default function PrevisioneAgentica() {
+  const [copyCount, setCopyCount] = useState(1)
   const [grippoOn, setGrippoOn] = useState(false)
   const [valentinoOn, setValentinoOn] = useState(false)
   const [caputoAgenteOn, setCaputoAgenteOn] = useState(false)
@@ -125,7 +140,7 @@ export default function PrevisioneAgentica() {
   const stadio1Count = EROG_CLIENTI.filter((r) => r.stadio === 1).length
 
   const righeGantt: RigaGantt[] = righe.map(({ r, data }) => ({
-    titolo: r.nome, sottotitolo: `${r.azienda} · ${STADIO_INFO[r.stadio].label}`, data, overdue: data < EROG_OGGI,
+    titolo: r.nome, sottotitolo: `${r.azienda} · ${STADIO_INFO[r.stadio].label}`, stadio: r.stadio, data, overdue: data < EROG_OGGI,
     tag: r.daVerificare ? 'da verificare' : r.dataApprox ? 'data stimata' : undefined,
   }))
   const maxDate = righeGantt.reduce((m, x) => (x.data > m ? x.data : m), EROG_OGGI)
@@ -153,32 +168,39 @@ export default function PrevisioneAgentica() {
         </header>
 
         <div className="mt-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Le variabili — chi fa il controllo</h3>
-          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Le variabili — scegli prima di vedere i risultati</h3>
+          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-4">
+            <Carta>
+              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-petrolio" />Chi scrive — copy</p>
+              <div className="space-y-1.5">
+                <Opzione attiva={copyCount === 1} label="Solo Carlo" tinta="bg-petrolio/10 text-petrolio-scuro" onClick={() => setCopyCount(1)} />
+                <Opzione attiva={copyCount === 2} label="Carlo + Paolo" tinta="bg-petrolio/10 text-petrolio-scuro" onClick={() => setCopyCount(2)} />
+              </div>
+            </Carta>
             <Carta>
               <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-amber-500" />Slide — Caputo</p>
               <div className="space-y-1.5">
-                <Opzione attiva={!caputoAgenteOn} label="Manuale — 2h" tinta="bg-amber-50 text-amber-700" onClick={() => setCaputoAgenteOn(false)} />
-                <Opzione attiva={caputoAgenteOn} label="Assistito da agente — 25min" tinta="bg-amber-50 text-amber-700" onClick={() => setCaputoAgenteOn(true)} />
+                <Opzione attiva={!caputoAgenteOn} label="Il copy controlla — manuale, 2h" tinta="bg-amber-50 text-amber-700" onClick={() => setCaputoAgenteOn(false)} />
+                <Opzione attiva={caputoAgenteOn} label="Caputo si inserisce nel flusso — 25min" tinta="bg-amber-50 text-amber-700" onClick={() => setCaputoAgenteOn(true)} />
               </div>
             </Carta>
             <Carta>
-              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-teal-600" />Controllo testo — chi lo fa</p>
+              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-teal-600" />Controllo testo</p>
               <div className="space-y-1.5">
-                <Opzione attiva={!grippoOn} label="Carlo controlla" tinta="bg-teal-50 text-teal-700" onClick={() => setGrippoOn(false)} />
-                <Opzione attiva={grippoOn} label="Grippo/Tabita controlla" tinta="bg-teal-50 text-teal-700" onClick={() => setGrippoOn(true)} />
+                <Opzione attiva={!grippoOn} label="Il copy controlla" tinta="bg-teal-50 text-teal-700" onClick={() => setGrippoOn(false)} />
+                <Opzione attiva={grippoOn} label="Grippo/Tabita si inserisce nel flusso" tinta="bg-teal-50 text-teal-700" onClick={() => setGrippoOn(true)} />
               </div>
             </Carta>
             <Carta>
-              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-indigo-600" />Controllo impaginazione — chi lo fa</p>
+              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-indigo-600" />Controllo impaginazione</p>
               <div className="space-y-1.5">
-                <Opzione attiva={!valentinoOn} label="Carlo controlla" tinta="bg-indigo-50 text-indigo-700" onClick={() => setValentinoOn(false)} />
-                <Opzione attiva={valentinoOn} label="Valentino controlla" tinta="bg-indigo-50 text-indigo-700" onClick={() => setValentinoOn(true)} />
+                <Opzione attiva={!valentinoOn} label="Il copy controlla" tinta="bg-indigo-50 text-indigo-700" onClick={() => setValentinoOn(false)} />
+                <Opzione attiva={valentinoOn} label="Valentino si inserisce nel flusso" tinta="bg-indigo-50 text-indigo-700" onClick={() => setValentinoOn(true)} />
               </div>
             </Carta>
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-inchiostro/45">
-            Il controllo dura sempre lo stesso tempo (35+60min per il testo, 2+30min per l&apos;impaginazione) sia che lo faccia lo specialista sia Carlo: la leva decide solo di chi è il tempo, non quanto ci mette — per questo il gantt sotto non cambia scegliendo chi controlla. Cambia invece l&apos;occupazione di ciascuno, qui sotto.
+            Il controllo dura sempre lo stesso tempo (35+60min per il testo, 2+30min per l&apos;impaginazione) sia che si inserisca lo specialista sia che controlli il copy: la leva decide solo di chi è il tempo, non quanto ci mette — per questo il gantt sotto non cambia scegliendo chi controlla (né scegliendo quante persone scrivono, che riguarda solo la coda dei nuovi progetti). Cambia invece l&apos;occupazione di ciascuno, qui sotto.
           </p>
         </div>
 

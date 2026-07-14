@@ -9,13 +9,13 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import {
-  AGENTE_GRAFICI, AGENTE_IMPAG, AGENTE_TESTO, DAY, EROG_ANOMALIE, EROG_CLIENTI,
+  AGENTE_IMPAG, AGENTE_SLIDE, AGENTE_TESTO, CAPUTO_MANUALE, DAY, EROG_ANOMALIE, EROG_CLIENTI,
   EROG_OGGI, EROG_PER_STADIO, EROG_STADI, EROG_TOT, FULLAI_AGENTE, FULLAI_INTERAZIONE, GEN,
   GIORNO_MS, MEDIANA_STAGE2_RECENTE, MEDIANA_STAGE2_STORICO, MEDIANA_STAGE3_RECENTE,
   MEDIANA_STAGE3_STORICO, MEDIANA_STAGE4_RECENTE, MEDIANA_STAGE4_STORICO, N_FUTURI,
-  REVG, REVI, REVT, RigaErog, Schedule, STIMA_LARGA_STAGE2, STIMA_LARGA_STAGE3,
+  REV_SLIDE, REVI, REVT, RigaErog, Schedule, STIMA_LARGA_STAGE2, STIMA_LARGA_STAGE3,
   STIMA_LARGA_STAGE4, StadioErog, VENDITE_MENSILI, fmtData, fmtHM, schedule,
-  stimaConsegna, workday,
+  stimaConsegna, tempoTotaleReport, workday,
 } from '@/lib/quadroaziendale'
 
 const LARGHEZZA_TABELLA = 260
@@ -367,20 +367,22 @@ function SezioneFuturi() {
   const [copyCount, setCopyCount] = useState(1)
   const [grippoOn, setGrippoOn] = useState(false)
   const [valentinoOn, setValentinoOn] = useState(false)
+  const [caputoAgenteOn, setCaputoAgenteOn] = useState(false)
   const [fullAiOn, setFullAiOn] = useState(false)
 
-  const sch: Schedule = useMemo(() => schedule(copyCount, grippoOn, valentinoOn, fullAiOn),
-    [copyCount, grippoOn, valentinoOn, fullAiOn])
+  const sch: Schedule = useMemo(() => schedule(copyCount, grippoOn, valentinoOn, caputoAgenteOn, fullAiOn),
+    [copyCount, grippoOn, valentinoOn, caputoAgenteOn, fullAiOn])
 
-  const preset = (cc: number, g: boolean, v: boolean, fa: boolean) => {
-    setCopyCount(cc); setGrippoOn(g); setValentinoOn(v); setFullAiOn(fa)
+  const preset = (cc: number, g: boolean, v: boolean, c: boolean, fa: boolean) => {
+    setCopyCount(cc); setGrippoOn(g); setValentinoOn(v); setCaputoAgenteOn(c); setFullAiOn(fa)
   }
-  const presets: { label: string; cc: number; g: boolean; v: boolean; fa: boolean }[] = [
-    { label: '1 · Solo Carlo', cc: 1, g: false, v: false, fa: false },
-    { label: '2 · + Paolo', cc: 2, g: false, v: false, fa: false },
-    { label: '3 · + Grippo', cc: 2, g: true, v: false, fa: false },
-    { label: '4 · + Valentino', cc: 2, g: true, v: true, fa: false },
-    { label: '5 · Full AI', cc: 2, g: true, v: true, fa: true },
+  const presets: { label: string; cc: number; g: boolean; v: boolean; c: boolean; fa: boolean }[] = [
+    { label: '1 · Solo Carlo', cc: 1, g: false, v: false, c: false, fa: false },
+    { label: '2 · + Paolo', cc: 2, g: false, v: false, c: false, fa: false },
+    { label: '3 · + Grippo', cc: 2, g: true, v: false, c: false, fa: false },
+    { label: '4 · + Valentino', cc: 2, g: true, v: true, c: false, fa: false },
+    { label: '5 · + Agente slide (Caputo)', cc: 2, g: true, v: true, c: true, fa: false },
+    { label: '6 · Full AI', cc: 2, g: true, v: true, c: true, fa: true },
   ]
 
   const copyNomi = copyCount === 1 ? 'Carlo' : 'Carlo o Paolo'
@@ -391,18 +393,23 @@ function SezioneFuturi() {
           { nm: "1b. Interazione con l'AI", tm: fmtHM(FULLAI_INTERAZIONE), who: copyNomi, bg: 'bg-petrolio/10', tinta: 'text-petrolio-scuro' },
         ]
       : [{ nm: '1. Generazione', tm: fmtHM(GEN), who: copyNomi, bg: 'bg-petrolio/10', tinta: 'text-petrolio-scuro' }]),
-    { nm: '2. Revisione testo (agente)', tm: `${AGENTE_TESTO}m`, who: 'agente', bg: 'bg-carta', tinta: 'text-inchiostro' },
-    { nm: '2b. Revisione testo', tm: grippoOn ? fmtHM(REVT * 0.1) : fmtHM(REVT), who: grippoOn ? 'Grippo (−90%)' : copyNomi, bg: grippoOn ? 'bg-teal-50' : 'bg-petrolio/10', tinta: grippoOn ? 'text-teal-700' : 'text-petrolio-scuro' },
-    { nm: '3. Creazione grafici (agente)', tm: `${AGENTE_GRAFICI}m`, who: 'agente', bg: 'bg-carta', tinta: 'text-inchiostro' },
-    { nm: '3b. Revisione grafici', tm: valentinoOn ? fmtHM(REVG * 0.1) : fmtHM(REVG), who: valentinoOn ? 'Valentino (−90%)' : copyNomi, bg: valentinoOn ? 'bg-indigo-50' : 'bg-petrolio/10', tinta: valentinoOn ? 'text-indigo-700' : 'text-petrolio-scuro' },
+    ...(caputoAgenteOn
+      ? [
+          { nm: '2. Slide (agente)', tm: `${AGENTE_SLIDE}m`, who: 'agente', bg: 'bg-carta', tinta: 'text-inchiostro' },
+          { nm: '2b. Slide — Caputo rivede', tm: `${REV_SLIDE}m`, who: 'Caputo', bg: 'bg-amber-50', tinta: 'text-amber-700' },
+        ]
+      : [{ nm: '2. Slide — Caputo (manuale)', tm: fmtHM(CAPUTO_MANUALE), who: 'Caputo', bg: 'bg-amber-50', tinta: 'text-amber-700' }]),
+    { nm: '3. Revisione testo (agente)', tm: `${AGENTE_TESTO}m`, who: 'agente', bg: 'bg-carta', tinta: 'text-inchiostro' },
+    { nm: '3b. Revisione testo', tm: grippoOn ? fmtHM(REVT * 0.1) : fmtHM(REVT), who: grippoOn ? 'Grippo (−90%)' : copyNomi, bg: grippoOn ? 'bg-teal-50' : 'bg-petrolio/10', tinta: grippoOn ? 'text-teal-700' : 'text-petrolio-scuro' },
     { nm: '4. Impaginazione (agente)', tm: `${AGENTE_IMPAG}m`, who: 'agente', bg: 'bg-carta', tinta: 'text-inchiostro' },
-    { nm: '4b. Rev. impaginazione', tm: grippoOn ? fmtHM(REVI * 0.1) : fmtHM(REVI), who: grippoOn ? 'Grippo (−90%)' : copyNomi, bg: grippoOn ? 'bg-teal-50' : 'bg-petrolio/10', tinta: grippoOn ? 'text-teal-700' : 'text-petrolio-scuro' },
+    { nm: '4b. Rev. impaginazione', tm: valentinoOn ? fmtHM(REVI * 0.1) : fmtHM(REVI), who: valentinoOn ? 'Valentino (−90%)' : copyNomi, bg: valentinoOn ? 'bg-indigo-50' : 'bg-petrolio/10', tinta: valentinoOn ? 'text-indigo-700' : 'text-petrolio-scuro' },
   ]
 
-  const agenteTot = AGENTE_TESTO + AGENTE_GRAFICI + AGENTE_IMPAG + (fullAiOn ? FULLAI_AGENTE : 0)
+  const agenteTot = AGENTE_TESTO + AGENTE_SLIDE + AGENTE_IMPAG + (fullAiOn ? FULLAI_AGENTE : 0)
   const agenteBreak = fullAiOn
-    ? `${FULLAI_AGENTE}+${AGENTE_TESTO}+${AGENTE_GRAFICI}+${AGENTE_IMPAG}`
-    : `${AGENTE_TESTO}+${AGENTE_GRAFICI}+${AGENTE_IMPAG}`
+    ? `${FULLAI_AGENTE}+${AGENTE_TESTO}+${AGENTE_SLIDE}+${AGENTE_IMPAG}`
+    : `${AGENTE_TESTO}+${AGENTE_SLIDE}+${AGENTE_IMPAG}`
+  const tempoTotale = tempoTotaleReport(grippoOn, valentinoOn, caputoAgenteOn, fullAiOn)
 
   const maxDays = sch.totalDays
 
@@ -420,49 +427,60 @@ function SezioneFuturi() {
           ))}
         </div>
         <p className="mt-2 rounded-xl border border-linea bg-carta p-3 text-xs text-inchiostro/60">
-          L&apos;agente lavora <b className="text-inchiostro">{agenteTot} min</b> a report ({agenteBreak}), sempre in parallelo
-          {fullAiOn ? ' — ora genera anche il documento' : ''}. Mentre lui lavora, chi scrive non aspetta: investe
-          almeno <b className="text-inchiostro">30 min</b>{' '}in anticipo sul report successivo. Il tempo &quot;copy&quot; qui sotto è già netto di questo recupero.
+          L&apos;agente lavora <b className="text-inchiostro">{agenteTot} min</b> a report ({agenteBreak}), ma il suo tempo
+          resta comunque nella sequenza{fullAiOn ? ' — ora genera anche il documento' : ''}: un report non è pronto finché
+          non ha attraversato tutti i passaggi, agente compreso. Mentre l&apos;agente lavora, però, chi scrive non resta
+          fermo: investe <b className="text-inchiostro">30 min</b> in anticipo sul report successivo — l&apos;unica parte
+          davvero recuperabile. Per questo <b className="text-inchiostro">un report richiede {fmtHM(tempoTotale)}</b> da
+          inizio a fine (somma di ogni passaggio qui sopra, meno quei 30 min), non le {fmtHM(sch.per)} che il copy da solo
+          ci investe: quelle servono solo a calcolare quanti report al giorno riesce a scrivere.
         </p>
       </div>
 
       <div>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Chi c&apos;è in squadra</h3>
-        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-4">
+        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-5">
           <Carta>
             <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-petrolio" />Chi scrive — copy</p>
             <div className="space-y-1.5">
-              <Opzione attiva={copyCount === 1} label="Solo Carlo" giorni={schedule(1, grippoOn, valentinoOn, fullAiOn).totalDays} tinta="bg-petrolio/10 text-petrolio-scuro" onClick={() => setCopyCount(1)} />
-              <Opzione attiva={copyCount === 2} label="Carlo + Paolo" giorni={schedule(2, grippoOn, valentinoOn, fullAiOn).totalDays} tinta="bg-petrolio/10 text-petrolio-scuro" onClick={() => setCopyCount(2)} />
+              <Opzione attiva={copyCount === 1} label="Solo Carlo" giorni={schedule(1, grippoOn, valentinoOn, caputoAgenteOn, fullAiOn).totalDays} tinta="bg-petrolio/10 text-petrolio-scuro" onClick={() => setCopyCount(1)} />
+              <Opzione attiva={copyCount === 2} label="Carlo + Paolo" giorni={schedule(2, grippoOn, valentinoOn, caputoAgenteOn, fullAiOn).totalDays} tinta="bg-petrolio/10 text-petrolio-scuro" onClick={() => setCopyCount(2)} />
+            </div>
+          </Carta>
+          <Carta>
+            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-amber-500" />Slide — Caputo</p>
+            <div className="space-y-1.5">
+              <Opzione attiva={!caputoAgenteOn} label="Manuale — 2h" giorni={schedule(copyCount, grippoOn, valentinoOn, false, fullAiOn).totalDays} tinta="bg-amber-50 text-amber-700" onClick={() => setCaputoAgenteOn(false)} />
+              <Opzione attiva={caputoAgenteOn} label="Assistito da agente" giorni={schedule(copyCount, grippoOn, valentinoOn, true, fullAiOn).totalDays} tinta="bg-amber-50 text-amber-700" onClick={() => setCaputoAgenteOn(true)} />
             </div>
           </Carta>
           <Carta>
             <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-teal-600" />Revisore testo — Grippo</p>
             <div className="space-y-1.5">
-              <Opzione attiva={!grippoOn} label="Off — resta al copy" giorni={schedule(copyCount, false, valentinoOn, fullAiOn).totalDays} tinta="bg-teal-50 text-teal-700" onClick={() => setGrippoOn(false)} />
-              <Opzione attiva={grippoOn} label="On — assorbe la revisione" giorni={schedule(copyCount, true, valentinoOn, fullAiOn).totalDays} tinta="bg-teal-50 text-teal-700" onClick={() => setGrippoOn(true)} />
+              <Opzione attiva={!grippoOn} label="Off — resta al copy" giorni={schedule(copyCount, false, valentinoOn, caputoAgenteOn, fullAiOn).totalDays} tinta="bg-teal-50 text-teal-700" onClick={() => setGrippoOn(false)} />
+              <Opzione attiva={grippoOn} label="On — assorbe la revisione" giorni={schedule(copyCount, true, valentinoOn, caputoAgenteOn, fullAiOn).totalDays} tinta="bg-teal-50 text-teal-700" onClick={() => setGrippoOn(true)} />
             </div>
           </Carta>
           <Carta>
-            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-indigo-600" />Grafico — Valentino</p>
+            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-indigo-600" />Impaginazione — Valentino</p>
             <div className="space-y-1.5">
-              <Opzione attiva={!valentinoOn} label="Off — resta al copy" giorni={schedule(copyCount, grippoOn, false, fullAiOn).totalDays} tinta="bg-indigo-50 text-indigo-700" onClick={() => setValentinoOn(false)} />
-              <Opzione attiva={valentinoOn} label="On — assorbe la grafica" giorni={schedule(copyCount, grippoOn, true, fullAiOn).totalDays} tinta="bg-indigo-50 text-indigo-700" onClick={() => setValentinoOn(true)} />
+              <Opzione attiva={!valentinoOn} label="Off — resta al copy" giorni={schedule(copyCount, grippoOn, false, caputoAgenteOn, fullAiOn).totalDays} tinta="bg-indigo-50 text-indigo-700" onClick={() => setValentinoOn(false)} />
+              <Opzione attiva={valentinoOn} label="On — assorbe l'impaginazione" giorni={schedule(copyCount, grippoOn, true, caputoAgenteOn, fullAiOn).totalDays} tinta="bg-indigo-50 text-indigo-700" onClick={() => setValentinoOn(true)} />
             </div>
           </Carta>
           <Carta>
             <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase text-inchiostro/50"><span className="h-2 w-2 rounded-full bg-violet-600" />Generazione — Full AI</p>
             <div className="space-y-1.5">
-              <Opzione attiva={!fullAiOn} label="Off — scrive il copy" giorni={schedule(copyCount, grippoOn, valentinoOn, false).totalDays} tinta="bg-violet-50 text-violet-700" onClick={() => setFullAiOn(false)} />
-              <Opzione attiva={fullAiOn} label="On — genera l'AI" giorni={schedule(copyCount, grippoOn, valentinoOn, true).totalDays} tinta="bg-violet-50 text-violet-700" onClick={() => setFullAiOn(true)} />
+              <Opzione attiva={!fullAiOn} label="Off — scrive il copy" giorni={schedule(copyCount, grippoOn, valentinoOn, caputoAgenteOn, false).totalDays} tinta="bg-violet-50 text-violet-700" onClick={() => setFullAiOn(false)} />
+              <Opzione attiva={fullAiOn} label="On — genera l'AI" giorni={schedule(copyCount, grippoOn, valentinoOn, caputoAgenteOn, true).totalDays} tinta="bg-violet-50 text-violet-700" onClick={() => setFullAiOn(true)} />
             </div>
           </Carta>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {presets.map((p) => {
-            const attivo = copyCount === p.cc && grippoOn === p.g && valentinoOn === p.v && fullAiOn === p.fa
+            const attivo = copyCount === p.cc && grippoOn === p.g && valentinoOn === p.v && caputoAgenteOn === p.c && fullAiOn === p.fa
             return (
-              <button key={p.label} onClick={() => preset(p.cc, p.g, p.v, p.fa)}
+              <button key={p.label} onClick={() => preset(p.cc, p.g, p.v, p.c, p.fa)}
                 className={`rounded-lg border px-3 py-1 text-[11.5px] font-semibold ${attivo ? 'border-transparent bg-petrolio text-white' : 'border-linea bg-carta text-inchiostro/60 hover:text-inchiostro'}`}>
                 {p.label}
               </button>
@@ -471,9 +489,13 @@ function SezioneFuturi() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Statistica label={`${N_FUTURI} progetti, prodotti così`} valore={`~${sch.totalDays} giornate`} sub={`ultimo report: ${fmtData(workday(sch.totalDays))}`} tinta="text-petrolio-scuro" grande />
-        <Statistica label="Tempo copy / report" valore={fmtHM(sch.per) + (copyCount === 2 ? ' a testa' : '')} sub={fullAiOn ? "interazione con l'AI + revisioni non assorbite" : 'generazione + revisioni non assorbite'} />
+        <Statistica label="Tempo per consegnare UN report" valore={fmtHM(tempoTotale)} sub="da inizio a fine, agente compreso, meno 30' recuperabili" tinta="text-petrolio-scuro" grande />
+        <Statistica label="Tempo copy / report" valore={fmtHM(sch.per) + (copyCount === 2 ? ' a testa' : '')} sub="solo il lavoro del copy — usato per programmare la coda" />
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Statistica label="Caputo — utilizzo" valore={`${sch.caputoUtilPct.toFixed(0)}%`} sub={caputoAgenteOn ? "della sua giornata, in media (assistito)" : `della sua giornata, in media (manuale) — ${sch.caputoDays}gg per smaltire i 58`} tinta="text-amber-700" />
         <Statistica label="Grippo — utilizzo" valore={grippoOn ? `${sch.grippoUtilPct.toFixed(0)}%` : '—'} sub={grippoOn ? 'della sua giornata, in media' : 'non attivo'} tinta={grippoOn ? 'text-teal-700' : 'text-inchiostro/40'} />
         <Statistica label="Valentino — utilizzo" valore={valentinoOn ? `${sch.valentinoUtilPct.toFixed(0)}%` : '—'} sub={valentinoOn ? 'della sua giornata, in media' : 'non attivo'} tinta={valentinoOn ? 'text-indigo-700' : 'text-inchiostro/40'} />
       </div>

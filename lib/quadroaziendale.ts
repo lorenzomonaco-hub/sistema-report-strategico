@@ -95,16 +95,35 @@ export const PROGETTI_FUTURI: [string, string, boolean][] = [
 ]
 export const N_FUTURI = PROGETTI_FUTURI.length
 
-export const GEN = 240, REVT = 60, REVG = 15, REVI = 30, CREDIT = 30, DAY = 420
-export const AGENTE_TESTO = 35, AGENTE_GRAFICI = 10, AGENTE_IMPAG = 2
+export const GEN = 240, REVT = 60, REVI = 30, CREDIT = 30, DAY = 420
+export const AGENTE_TESTO = 35, AGENTE_IMPAG = 2
 export const FULLAI_AGENTE = 60, FULLAI_INTERAZIONE = 60
+// Passaggio di Caputo (slide), tra la generazione e la revisione testo — confermato da Lorenzo:
+// manuale (senza agente) 2h a report; con l'agente, 10' per generare la bozza + 15' di revisione di Caputo.
+export const CAPUTO_MANUALE = 120
+export const AGENTE_SLIDE = 10
+export const REV_SLIDE = 15
 
 export function perReportCopyMin(grippoOn: boolean, valentinoOn: boolean, fullAiOn: boolean): number {
   let m = fullAiOn ? FULLAI_INTERAZIONE : GEN
   if (!grippoOn) m += REVT
-  if (!valentinoOn) m += REVG
-  if (!grippoOn) m += REVI
+  if (!valentinoOn) m += REVI
   return m - CREDIT
+}
+
+/**
+ * Tempo reale, da inizio a fine, per consegnare UN report: somma di ogni passaggio della
+ * pipeline (agente compreso — non è "gratis", richiede comunque il suo tempo in sequenza),
+ * meno i 30' di recupero che chi scrive investe in anticipo sul report successivo mentre
+ * l'agente lavora. Diverso da perReportCopyMin, che è solo il tempo che il copy investe
+ * (usato per programmare quanti report al giorno riesce a scrivere).
+ */
+export function tempoTotaleReport(grippoOn: boolean, valentinoOn: boolean, caputoAgenteOn: boolean, fullAiOn: boolean): number {
+  const generazione = fullAiOn ? FULLAI_AGENTE + FULLAI_INTERAZIONE : GEN
+  const slide = caputoAgenteOn ? AGENTE_SLIDE + REV_SLIDE : CAPUTO_MANUALE
+  const revisioneTesto = AGENTE_TESTO + (grippoOn ? REVT * 0.1 : REVT)
+  const impaginazione = AGENTE_IMPAG + (valentinoOn ? REVI * 0.1 : REVI)
+  return generazione + slide + revisioneTesto + impaginazione - CREDIT
 }
 
 export type RigaSchedulata = { nome: string; contesto: string; rifare: boolean; start: number; finish: number }
@@ -114,9 +133,11 @@ export type Schedule = {
   totalDays: number
   grippoUtilPct: number
   valentinoUtilPct: number
+  caputoUtilPct: number
+  caputoDays: number
 }
 
-export function schedule(copyCount: number, grippoOn: boolean, valentinoOn: boolean, fullAiOn: boolean): Schedule {
+export function schedule(copyCount: number, grippoOn: boolean, valentinoOn: boolean, caputoAgenteOn: boolean, fullAiOn: boolean): Schedule {
   const per = perReportCopyMin(grippoOn, valentinoOn, fullAiOn)
   const lanes = new Array(copyCount).fill(0)
   const righe: RigaSchedulata[] = PROGETTI_FUTURI.map(([nome, contesto, rifare]) => {
@@ -127,13 +148,19 @@ export function schedule(copyCount: number, grippoOn: boolean, valentinoOn: bool
     return { nome, contesto, rifare, start, finish: lanes[li] }
   })
   const copyDays = Math.ceil(Math.max(...lanes) / DAY)
-  const grippoMin = grippoOn ? N_FUTURI * (REVT + REVI) * 0.10 : 0
-  const valentinoMin = valentinoOn ? N_FUTURI * REVG * 0.10 : 0
+  const grippoMin = grippoOn ? N_FUTURI * REVT * 0.10 : 0
+  const valentinoMin = valentinoOn ? N_FUTURI * REVI * 0.10 : 0
+  const caputoMin = N_FUTURI * (caputoAgenteOn ? REV_SLIDE : CAPUTO_MANUALE)
   const grippoDays = Math.ceil(grippoMin / DAY) || 0
   const valentinoDays = Math.ceil(valentinoMin / DAY) || 0
-  const totalDays = Math.max(copyDays, grippoDays, valentinoDays, 1)
+  const caputoDays = Math.ceil(caputoMin / DAY) || 0
+  const totalDays = Math.max(copyDays, grippoDays, valentinoDays, caputoDays, 1)
   const pct = (min: number, days: number) => (days > 0 ? (min / (days * DAY)) * 100 : 0)
-  return { righe, per, totalDays, grippoUtilPct: pct(grippoMin, totalDays), valentinoUtilPct: pct(valentinoMin, totalDays) }
+  return {
+    righe, per, totalDays,
+    grippoUtilPct: pct(grippoMin, totalDays), valentinoUtilPct: pct(valentinoMin, totalDays),
+    caputoUtilPct: pct(caputoMin, totalDays), caputoDays,
+  }
 }
 
 // ============================================================

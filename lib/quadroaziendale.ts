@@ -218,10 +218,6 @@ export const MEDIANA_STAGE4_RECENTE = 3    // n=69 — stabile, Valentino tiene 
 export const STIMA_LARGA_STAGE2 = 94
 export const STIMA_LARGA_STAGE3 = 28
 export const STIMA_LARGA_STAGE4 = 4
-// Tempo agente per i passaggi successivi a quello in corso (generazione esclusa,
-// resta sempre umana per chi ha già iniziato): revisione 35m + grafici 10m +
-// impaginazione 2m, sempre sotto l'ora — arrotondato a favore della prudenza.
-export const GIORNI_AGENTE_RESTANTI = 1
 
 // Vendite reali (fatture) e questionari ricevuti, mese per mese — dallo stesso
 // foglio, colonne DATA FATTURA e QUESTIONARIO RICEVUTO, tutte le 317 righe
@@ -288,30 +284,84 @@ export function stimaConsegna(r: RigaErog): { data: Date; giorniRitardo: number 
   return { data, giorniRitardo }
 }
 
+export function minutesToWorkdays(min: number): number {
+  return Math.max(1, Math.ceil(min / DAY))
+}
+
+/**
+ * Minuti restanti in modalità "human in the loop" per i passaggi ANCORA DA FARE
+ * di un cliente già in erogazione — il passaggio ATTUALE non si tocca mai (non si
+ * toglie lavoro già iniziato): resta umano, alla velocità reale già in corso.
+ * Il passaggio di Caputo non è incluso qui apposta: per chi è già in stadio 2 il
+ * suo tempo è dentro STIMA_LARGA_STAGE2, indistinguibile dalla scrittura — la leva
+ * Caputo si applica solo ai clienti non ancora iniziati (futuri).
+ */
+function minutiRestantiErogazioneHITL(stadio: StadioErog, grippoOn: boolean, valentinoOn: boolean): number {
+  let m = 0
+  if (stadio < 3) m += AGENTE_TESTO + (grippoOn ? REVT * 0.1 : REVT)
+  if (stadio < 4) m += AGENTE_IMPAG + (valentinoOn ? REVI * 0.1 : REVI)
+  return m
+}
+
 /**
  * Data di consegna se il passaggio in corso resta alla persona che lo sta già
  * facendo (non le si toglie il lavoro), ma tutti i passaggi successivi li fa
- * l'agente. Per lo stadio 1 non c'è una data di partenza: si segnala solo che,
- * una volta ricevute le informazioni, il resto lo fa l'agente in ~1 giorno.
+ * l'agente con revisione rapida dello specialista (human in the loop) — leve:
+ * Grippo e Valentino assistiti o no. Per lo stadio 1 non c'è una data di
+ * partenza: non si può stimare finché non arrivano le informazioni.
  */
-export function stimaConsegnaAgentica(r: RigaErog):
+export function stimaConsegnaAgentica(r: RigaErog, grippoOn: boolean, valentinoOn: boolean):
   | { tipo: 'data'; data: Date; giorniRisparmiati: number }
-  | { tipo: 'condizionale'; giorniDopoInfo: number }
+  | { tipo: 'condizionale' }
   | null {
-  if (r.stadio === 1) return { tipo: 'condizionale', giorniDopoInfo: GIORNI_AGENTE_RESTANTI }
+  if (r.stadio === 1) return { tipo: 'condizionale' }
   if (!r.dataStadio) return null
   const d0 = parseDataStadio(r.dataStadio)
   if (!d0) return null
+  const baseline = stimaConsegna(r)
+  const minutiRestanti = minutiRestantiErogazioneHITL(r.stadio, grippoOn, valentinoOn)
+  if (minutiRestanti === 0) {
+    // già sull'ultimo passaggio (Valentino): nessuna trasformazione possibile, resta la stima umana
+    return baseline ? { tipo: 'data', data: baseline.data, giorniRisparmiati: 0 } : null
+  }
   const stimaStadioCorrente =
     r.stadio === 2 ? STIMA_LARGA_STAGE2 : r.stadio === 3 ? STIMA_LARGA_STAGE3 : STIMA_LARGA_STAGE4
   const fineUmana = workdayAdd(d0, stimaStadioCorrente)
   // Se il passaggio umano, con la stima larga, dovrebbe già essere finito, l'agente
   // parte da oggi (il giorno in cui lo attiveremo) — non da una data passata.
   const partenzaAgente = fineUmana < OGGI ? OGGI : fineUmana
-  const data = workdayAdd(partenzaAgente, GIORNI_AGENTE_RESTANTI)
-  const baseline = stimaConsegna(r)
+  const data = workdayAdd(partenzaAgente, minutesToWorkdays(minutiRestanti))
   const giorniRisparmiati = baseline ? workdaysBetween(data, baseline.data) : 0
   return { tipo: 'data', data, giorniRisparmiati }
+}
+
+export type RigaFutura = { nome: string; azienda: string; rifare: boolean; data: Date }
+
+/** Scenario "Umano": i 58 futuri, scritti in coda da copyCount persone, poi Caputo/Grippo/Valentino
+ * manuali in sequenza — nessun agente da nessuna parte, la leva è solo quante persone scrivono. */
+export function futuriUmano(copyCount: number): { righe: RigaFutura[]; totalDays: number } {
+  const sch = schedule(copyCount, false, false, false, false)
+  const minutiSuccessivi = CAPUTO_MANUALE + REVT + REVI
+  const righe: RigaFutura[] = sch.righe.map((r) => ({
+    nome: r.nome, azienda: r.contesto, rifare: r.rifare,
+    data: workdayAdd(workday(Math.ceil(r.finish / DAY)), minutesToWorkdays(minutiSuccessivi)),
+  }))
+  return { righe, totalDays: sch.totalDays }
+}
+
+/** Scenario "Human in the loop": stesse leve del calcolatore Futuri, applicate dall'inizio
+ * (per i futuri non c'è nessun passaggio "già in corso" da proteggere). */
+export function futuriHITL(copyCount: number, grippoOn: boolean, valentinoOn: boolean, caputoAgenteOn: boolean, fullAiOn: boolean): { righe: RigaFutura[]; totalDays: number } {
+  const sch = schedule(copyCount, grippoOn, valentinoOn, caputoAgenteOn, fullAiOn)
+  const slide = caputoAgenteOn ? AGENTE_SLIDE + REV_SLIDE : CAPUTO_MANUALE
+  const testo = AGENTE_TESTO + (grippoOn ? REVT * 0.1 : REVT)
+  const impag = AGENTE_IMPAG + (valentinoOn ? REVI * 0.1 : REVI)
+  const minutiSuccessivi = slide + testo + impag
+  const righe: RigaFutura[] = sch.righe.map((r) => ({
+    nome: r.nome, azienda: r.contesto, rifare: r.rifare,
+    data: workdayAdd(workday(Math.ceil(r.finish / DAY)), minutesToWorkdays(minutiSuccessivi)),
+  }))
+  return { righe, totalDays: sch.totalDays }
 }
 
 export const EROG_CLIENTI: RigaErog[] = [

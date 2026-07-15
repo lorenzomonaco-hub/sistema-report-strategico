@@ -253,6 +253,24 @@ export const VENDITE_MENSILI: { mese: string; vendite: number; questionari: numb
   { mese: '2026-07', vendite: 4, questionari: 0 }, // parziale, solo fino al 13
 ]
 
+// ── Impatto economico degli agenti ──
+// Persone il cui lavoro su questa pipeline è stato assorbito dagli agenti AI.
+// Salario annuo lordo × frazione del lavoro che facevano qui (dati forniti da
+// Lorenzo, 15 lug 2026). Restano a lavorarci solo Paolo e Carlo (copy).
+export const RISPARMIO_PERSONALE: { nome: string; ruolo: string; salario: number; frazione: number }[] = [
+  { nome: 'Valentino', ruolo: 'Grafica', salario: 60_000, frazione: 0.75 },
+  { nome: 'Grippo', ruolo: 'Revisione testo', salario: 60_000, frazione: 0.75 },
+  { nome: 'Tabita', ruolo: 'Revisione testo', salario: 40_000, frazione: 1 },
+  { nome: 'Claudia', ruolo: 'Copy / revisione', salario: 80_000, frazione: 0.25 },
+  { nome: 'Luigi', ruolo: 'Copy', salario: 60_000, frazione: 0.25 },
+]
+export const RISPARMIO_ANNUO = RISPARMIO_PERSONALE.reduce((s, p) => s + p.salario * p.frazione, 0)
+export const RISPARMIO_GIORNO = RISPARMIO_ANNUO / 365
+export const TEAM_RESIDUO = ['Paolo', 'Carlo'] // le uniche persone che restano sulla pipeline (copy)
+
+export const fmtEuro = (n: number) =>
+  new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n))
+
 function parseDataStadio(s: string): Date | null {
   const m = s.match(/^(\d{1,2})\/(\d{1,2})$/)
   if (!m) return null

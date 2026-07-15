@@ -13,9 +13,9 @@ import {
   EROG_OGGI, EROG_PER_STADIO, EROG_STADI, EROG_TOT, FULLAI_AGENTE, FULLAI_INTERAZIONE, GEN,
   GIORNO_MS, MEDIANA_STAGE2_RECENTE, MEDIANA_STAGE2_STORICO, MEDIANA_STAGE3_RECENTE,
   MEDIANA_STAGE3_STORICO, MEDIANA_STAGE4_RECENTE, MEDIANA_STAGE4_STORICO, N_FUTURI,
-  REV_SLIDE, REVI, REVT, RigaErog, Schedule, STIMA_LARGA_STAGE2, STIMA_LARGA_STAGE3,
-  STIMA_LARGA_STAGE4, StadioErog, VENDITE_MENSILI, fmtData, fmtHM, schedule,
-  stimaConsegna, tempoTotaleReport, workday,
+  REV_SLIDE, REVI, REVT, RISPARMIO_ANNUO, RISPARMIO_GIORNO, RISPARMIO_PERSONALE, RigaErog,
+  Schedule, STIMA_LARGA_STAGE2, STIMA_LARGA_STAGE3, STIMA_LARGA_STAGE4, StadioErog, TEAM_RESIDUO,
+  VENDITE_MENSILI, fmtData, fmtEuro, fmtHM, schedule, stimaConsegna, tempoTotaleReport, workday,
 } from '@/lib/quadroaziendale'
 
 const LARGHEZZA_TABELLA = 260
@@ -236,9 +236,87 @@ function GanttConsegneUmano() {
   )
 }
 
+function SezioneImpatto() {
+  const agenteMin = AGENTE_TESTO + AGENTE_SLIDE + AGENTE_IMPAG // 47 min: testo + immagini + grafica
+  const codaUmanaGg = MEDIANA_STAGE3_RECENTE + MEDIANA_STAGE4_RECENTE // ~24 gg lavorativi di coda
+  return (
+    <div className="space-y-4">
+      {/* headline risparmio */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Carta className="bg-green-600/10 sm:col-span-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Risparmio dagli agenti — all&apos;anno</p>
+          <p className="font-display mt-1 text-3xl font-bold tracking-tight text-green-700">{fmtEuro(RISPARMIO_ANNUO)}</p>
+          <p className="mt-1 text-[11px] text-inchiostro/50">lavoro su questa pipeline assorbito dagli agenti AI</p>
+        </Carta>
+        <Carta className="bg-green-600/10">
+          <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">…ovvero al giorno</p>
+          <p className="font-display mt-1 text-3xl font-bold tracking-tight text-green-700">{fmtEuro(RISPARMIO_GIORNO)}</p>
+          <p className="mt-1 text-[11px] text-inchiostro/50">ogni giorno di calendario ({fmtEuro(RISPARMIO_ANNUO)} ÷ 365)</p>
+        </Carta>
+        <Carta>
+          <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Restano sulla pipeline</p>
+          <p className="font-display mt-1 text-2xl font-bold tracking-tight text-petrolio-scuro">{TEAM_RESIDUO.join(' + ')}</p>
+          <p className="mt-1 text-[11px] text-inchiostro/50">solo il copy; tutti gli altri passaggi li fanno gli agenti</p>
+        </Carta>
+      </div>
+
+      {/* dettaglio per persona */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Chi non serve più su questa pipeline — costo assorbito</h3>
+        <div className="mt-2 overflow-x-auto rounded-2xl border border-linea bg-carta shadow-sm">
+          <div className="min-w-[620px]">
+            <div className="grid items-center gap-3 border-b border-linea bg-inchiostro/[0.03] px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/40"
+                 style={{ gridTemplateColumns: '1fr 130px 90px 110px 100px' }}>
+              <div>Persona · ruolo</div><div>Salario/anno</div><div>% su pipeline</div><div className="text-right">Risparmio/anno</div><div className="text-right">Al giorno</div>
+            </div>
+            {RISPARMIO_PERSONALE.map((p) => (
+              <div key={p.nome} className="grid items-center gap-3 border-b border-linea/70 px-3 py-2.5 last:border-b-0"
+                   style={{ gridTemplateColumns: '1fr 130px 90px 110px 100px' }}>
+                <div><span className="text-[13px] font-bold text-inchiostro">{p.nome}</span> <span className="text-[11px] text-inchiostro/45">· {p.ruolo}</span></div>
+                <div className="text-[12px] tabular-nums text-inchiostro/70">{fmtEuro(p.salario)}</div>
+                <div className="text-[12px] tabular-nums text-inchiostro/70">{Math.round(p.frazione * 100)}%</div>
+                <div className="text-right text-[12.5px] font-bold tabular-nums text-green-700">{fmtEuro(p.salario * p.frazione)}</div>
+                <div className="text-right text-[12px] tabular-nums text-green-700/80">{fmtEuro((p.salario * p.frazione) / 365)}</div>
+              </div>
+            ))}
+            <div className="grid items-center gap-3 bg-green-600/[0.06] px-3 py-2.5 text-[13px] font-bold"
+                 style={{ gridTemplateColumns: '1fr 130px 90px 110px 100px' }}>
+              <div className="text-inchiostro">Totale</div><div /><div />
+              <div className="text-right tabular-nums text-green-700">{fmtEuro(RISPARMIO_ANNUO)}</div>
+              <div className="text-right tabular-nums text-green-700">{fmtEuro(RISPARMIO_GIORNO)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* capacità: prima vs ora */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Carta>
+          <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Quanto ci mettevamo PRIMA (dato reale)</p>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-inchiostro/75">
+            Dall&apos;ingresso alla consegna: <b className="text-inchiostro">~{MEDIANA_STAGE2_RECENTE + MEDIANA_STAGE3_RECENTE + MEDIANA_STAGE4_RECENTE} giorni lavorativi</b> (mediana ultimi 90gg). Dopo che il copy finiva, il report faceva ancora <b className="text-inchiostro">~{codaUmanaGg} giorni lavorativi</b> di coda umana: revisione testo (Grippo, {MEDIANA_STAGE3_RECENTE}gg) + grafica (Valentino, {MEDIANA_STAGE4_RECENTE}gg).
+          </p>
+        </Carta>
+        <Carta className="bg-petrolio/[0.06]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Quanto ci mettiamo ORA con gli agenti</p>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-inchiostro/75">
+            Testo, immagini e grafica li fa l&apos;agente in <b className="text-inchiostro">{agenteMin} minuti</b> (35+10+2): quei ~{codaUmanaGg} giorni lavorativi di coda crollano a <b className="text-inchiostro">meno di 1 giornata</b>. Il collo di bottiglia resta solo la scrittura ({TEAM_RESIDUO.join(' + ')}).
+          </p>
+          <p className="mt-2 text-[11px] text-ambra">⚠ Il tempo di consegna reale end-to-end col nuovo modello è ancora in raccolta: questa è la proiezione dai tempi degli agenti, non una media misurata.</p>
+        </Carta>
+      </div>
+      <p className="text-[11px] leading-relaxed text-inchiostro/45">
+        Oltre al costo del personale, il risparmio vero è la <b className="text-inchiostro/70">capacità produttiva e di vendita</b>: azzerando le settimane di coda dei revisori si consegnano molti più report nello stesso tempo, quindi si possono evadere più vendite. Il moltiplicatore esatto lo fisseremo quando avremo il dato reale di consegna col nuovo modello.
+      </p>
+    </div>
+  )
+}
+
 function SezioneErogazione() {
   return (
     <div className="mt-6 space-y-6">
+      <SezioneImpatto />
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Statistica label={`${EROG_TOT} clienti realmente attivi`} valore="4 passaggi fissi" sub="stesso flusso per ogni progetto, dati reali" tinta="text-petrolio-scuro" grande />
         {EROG_STADI.map((s, i) => (

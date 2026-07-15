@@ -1,41 +1,18 @@
-'use client'
-
-// ─── Clienti per tutor ───
-// Gli stessi 87 clienti del Quadro Aziendale, raggruppati per tutor di
-// riferimento — sia chi è già in erogazione (stadio 2-4) sia chi è ancora in
-// attesa di informazioni (stadio 1). Una card per tutor, poi la pagina
-// individuale con l'elenco completo.
+// ─── Clienti per tutor ─── (indice)
+// Gli stessi clienti del Gantt Consulenze Frank, raggruppati per tutor. Per
+// ciascun tutor: quanti clienti in produzione e quanti NON hanno ancora la
+// consulenza con Frank prenotata (così il tutor sa chi manca e può segnalarlo).
 
 import Link from 'next/link'
-import { EROG_TOT, StadioErog, TUTOR_LIST } from '@/lib/quadroaziendale'
+import { CONSULENZE_FRANK, TUTOR_FRANK } from '@/lib/consulenzeFrank'
 
 function Carta({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <div className={`rounded-2xl border border-linea bg-carta p-4 shadow-sm ${className}`}>{children}</div>
 }
 
-const STADIO_COLORE: Record<StadioErog, string> = {
-  1: 'bg-rose-500',
-  2: 'bg-petrolio',
-  3: 'bg-teal-600',
-  4: 'bg-indigo-600',
-}
-
-function BarraDistribuzione({ perStadio }: { perStadio: [number, number, number, number] }) {
-  const tot = perStadio.reduce((s, n) => s + n, 0) || 1
-  return (
-    <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-inchiostro/[0.06]">
-      {([1, 2, 3, 4] as StadioErog[]).map((s) => {
-        const n = perStadio[s - 1]
-        if (n === 0) return null
-        return <div key={s} className={STADIO_COLORE[s]} style={{ width: `${(n / tot) * 100}%` }} />
-      })}
-    </div>
-  )
-}
-
 export default function TutorIndex() {
-  const totInErogazione = TUTOR_LIST.reduce((s, t) => s + t.perStadio[1] + t.perStadio[2] + t.perStadio[3], 0)
-  const totInAttesa = TUTOR_LIST.reduce((s, t) => s + t.perStadio[0], 0)
+  const totale = CONSULENZE_FRANK.length
+  const senzaConsTot = CONSULENZE_FRANK.filter((r) => !r.consulenzaFrank).length
 
   return (
     <div className="min-h-screen flex-1 sfondo-trama">
@@ -45,10 +22,13 @@ export default function TutorIndex() {
             <p className="text-xs font-semibold uppercase tracking-widest text-ambra">Solo amministratori</p>
             <h1 className="font-display mt-1 text-3xl font-bold tracking-tight text-inchiostro">Clienti per tutor</h1>
             <p className="mt-1 max-w-2xl text-sm text-inchiostro/55">
-              {EROG_TOT} clienti, {TUTOR_LIST.length} tutor — sia chi è già in erogazione sia chi è ancora in attesa di informazioni.
+              {totale} clienti in produzione, {TUTOR_FRANK.length} tutor. Il badge rosso segnala chi non ha ancora prenotato la consulenza con Frank.
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <Link href="/amministrazione/consulenze-frank" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
+              Gantt Consulenze Frank →
+            </Link>
             <Link href="/amministrazione/quadro-aziendale" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
               ← Quadro Aziendale
             </Link>
@@ -57,38 +37,39 @@ export default function TutorIndex() {
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Carta className="bg-petrolio/10">
-            <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">{EROG_TOT} clienti totali</p>
-            <p className="font-display mt-1 text-3xl font-bold tracking-tight text-petrolio-scuro">{TUTOR_LIST.length} tutor</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">{totale} clienti totali</p>
+            <p className="font-display mt-1 text-3xl font-bold tracking-tight text-petrolio-scuro">{TUTOR_FRANK.length} tutor</p>
+          </Carta>
+          <Carta className={senzaConsTot > 0 ? 'bg-rose-50' : ''}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Senza consulenza prenotata</p>
+            <p className="font-display mt-1 text-2xl font-bold text-rose-700">{senzaConsTot}</p>
+            <p className="mt-1 text-[11px] text-inchiostro/50">da sollecitare / segnalare</p>
           </Carta>
           <Carta>
-            <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Già in erogazione</p>
-            <p className="font-display mt-1 text-2xl font-bold text-inchiostro">{totInErogazione}</p>
-          </Carta>
-          <Carta>
-            <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">In attesa di informazioni</p>
-            <p className="font-display mt-1 text-2xl font-bold text-rose-700">{totInAttesa}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Consulenza prenotata</p>
+            <p className="font-display mt-1 text-2xl font-bold text-green-700">{totale - senzaConsTot}</p>
           </Carta>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-inchiostro/55">
-          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-4 rounded-full bg-rose-500" />Informazioni mancanti</span>
-          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-4 rounded-full bg-petrolio" />Copy e Caputo</span>
-          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-4 rounded-full bg-teal-600" />Revisione Grippo</span>
-          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-4 rounded-full bg-indigo-600" />Grafica Valentino</span>
-        </div>
-
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {TUTOR_LIST.map((t) => (
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {TUTOR_FRANK.map((t) => (
             <Link key={t.slug} href={`/amministrazione/tutor/${t.slug}`} className="block">
               <Carta className="h-full transition-colors hover:border-petrolio/40">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <p className="font-display text-base font-bold text-inchiostro">{t.tutor}</p>
-                  <span className="rounded-full bg-inchiostro/[0.06] px-2 py-0.5 text-[11px] font-bold text-inchiostro/60">{t.totale}</span>
+                  <span className="shrink-0 rounded-full bg-inchiostro/[0.06] px-2 py-0.5 text-[11px] font-bold text-inchiostro/60">{t.totale}</span>
                 </div>
-                <BarraDistribuzione perStadio={t.perStadio} />
-                <p className="mt-2 text-[11px] text-inchiostro/45">
-                  {t.perStadio[0]} in attesa · {t.perStadio[1] + t.perStadio[2] + t.perStadio[3]} in erogazione
-                </p>
+                <div className="mt-2">
+                  {t.senzaConsulenza > 0 ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700">
+                      ⚠ {t.senzaConsulenza} senza consulenza
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-700">
+                      ✓ tutte prenotate
+                    </span>
+                  )}
+                </div>
               </Carta>
             </Link>
           ))}

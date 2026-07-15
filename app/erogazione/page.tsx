@@ -129,8 +129,8 @@ export default function PaginaSilos() {
                           onDragEnd={bloccato ? undefined : () => { setInTrascinamento(null); window.setTimeout(() => { haTrascinatoRef.current = false }, 0) }}
                           className={`card-sollevabile block rounded-2xl border border-linea bg-carta p-3 shadow-sm ${bloccato ? 'cursor-default' : 'cursor-grab'} ${inTrascinamento === c.slug ? 'opacity-50' : ''}`}
                         >
-                          {c.origine === 'frank' ? (
-                            <Link href={`/amministrazione/consulenze-frank/${c.slug}`} className="block" onClick={(e) => { if (haTrascinatoRef.current) e.preventDefault() }}>
+                          {c.origine !== 'attesa' ? (
+                            <Link href={`/erogazione/scheda?slug=${encodeURIComponent(c.slug)}`} className="block" onClick={(e) => { if (haTrascinatoRef.current) e.preventDefault() }}>
                               {intestazione}
                             </Link>
                           ) : (

@@ -189,6 +189,12 @@ export interface PromptTemplate {
   changelog: VoceChangelog[]
 }
 
+/** Una voce del log dei passaggi: quando un cliente è entrato in un silo. */
+export interface SiloLogVoce {
+  silo: string
+  dataOra: string
+}
+
 export interface AppState {
   pratiche: Pratica[]
   apprendimenti: Apprendimento[]
@@ -198,6 +204,9 @@ export interface AppState {
    *  commerciale. Fonte condivisa per board /erogazione, Gantt e vista tutor.
    *  Opzionale per retro-compatibilità con stati salvati prima. */
   siloClienti?: Record<string, string>
+  /** Log dei passaggi nei silo, per cliente (slug → voci timbrate). Tiene
+   *  traccia del tempo: dalla registrazione all'invio, passaggio per passaggio. */
+  siloLog?: Record<string, SiloLogVoce[]>
   /** Flag di migrazione una-tantum: quando manca (stati vecchi), le pratiche e
    *  gli apprendimenti di DEMO vengono ripuliti al caricamento. I clienti reali
    *  vengono creati dopo, con il flag già a true, quindi non vengono toccati. */

@@ -75,6 +75,12 @@ const mappaSilos = (state: AppState): Record<string, SiloId> => ({
   ...((state.siloClienti as Record<string, SiloId>) ?? {}),
 })
 
+/** Aggiunge una voce al log dei passaggi di un cliente (timbra l'ora). */
+const logSilo = (state: AppState, slug: string, silo: SiloId): Record<string, { silo: string; dataOra: string }[]> => {
+  const log = state.siloLog ?? {}
+  return { ...log, [slug]: [...(log[slug] ?? []), { silo, dataOra: ora() }] }
+}
+
 /** Migrazione una-tantum: gli stati salvati PRIMA della pulizia contengono le
  *  pratiche/apprendimenti di demo (dati fittizi). Al primo caricamento li
  *  azzeriamo e alziamo il flag; i clienti reali, creati dopo, non vengono
@@ -209,10 +215,12 @@ function reducer(state: AppState, azione: Azione): AppState {
         ],
       }
       // Il nuovo cliente entra nella pipeline a silos allo STEP 0 (documenti).
+      const slugNuovo = slugPratica(nuovoId)
       return {
         ...state,
         pratiche: [nuova, ...state.pratiche],
-        siloClienti: { ...mappaSilos(state), [slugPratica(nuovoId)]: 'documenti' },
+        siloClienti: { ...mappaSilos(state), [slugNuovo]: 'documenti' },
+        siloLog: logSilo(state, slugNuovo, 'documenti'),
       }
     }
 
@@ -299,7 +307,12 @@ function reducer(state: AppState, azione: Azione): AppState {
         ],
       }))
       // Nella pipeline a silos: dallo step 0 (documenti) allo step 1 (copy).
-      return { ...avanzato, siloClienti: { ...mappaSilos(state), [slugPratica(azione.praticaId)]: 'copy' } }
+      const slugPr = slugPratica(azione.praticaId)
+      return {
+        ...avanzato,
+        siloClienti: { ...mappaSilos(state), [slugPr]: 'copy' },
+        siloLog: logSilo(state, slugPr, 'copy'),
+      }
     }
 
     case 'AVANZA_STEP_AUTONOMO':
@@ -421,18 +434,18 @@ function reducer(state: AppState, azione: Azione): AppState {
       }
 
     case 'SPOSTA_SILO':
-      return { ...state, siloClienti: { ...mappaSilos(state), [azione.slug]: azione.silo } }
+      return { ...state, siloClienti: { ...mappaSilos(state), [azione.slug]: azione.silo }, siloLog: logSilo(state, azione.slug, azione.silo) }
 
     case 'AVANZA_SILO': {
       const corr = mappaSilos(state)[azione.slug] ?? 'documenti'
       const next = siloSuccessivo(corr)
-      return next ? { ...state, siloClienti: { ...mappaSilos(state), [azione.slug]: next } } : state
+      return next ? { ...state, siloClienti: { ...mappaSilos(state), [azione.slug]: next }, siloLog: logSilo(state, azione.slug, next) } : state
     }
 
     case 'INDIETREGGIA_SILO': {
       const corr = mappaSilos(state)[azione.slug] ?? 'documenti'
       const prev = siloPrecedente(corr)
-      return prev ? { ...state, siloClienti: { ...mappaSilos(state), [azione.slug]: prev } } : state
+      return prev ? { ...state, siloClienti: { ...mappaSilos(state), [azione.slug]: prev }, siloLog: logSilo(state, azione.slug, prev) } : state
     }
 
     case 'RESET_SILOS':

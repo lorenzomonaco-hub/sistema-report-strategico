@@ -11,9 +11,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useApp, contaNotifiche } from '@/lib/store'
-import { indiceFase, statoCommerciale } from '@/lib/fasi'
 import RoleShell from '@/components/RoleShell'
-import PraticaCard from '@/components/PraticaCard'
 import EmptyState from '@/components/EmptyState'
 import { PersonaAF } from '@/lib/types'
 import { IN_ATTESA, TUTOR_FRANK } from '@/lib/consulenzeFrank'
@@ -49,7 +47,7 @@ function TitoloSezione({ titolo, conteggio }: { titolo: string; conteggio?: stri
   return (
     <div className="flex items-baseline justify-between gap-4">
       <h2 className="font-display text-xl font-bold tracking-tight text-inchiostro">{titolo}</h2>
-      {conteggio && <span className="shrink-0 text-xs text-inchiostro/40">{conteggio}</span>}
+      {conteggio && <span className="shrink-0 text-xs text-inchiostro">{conteggio}</span>}
     </div>
   )
 }
@@ -65,8 +63,8 @@ function PersonaChip({ p, tono, onRimuovi }: { p: PersonaAF; tono: 'titolare' | 
     <li className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-3 py-2 text-sm ${stile}`}>
       <span className="font-semibold">{p.nome}</span>
       <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${badge}`}>{p.ruolo}</span>
-      <span className="text-inchiostro/45">{p.email}</span>
-      <button onClick={onRimuovi} aria-label={`Rimuovi ${p.nome}`} className="ml-auto text-inchiostro/30 transition hover:text-rose-600">✕</button>
+      <span className="text-inchiostro">{p.email}</span>
+      <button onClick={onRimuovi} aria-label={`Rimuovi ${p.nome}`} className="ml-auto text-inchiostro transition hover:text-rose-600">✕</button>
     </li>
   )
 }
@@ -133,13 +131,13 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
     onCreata(azienda.trim()); onChiudi()
   }
 
-  const labelCampo = 'mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro/45'
+  const labelCampo = 'mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro'
 
   return (
     <div className="card-sollevabile space-y-6 rounded-2xl border border-linea bg-carta p-6 shadow-sm">
       <div>
         <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Registra il cliente — avvia la pipeline (step 0)</h3>
-        <p className="mt-1 text-xs text-inchiostro/50">
+        <p className="mt-1 text-xs text-inchiostro">
           Registrare il cliente crea il progetto allo <strong>step 0</strong> (vendita registrata, documenti mancanti). Poi Elisa carica i documenti.
         </p>
       </div>
@@ -157,19 +155,19 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
           </div>
           <div>
             <label className={labelCampo}>Email tutor (automatica)</label>
-            <div className={`flex h-[38px] items-center rounded-xl border border-linea px-3 text-sm ${emailDelTutor ? 'bg-carta text-inchiostro' : 'bg-inchiostro/[0.03] text-inchiostro/35'}`}>
+            <div className={`flex h-[38px] items-center rounded-xl border border-linea px-3 text-sm ${emailDelTutor ? 'bg-carta text-inchiostro' : 'bg-inchiostro/[0.03] text-inchiostro'}`}>
               {emailDelTutor || 'compare quando scegli il nome'}
             </div>
           </div>
         </div>
-        <p className="mt-2 text-[11px] text-inchiostro/45">
+        <p className="mt-2 text-[11px] text-inchiostro">
           A questa email riceverai le notifiche: il <strong>report AssessFirst di Irene</strong> e il <strong>completamento</strong> dopo la grafica. La registrazione timbra l&rsquo;ora d&rsquo;inizio per misurare la durata di erogazione.
         </p>
       </div>
 
       {/* ── Azienda e titolare ── */}
       <div className="rounded-xl border border-linea/70 bg-inchiostro/[0.015] p-4">
-        <p className="mb-3 text-xs font-bold uppercase tracking-wide text-inchiostro/50">Azienda e titolare</p>
+        <p className="mb-3 text-xs font-bold uppercase tracking-wide text-inchiostro">Azienda e titolare</p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className={labelCampo}>Azienda *</label>
@@ -196,7 +194,7 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
           <p className="text-sm font-bold text-indigo-900">1 · Titolari e soci</p>
           <span className="text-[11px] font-semibold text-indigo-500">{soci.length} inseriti · illimitati</span>
         </div>
-        <p className="mt-0.5 text-[11px] text-inchiostro/45">Il titolare qui sopra è già incluso. Aggiungi altri titolari o soci; ognuno fa l&rsquo;AssessFirst.</p>
+        <p className="mt-0.5 text-[11px] text-inchiostro">Il titolare qui sopra è già incluso. Aggiungi altri titolari o soci; ognuno fa l&rsquo;AssessFirst.</p>
 
         <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
           <div>
@@ -217,7 +215,7 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
             <div className="flex h-[38px] overflow-hidden rounded-xl border border-linea">
               {(['titolare', 'socio'] as const).map((t) => (
                 <button key={t} onClick={() => setSTipo(t)} type="button"
-                  className={`px-3 text-xs font-semibold capitalize transition ${sTipo === t ? 'bg-indigo-500 text-white' : 'bg-carta text-inchiostro/50 hover:text-inchiostro'}`}>
+                  className={`px-3 text-xs font-semibold capitalize transition ${sTipo === t ? 'bg-indigo-500 text-white' : 'bg-carta text-inchiostro hover:text-inchiostro'}`}>
                   {t}
                 </button>
               ))}
@@ -241,7 +239,7 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
           <p className="text-sm font-bold text-sky-900">2 · Dipendenti strategici</p>
           <span className={`text-[11px] font-semibold ${dip.length >= MAX_DIPENDENTI ? 'text-amber-700' : 'text-sky-500'}`}>{dip.length}/{MAX_DIPENDENTI}</span>
         </div>
-        <p className="mt-0.5 text-[11px] text-inchiostro/45">Massimo {MAX_DIPENDENTI}. La qualifica la scrivi tu (testo libero).</p>
+        <p className="mt-0.5 text-[11px] text-inchiostro">Massimo {MAX_DIPENDENTI}. La qualifica la scrivi tu (testo libero).</p>
 
         <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr]">
           <div>
@@ -279,7 +277,7 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
 
       <div className="flex flex-wrap gap-2">
         <button onClick={registra} className="rounded-xl bg-petrolio px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-petrolio-scuro">Registra il cliente</button>
-        <button onClick={onChiudi} className="rounded-xl border border-linea bg-carta px-4 py-2.5 text-sm font-semibold text-inchiostro/60 transition hover:border-petrolio/40 hover:text-petrolio">Annulla</button>
+        <button onClick={onChiudi} className="rounded-xl border border-linea bg-carta px-4 py-2.5 text-sm font-semibold text-inchiostro transition hover:border-petrolio/40 hover:text-petrolio">Annulla</button>
       </div>
     </div>
   )
@@ -291,7 +289,6 @@ export default function PaginaTutor() {
   const [aziendaCreata, setAziendaCreata] = useState<string | null>(null)
 
   const step0 = state.pratiche.filter((p) => p.faseCorrente === 'vendita' || p.faseCorrente === 'raccolta-documenti')
-  const inLavorazione = state.pratiche.filter((p) => indiceFase(p.faseCorrente) >= indiceFase('generazione'))
 
   return (
     <RoleShell
@@ -304,7 +301,7 @@ export default function PaginaTutor() {
         {/* Registrazione */}
         <section className="anima anima-1">
           <TitoloSezione titolo="Nuovo cliente — step 0" />
-          <p className="mt-1 text-xs text-inchiostro/45">
+          <p className="mt-1 text-xs text-inchiostro">
             Registra azienda, titolare e le persone da valutare. La registrazione avvia la pipeline: il cliente entra allo step 0 in attesa dei documenti di Elisa.
           </p>
           <div className="mt-3 space-y-3">
@@ -327,7 +324,7 @@ export default function PaginaTutor() {
         {/* In attesa del questionario — PROTOTIPO: per ora un cliente solo */}
         <section className="anima anima-2">
           <TitoloSezione titolo="In attesa del questionario" conteggio={`1 di ${IN_ATTESA.length} — prototipo`} />
-          <p className="mt-1 text-xs text-inchiostro/45">
+          <p className="mt-1 text-xs text-inchiostro">
             Clienti già acquisiti che non hanno ancora compilato questionario/AssessFirst. Per ora mostriamo <strong>un solo cliente</strong> come esempio d&rsquo;interfaccia: quando approvi il formato lo replichiamo per tutti e {IN_ATTESA.length}.
           </p>
           <div className="mt-3">
@@ -337,7 +334,7 @@ export default function PaginaTutor() {
                 <div className="flex items-center justify-between gap-3 rounded-2xl border border-linea bg-carta px-4 py-3 shadow-sm">
                   <div className="min-w-0">
                     <p className="truncate font-display font-bold text-inchiostro">{c.azienda || c.nome}</p>
-                    <p className="truncate text-xs text-inchiostro/50">{c.nome} · tutor {c.tutor}</p>
+                    <p className="truncate text-xs text-inchiostro">{c.nome} · tutor {c.tutor}</p>
                   </div>
                   <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-medium text-rose-700">
                     <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> questionario mancante
@@ -351,7 +348,7 @@ export default function PaginaTutor() {
         {/* Step 0: in attesa dei documenti di Elisa */}
         <section className="anima anima-2">
           <TitoloSezione titolo="Step 0 — in attesa dei documenti (Elisa)" conteggio={`${step0.length} client${step0.length === 1 ? 'e' : 'i'}`} />
-          <p className="mt-1 text-xs text-inchiostro/45">
+          <p className="mt-1 text-xs text-inchiostro">
             Clienti registrati per cui Elisa deve ancora caricare tutti i documenti. Quando li completa, passano allo step 1 (Copy).
           </p>
           <div className="mt-3 space-y-3">
@@ -362,7 +359,7 @@ export default function PaginaTutor() {
                 <div key={p.id} className="flex items-center justify-between gap-3 rounded-2xl border border-linea bg-carta px-4 py-3 shadow-sm">
                   <div className="min-w-0">
                     <p className="truncate font-display font-bold text-inchiostro">{p.azienda}</p>
-                    <p className="truncate text-xs text-inchiostro/50">{p.cliente} · {p.dipendenti.length} {p.dipendenti.length === 1 ? 'persona' : 'persone'} · registrato {dataIt(p.dataCreazione)}</p>
+                    <p className="truncate text-xs text-inchiostro">{p.cliente} · {p.dipendenti.length} {p.dipendenti.length === 1 ? 'persona' : 'persone'} · registrato {dataIt(p.dataCreazione)}</p>
                   </div>
                   <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
                     <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> step 0 · documenti da Elisa
@@ -371,31 +368,9 @@ export default function PaginaTutor() {
               ))
             )}
           </div>
-          <p className="mt-3 text-xs text-inchiostro/45">
+          <p className="mt-3 text-xs text-inchiostro">
             I documenti li carica <Link href="/commerciale/elisa" className="font-semibold text-petrolio hover:underline">Elisa</Link>.
           </p>
-        </section>
-
-        {/* In lavorazione */}
-        <section className="anima anima-3">
-          <TitoloSezione titolo="In lavorazione" conteggio={`${inLavorazione.length} client${inLavorazione.length === 1 ? 'e' : 'i'}`} />
-          <p className="mt-1 text-xs text-inchiostro/45">Dallo step 1 in poi lavorano il team copy e la pipeline: questi macro-stati ti bastano per aggiornare il cliente.</p>
-          <div className="mt-3 space-y-3">
-            {inLavorazione.length === 0 ? (
-              <EmptyState titolo="Nessun cliente in lavorazione" sottotitolo="I clienti avviati compariranno qui con il loro stato." icona="🗂️" />
-            ) : (
-              inLavorazione.map((p) => {
-                const stato = statoCommerciale(p.faseCorrente)
-                return (
-                  <PraticaCard key={p.id} pratica={p} nascondiFase azioni={
-                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${stato.badge}`}>
-                      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-60" /> {stato.label}
-                    </span>
-                  } />
-                )
-              })
-            )}
-          </div>
         </section>
       </div>
     </RoleShell>

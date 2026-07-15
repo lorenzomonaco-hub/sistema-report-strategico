@@ -1,15 +1,20 @@
 'use client'
 
 // ─── Consulenze Frank — Gantt ufficiale ───
-// Lista unica dei 34 clienti attivi del progetto, con le date di consegna del
-// piano ufficiale (vincolo: massimo 2 consegne per giornata lavorativa, weekend
-// esclusi, coda per fase 5→4→3→1→2). Stesso stile Gantt del Quadro Aziendale.
+// Lista unica dei 34 clienti, timeline a calendario scorrevole con linea "oggi"
+// centrale (stile del Gantt di /amministrazione). Ogni barra parte dall'ingresso
+// reale in pipeline (dati foglio maestro) e arriva alla consegna prevista del
+// piano ufficiale; la parte già percorsa è piena, quella futura è tenue. I
+// milestone reali dei passaggi già completati (copy, revisione Grippo) sono
+// marcati sulla barra. Le date di consegna vengono dal file ufficiale del
+// 14/07/2026 (max 2 consegne/giorno lavorativo).
 
 import Link from 'next/link'
-import { CONSULENZE_FRANK, FASI_FRANK, FRANK_OGGI, FaseFrank } from '@/lib/consulenzeFrank'
+import { CONSULENZE_FRANK, FASI_FRANK, FRANK_OGGI, FaseFrank, RigaFrank } from '@/lib/consulenzeFrank'
 import { GIORNO_MS, fmtData } from '@/lib/quadroaziendale'
 
-const LARGHEZZA_TABELLA = 260
+const LARGHEZZA_TABELLA = 300
+const MIN_W = 1720
 
 function Carta({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <div className={`rounded-2xl border border-linea bg-carta p-4 shadow-sm ${className}`}>{children}</div>
@@ -26,63 +31,87 @@ function Statistica({ label, valore, sub, tinta = 'text-inchiostro', grande = fa
   )
 }
 
-const FASE_COLORE: Record<FaseFrank, { barra: string; testo: string; bg: string }> = {
-  1: { barra: 'bg-rose-500', testo: 'text-rose-700', bg: 'bg-rose-50' },
-  2: { barra: 'bg-amber-500', testo: 'text-amber-700', bg: 'bg-amber-50' },
-  3: { barra: 'bg-teal-600', testo: 'text-teal-700', bg: 'bg-teal-50' },
-  4: { barra: 'bg-orange-500', testo: 'text-orange-700', bg: 'bg-orange-50' },
-  5: { barra: 'bg-indigo-600', testo: 'text-indigo-700', bg: 'bg-indigo-50' },
-  6: { barra: 'bg-inchiostro/50', testo: 'text-inchiostro/70', bg: 'bg-inchiostro/[0.05]' },
+const FASE_COLORE: Record<FaseFrank, { barra: string; pieno: string; testo: string }> = {
+  1: { barra: 'bg-rose-500/20', pieno: 'bg-rose-500', testo: 'text-rose-700' },
+  2: { barra: 'bg-amber-500/20', pieno: 'bg-amber-500', testo: 'text-amber-700' },
+  3: { barra: 'bg-teal-600/20', pieno: 'bg-teal-600', testo: 'text-teal-700' },
+  4: { barra: 'bg-orange-500/20', pieno: 'bg-orange-500', testo: 'text-orange-700' },
+  5: { barra: 'bg-indigo-600/20', pieno: 'bg-indigo-600', testo: 'text-indigo-700' },
+  6: { barra: 'bg-green-600/20', pieno: 'bg-green-600', testo: 'text-green-700' },
 }
 
-/** Riga del Gantt: nome+contesto a sinistra, UNA barra da oggi alla consegna a destra. */
-function RigaBarra({ titolo, sottotitolo, endPct, bg, testo, etichetta, tag, zebra }: {
-  titolo: string; sottotitolo: string; endPct: number
-  bg: string; testo: string; etichetta: string; tag?: string; zebra: boolean
-}) {
-  const larghezza = Math.max(endPct, 1.2)
-  const labLeft = endPct > (tag ? 55 : 78)
+/** Lo stepper dei 5 passaggi: pieni quelli già completati, acceso quello attuale, vuoti i futuri. */
+function Stepper({ fase }: { fase: FaseFrank }) {
   return (
-    <div className={`grid border-b border-linea/70 last:border-b-0 ${zebra ? 'bg-inchiostro/[0.02]' : ''}`}
-         style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr` }}>
-      <div className="border-r border-linea px-3 py-2">
-        <p className="truncate text-[12.5px] font-bold text-inchiostro">{titolo}</p>
-        <p className="truncate text-[10.5px] text-inchiostro/45">{sottotitolo}</p>
-      </div>
-      <div className="relative h-9">
-        <div className={`absolute top-1/2 h-[11px] -translate-y-1/2 rounded-full ${bg}`}
-             style={{ left: 0, width: `${larghezza}%` }} />
-        <div className={`absolute top-1/2 flex -translate-y-1/2 items-center gap-1 whitespace-nowrap rounded bg-carta px-1 text-[10.5px] font-bold tabular-nums ${testo}`}
-             style={labLeft ? { right: `${100 - endPct}%`, textAlign: 'right' } : { left: `${endPct}%`, paddingLeft: 6 }}>
-          <span>{etichetta}</span>
-          {tag && <span className="rounded bg-amber-100 px-1 py-px text-[8.5px] font-bold text-amber-800">{tag}</span>}
-        </div>
-      </div>
+    <div className="mt-1 flex items-center gap-1">
+      {([1, 2, 3, 4, 5] as FaseFrank[]).map((n) => {
+        const done = n < fase || fase === 6
+        const cur = n === fase
+        const cls = cur ? FASE_COLORE[fase].pieno : done ? 'bg-green-600/40' : 'bg-inchiostro/[0.08]'
+        return <div key={n} className={`h-1.5 flex-1 rounded-full ${cls}`} title={`${n}. ${FASI_FRANK[n].label}`} />
+      })}
     </div>
   )
 }
 
-function Assi({ maxDays }: { maxDays: number }) {
-  const n = Math.min(7, Math.max(1, maxDays))
-  const seen = new Set<number>()
-  const tacche: { pct: number; label: string }[] = []
-  for (let i = 0; i <= n; i++) {
-    const gg = Math.max(0, Math.round((maxDays * i) / n))
-    if (seen.has(gg)) continue
-    seen.add(gg)
-    tacche.push({ pct: (gg / maxDays) * 100, label: fmtData(new Date(FRANK_OGGI.getTime() + gg * GIORNO_MS)) })
-  }
+function RigaGantt({ r, pct }: { r: RigaFrank; pct: (ms: number) => number }) {
+  const c = FASE_COLORE[r.fase]
+  const oggiMs = FRANK_OGGI.getTime()
+  const consegnaMs = r.consegnaPrevista.getTime()
+  const inizioMs = r.entrata ? r.entrata.getTime() : oggiMs
+  const sinistra = pct(inizioMs)
+  const destra = pct(consegnaMs)
+  const larghezza = Math.max(destra - sinistra, 0.6)
+  // parte già percorsa: da inizio a oggi (limitata alla barra)
+  const oggiPct = Math.min(Math.max(pct(oggiMs), sinistra), destra)
+  const pienoW = Math.max(oggiPct - sinistra, 0)
+
+  const milestoneCompletati = [
+    r.copyDone ? { ms: r.copyDone.getTime(), label: `Copy completato ${fmtData(r.copyDone)}` } : null,
+    r.grippoDone ? { ms: r.grippoDone.getTime(), label: `Revisione Grippo completata ${fmtData(r.grippoDone)}` } : null,
+  ].filter((m): m is { ms: number; label: string } => m !== null)
+
+  const testoStorico = [
+    r.entrata ? `in pipeline dal ${fmtData(r.entrata)}` : null,
+    r.copyDone ? `copy ${fmtData(r.copyDone)}` : null,
+    r.grippoDone ? `Grippo ${fmtData(r.grippoDone)}` : null,
+  ].filter(Boolean).join(' · ')
+
   return (
-    <div className="grid border-b border-linea bg-inchiostro/[0.03]" style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr` }}>
-      <div className="flex items-end border-r border-linea px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/40">
-        Cliente
+    <div className="grid border-b border-linea/70 last:border-b-0 hover:bg-inchiostro/[0.025]"
+         style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr` }}>
+      <div className="border-r border-linea px-3 py-2.5">
+        <div className="flex items-baseline gap-2">
+          <span className="font-display truncate text-sm font-bold tracking-tight text-inchiostro">{r.cliente}</span>
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${c.barra} ${c.testo}`}>
+            {r.fase === 6 ? 'consegnato' : `${r.fase} · ${FASI_FRANK[r.fase].label}`}
+          </span>
+        </div>
+        <div className="mt-0.5 truncate text-[11px] text-inchiostro/45">{r.owner}</div>
+        <Stepper fase={r.fase} />
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[10.5px] text-inchiostro/50">
+          {r.fase !== 6 && <span className={`font-semibold ${c.testo}`}>consegna {fmtData(r.consegnaPrevista)}</span>}
+          {testoStorico && <span className="text-inchiostro/45">✓ {testoStorico}</span>}
+        </div>
       </div>
-      <div className="relative h-8">
-        <span className="absolute bottom-1.5 left-0 text-[10px] font-bold text-petrolio-scuro">oggi</span>
-        {tacche.map((t, i) => (
-          <span key={i} className="absolute bottom-1.5 -translate-x-1/2 text-[10px] text-inchiostro/45"
-                style={{ left: `${t.pct}%` }}>{t.label}</span>
+
+      <div className="relative h-full min-h-[64px]"
+           title={`${r.cliente} — fase ${r.fase}${testoStorico ? '\\n✓ ' + testoStorico : ''}\\nConsegna prevista ${fmtData(r.consegnaPrevista)}`}>
+        <div className={`absolute top-1/2 h-4 -translate-y-1/2 rounded-full ${c.barra}`}
+             style={{ left: `${sinistra}%`, width: `${larghezza}%` }}>
+          <div className={`h-full rounded-full ${c.pieno}`} style={{ width: `${larghezza > 0 ? (pienoW / larghezza) * 100 : 0}%` }} />
+        </div>
+        {/* milestone reali dei passaggi completati */}
+        {milestoneCompletati.map((m, i) => (
+          <div key={i} className="absolute top-1/2 z-10 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border border-carta bg-green-700"
+               style={{ left: `${pct(m.ms)}%` }} title={m.label} />
         ))}
+        {/* consegna prevista */}
+        <div className="absolute top-1/2 z-10 flex -translate-y-1/2 items-center gap-1 whitespace-nowrap"
+             style={{ left: `${destra}%`, paddingLeft: 6 }}>
+          <span className={`h-2.5 w-2.5 -translate-x-3 rotate-45 border border-carta ${c.pieno}`} />
+          <span className={`-translate-x-2 text-[10.5px] font-bold tabular-nums ${c.testo}`}>{fmtData(r.consegnaPrevista)}</span>
+        </div>
       </div>
     </div>
   )
@@ -90,8 +119,26 @@ function Assi({ maxDays }: { maxDays: number }) {
 
 export default function ConsulenzeFrank() {
   const righe = [...CONSULENZE_FRANK].sort((a, b) => a.consegnaPrevista.getTime() - b.consegnaPrevista.getTime())
-  const maxDate = righe.reduce((m, r) => (r.consegnaPrevista > m ? r.consegnaPrevista : m), FRANK_OGGI)
-  const maxDays = Math.max(1, Math.round((maxDate.getTime() - FRANK_OGGI.getTime()) / GIORNO_MS))
+  const oggiMs = FRANK_OGGI.getTime()
+
+  const inizi = righe.map((r) => (r.entrata ? r.entrata.getTime() : oggiMs))
+  const da = Math.min(...inizi, oggiMs) - GIORNO_MS * 4
+  const a = Math.max(...righe.map((r) => r.consegnaPrevista.getTime()), oggiMs) + GIORNO_MS * 4
+  const ampiezza = Math.max(a - da, GIORNO_MS * 7)
+  const pct = (ms: number) => Math.max(0, Math.min(100, ((ms - da) / ampiezza) * 100))
+
+  // settimane e mesi per la griglia
+  const settimane: number[] = []
+  for (let t = Math.ceil(da / (GIORNO_MS * 7)) * GIORNO_MS * 7; t < a; t += GIORNO_MS * 7) settimane.push(t)
+  const mesi: { inizio: number; label: string }[] = []
+  {
+    const dd = new Date(da); dd.setDate(1); dd.setHours(0, 0, 0, 0)
+    while (dd.getTime() < a) {
+      mesi.push({ inizio: dd.getTime(), label: dd.toLocaleDateString('it-IT', { month: 'long' }) })
+      dd.setMonth(dd.getMonth() + 1)
+    }
+  }
+
   const perFase = ([1, 2, 3, 4, 5, 6] as FaseFrank[]).map((f) => CONSULENZE_FRANK.filter((r) => r.fase === f).length)
   const ultima = righe[righe.length - 1]
 
@@ -103,7 +150,7 @@ export default function ConsulenzeFrank() {
             <p className="text-xs font-semibold uppercase tracking-widest text-ambra">Solo amministratori</p>
             <h1 className="font-display mt-1 text-3xl font-bold tracking-tight text-inchiostro">Consulenze Frank — Gantt ufficiale</h1>
             <p className="mt-1 max-w-2xl text-sm text-inchiostro/55">
-              {CONSULENZE_FRANK.length} clienti attivi, un&apos;unica lista ordinata per data di consegna prevista. Piano ufficiale del 14/07/2026: massimo 2 consegne per giornata lavorativa, weekend esclusi.
+              {CONSULENZE_FRANK.length} clienti su un&apos;unica timeline. Ogni barra va dall&apos;ingresso reale in pipeline alla consegna prevista; la parte piena è già stata percorsa, i rombi verdi sono i passaggi già completati. Scorri in orizzontale — la linea arancione è oggi.
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -115,37 +162,61 @@ export default function ConsulenzeFrank() {
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Statistica label={`${CONSULENZE_FRANK.length} clienti totali`} valore={fmtData(ultima.consegnaPrevista)} sub="ultima consegna prevista" tinta="text-petrolio-scuro" grande />
-          {([1, 2, 3, 4, 5] as FaseFrank[]).map((f, i) => (
-            <Statistica key={f} label={`${f} · ${FASI_FRANK[f].label}`} valore={String(perFase[i])} sub={FASI_FRANK[f].sub} tinta={FASE_COLORE[f].testo} />
-          ))}
+          <Statistica label="Copy da scrivere (fase 1)" valore={String(perFase[0])} sub="+ 5 dall'avvocato Jelo (fase 2)" tinta={FASE_COLORE[1].testo} />
+          <Statistica label="Dall'agente AI (fasi 3-5)" valore={String(perFase[2] + perFase[3] + perFase[4])} sub="Grippo, Caputo, Valentino" tinta={FASE_COLORE[4].testo} />
+          <Statistica label="Consegnati" valore={String(perFase[5])} sub="fase 6" tinta="text-green-700" />
         </div>
 
         <div className="mt-6">
           <div className="flex flex-wrap items-center gap-3">
-            <h3 className="font-display text-xl font-bold tracking-tight text-inchiostro">Quando consegniamo, cliente per cliente</h3>
+            <h3 className="font-display text-xl font-bold tracking-tight text-inchiostro">Timeline del progetto</h3>
             <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-inchiostro/55">
-              {([1, 2, 3, 4, 5, 6] as FaseFrank[]).map((f) => (
+              {([1, 2, 3, 4, 5] as FaseFrank[]).map((f) => (
                 <span key={f} className="inline-flex items-center gap-1.5">
-                  <span className={`h-2 w-4 rounded-full ${FASE_COLORE[f].barra}`} />{f}. {FASI_FRANK[f].label}
+                  <span className={`h-2 w-4 rounded-full ${FASE_COLORE[f].pieno}`} />{f}. {FASI_FRANK[f].label}
                 </span>
               ))}
+              <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rotate-45 bg-green-700" />passaggio completato</span>
             </div>
           </div>
-          <div className="mt-2 overflow-x-auto rounded-2xl border border-linea bg-carta shadow-sm">
-            <div className="min-w-[760px]">
-              <Assi maxDays={maxDays} />
-              {righe.map((r, i) => {
-                const giorni = Math.round((r.consegnaPrevista.getTime() - FRANK_OGGI.getTime()) / GIORNO_MS)
-                const endPct = Math.max((giorni / maxDays) * 100, 1.2)
-                const c = FASE_COLORE[r.fase]
-                return (
-                  <RigaBarra key={r.cliente + i} zebra={i % 2 === 0}
-                    titolo={r.cliente} sottotitolo={`${r.owner} · ${FASI_FRANK[r.fase].label}`}
-                    endPct={endPct} bg={c.barra} testo={c.testo}
-                    etichetta={fmtData(r.consegnaPrevista)}
-                    tag={r.nota ? 'nota' : undefined} />
-                )
-              })}
+          <div className="mt-3 overflow-x-auto rounded-2xl border border-linea bg-carta shadow-sm">
+            <div style={{ minWidth: MIN_W }}>
+              {/* intestazione: mesi + settimane + oggi */}
+              <div className="grid border-b border-linea bg-inchiostro/[0.03]" style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr` }}>
+                <div className="flex items-end border-r border-linea px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/40">
+                  Cliente · fase · consegna
+                </div>
+                <div className="relative h-11">
+                  {mesi.map((m) => (
+                    <span key={m.inizio} className="absolute top-1 text-[10px] font-bold uppercase tracking-wider text-inchiostro/50"
+                          style={{ left: `${Math.max(pct(m.inizio), 0.4)}%` }}>{m.label}</span>
+                  ))}
+                  {settimane.map((t) => (
+                    <span key={t} className="absolute bottom-0.5 -translate-x-1/2 text-[10px] text-inchiostro/40"
+                          style={{ left: `${pct(t)}%` }}>{new Date(t).getDate()}</span>
+                  ))}
+                  <span className="absolute top-1 -translate-x-1/2 rounded bg-ambra px-1 py-px text-[9px] font-bold uppercase text-white"
+                        style={{ left: `${pct(oggiMs)}%` }}>oggi</span>
+                </div>
+              </div>
+
+              {/* corpo: griglia + linea oggi dietro le righe */}
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-0 grid" style={{ gridTemplateColumns: `${LARGHEZZA_TABELLA}px 1fr` }}>
+                  <div />
+                  <div className="relative">
+                    {settimane.map((t) => (
+                      <div key={t} className="absolute top-0 bottom-0 w-px bg-inchiostro/[0.06]" style={{ left: `${pct(t)}%` }} />
+                    ))}
+                    {mesi.map((m) => (
+                      <div key={m.inizio} className="absolute top-0 bottom-0 w-px bg-inchiostro/[0.14]" style={{ left: `${pct(m.inizio)}%` }} />
+                    ))}
+                    <div className="absolute top-0 bottom-0 z-10 w-0.5 bg-ambra" style={{ left: `${pct(oggiMs)}%` }} />
+                  </div>
+                </div>
+
+                {righe.map((r, i) => <RigaGantt key={r.cliente + i} r={r} pct={pct} />)}
+              </div>
             </div>
           </div>
         </div>
@@ -163,9 +234,9 @@ export default function ConsulenzeFrank() {
         </div>
 
         <Carta className="mt-6 text-xs leading-relaxed text-inchiostro/65">
-          <p><b className="text-inchiostro">Fonte e regole del piano.</b> Date ufficiali dal file &quot;Gantt_Consulenze_Frank_XY_Max2_14-07-2026.xlsx&quot; (foglio &quot;Elenco consegne&quot;), non ricalcolate da questa piattaforma. Vincolo applicato: <b className="text-inchiostro">massimo 2 consegne per giornata lavorativa</b>, weekend esclusi — chi è pronto il venerdì può slittare al lunedì. Priorità di coda: fase 5, poi 4, poi 3, poi le pratiche in fase 1 e 2 nell&apos;ordine fornito.</p>
-          <p className="mt-2">Per i clienti in fase 1 (Mastella, Rea, Banfi, Donnantuono, Novella, Tamburini) la data indicata è trattata come fine copy, non come consegna finale: da lì il progetto attraversa comunque revisione Grippo, Caputo e Valentino (e l&apos;avvocato Jelo se il progetto è di branding — <b className="text-inchiostro">da confermare per ciascuno</b>). Solo i clienti già presenti dal Avv. Jelo (Pessot, Lancia, Barcello, Cazan, Imbriano 1) includono i 3 giorni lavorativi legali nel calcolo.</p>
-          <p className="mt-2">Se il piano cambia, aggiornare i dati in <code className="rounded bg-inchiostro/[0.06] px-1 py-0.5">lib/consulenzeFrank.ts</code> con il nuovo file ufficiale.</p>
+          <p><b className="text-inchiostro">Cosa mostra la barra.</b> Da sinistra: l&apos;ingresso reale del cliente in pipeline (data del questionario ricevuto), poi la parte piena = tempo già percorso fino a oggi, poi la parte tenue = runway che resta fino alla consegna prevista. I <b className="text-green-700">rombi verdi</b> sono i passaggi già completati con la loro data reale (copy consegnato, revisione Grippo chiusa), presi dal foglio maestro &quot;CONSULENZE FRANK - Report in lavorazione&quot;. Lo stepper a 5 tacche sotto ogni nome dice quali passaggi sono fatti (verde), quale è in corso (colore fase) e quali restano.</p>
+          <p className="mt-2"><b className="text-inchiostro">Date di consegna.</b> Dal file ufficiale &quot;Gantt_Consulenze_Frank_XY_Max2_14-07-2026.xlsx&quot;: vincolo massimo 2 consegne per giornata lavorativa, weekend esclusi, coda per fase 5→4→3→1→2.</p>
+          <p className="mt-2"><b className="text-inchiostro">Nota di trasparenza.</b> Le date storiche a monte sono disponibili solo per i clienti già entrati in pipeline (fasi 3-6). Per chi è ancora in scrittura copy (fase 1) o dall&apos;avvocato Jelo (fase 2) non esistono ancora passaggi completati, quindi la barra parte da oggi. Il foglio maestro non traccia separatamente Caputo (immagini) da Valentino (grafica) né la revisione dell&apos;avvocato: i rombi verdi coprono copy e revisione testo, gli unici milestone a monte con una data certa.</p>
         </Carta>
       </div>
     </div>

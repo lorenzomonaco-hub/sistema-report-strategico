@@ -1,22 +1,21 @@
 'use client'
 
 // ─── Area Commerciale — Tutor ───
-// FASE 1: il tutor registra il cliente (azienda, titolare, email) e i
-//   dipendenti (nome, email, ruolo a tendina). Compilazione semplice.
-// FASE 2: il venditore (o un dipendente) carica i documenti REALI —
-//   questionario e trascrizione per l'azienda, i 4 AssessFirst per persona —
-//   che restano a sistema fino alla 4a. Con «Completo» parte la generazione.
+// Il tutor fa UNA cosa: registra il cliente e le persone da valutare.
+// La registrazione è il TRIGGER della pipeline: il cliente nasce allo STEP 0
+// (vendita registrata, documenti mancanti). Da lì è Elisa a caricare i
+// documenti e a farlo passare allo step 1 (Copy).
+// Regole persone: nome, cognome, email (serve per l'AssessFirst), qualifica.
+//   · soci ILLIMITATI (titolare + soci)   · dipendenti MAX 3 per azienda.
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useApp, contaNotifiche } from '@/lib/store'
-import { documentiTutorPronti, indiceFase, statoCommerciale } from '@/lib/fasi'
-import { caricaFile, cancellaFile } from '@/lib/archivioblocco'
+import { indiceFase, statoCommerciale } from '@/lib/fasi'
 import RoleShell from '@/components/RoleShell'
 import PraticaCard from '@/components/PraticaCard'
 import EmptyState from '@/components/EmptyState'
-import {
-  ASSESSFIRST_TIPI, DocumentoAllegato, PersonaAF, Pratica, RUOLI, qualificaDaRuolo, relazioneAF,
-} from '@/lib/types'
+import { PersonaAF, RUOLI, qualificaDaRuolo, relazioneAF } from '@/lib/types'
 
 const dataIt = (iso: string) =>
   new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Rome' })
@@ -24,27 +23,7 @@ const dataIt = (iso: string) =>
 const classiInput =
   'w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35 transition focus:border-petrolio focus:outline-none focus:ring-2 focus:ring-petrolio/15'
 
-const uid = () => `al-${Math.random().toString(36).slice(2, 10)}`
-
-const normalizza = (s: string) =>
-  (s || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
-
-/** Riconosce quale dei 4 AssessFirst è un file dal suo nome. */
-function categoriaDaNome(nomeFile: string): string | null {
-  const n = normalizza(nomeFile)
-  if (n.includes('swipe')) return 'SWIPE'
-  if (n.includes('drive')) return 'DRIVE'
-  if (n.includes('brain')) return 'BRAIN'
-  if (n.includes('comportament')) return 'Comportamenti chiave'
-  return null
-}
-
-/** Il nome file contiene il nome e cognome della persona? (controllo veridicità) */
-function nomeCorrisponde(nomeFile: string, persona: string): boolean {
-  const f = normalizza(nomeFile)
-  const tokens = normalizza(persona).split(' ').filter((t) => t.length >= 3)
-  return tokens.length > 0 && tokens.every((t) => f.includes(t))
-}
+const MAX_DIPENDENTI = 3
 
 function BannerConferma({ testo, onChiudi }: { testo: React.ReactNode; onChiudi: () => void }) {
   return (
@@ -64,52 +43,69 @@ function TitoloSezione({ titolo, conteggio }: { titolo: string; conteggio?: stri
   )
 }
 
-// ─── FASE 1: form nuovo cliente ───
+// ─── Form nuovo cliente: il trigger della pipeline ───
 function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCreata: (azienda: string) => void }) {
   const { creaPratica } = useApp()
   const [azienda, setAzienda] = useState('')
-  const [titolare, setTitolare] = useState('')
+  const [titolareNome, setTitolareNome] = useState('')
+  const [titolareCognome, setTitolareCognome] = useState('')
   const [emailCliente, setEmailCliente] = useState('')
   const [dipendenti, setDipendenti] = useState<PersonaAF[]>([])
   const [nome, setNome] = useState('')
+  const [cognome, setCognome] = useState('')
   const [email, setEmail] = useState('')
   const [ruolo, setRuolo] = useState<string>('Imprenditore')
   const [ruoloAltro, setRuoloAltro] = useState('')
   const [errore, setErrore] = useState<string | null>(null)
 
+  const nDipendenti = dipendenti.filter((d) => d.qualifica === 'dipendente').length
+  const nSoci = dipendenti.length - nDipendenti
+
   const aggiungi = () => {
     const n = nome.trim()
+    const c = cognome.trim()
     const r = ruolo === 'Altro' ? ruoloAltro.trim() : ruolo
-    if (!n) return setErrore('Manca il nome del dipendente.')
+    const em = email.trim()
+    if (!n || !c) return setErrore('Servono nome E cognome della persona.')
     if (!r) return setErrore('Indica il ruolo (o scrivilo se hai scelto «Altro»).')
-    if (email.trim() && !email.includes('@')) return setErrore('Email del dipendente non valida.')
-    if (dipendenti.some((d) => d.nome.toLowerCase() === n.toLowerCase())) return setErrore('Questa persona è già in elenco.')
-    setDipendenti([...dipendenti, { nome: n, email: email.trim(), ruolo: r, qualifica: qualificaDaRuolo(r) }])
-    setNome(''); setEmail(''); setRuolo('Imprenditore'); setRuoloAltro(''); setErrore(null)
+    if (!em || !em.includes('@')) return setErrore('L’email è obbligatoria: serve per inviare il test AssessFirst.')
+    const nomeCompleto = `${n} ${c}`
+    if (dipendenti.some((d) => d.nome.toLowerCase() === nomeCompleto.toLowerCase())) return setErrore('Questa persona è già in elenco.')
+    const q = qualificaDaRuolo(r)
+    if (q === 'dipendente' && nDipendenti >= MAX_DIPENDENTI) return setErrore(`Massimo ${MAX_DIPENDENTI} dipendenti per azienda. Titolare e soci sono invece illimitati.`)
+    setDipendenti([...dipendenti, { nome: nomeCompleto, email: em, ruolo: r, qualifica: q }])
+    setNome(''); setCognome(''); setEmail(''); setRuolo('Imprenditore'); setRuoloAltro(''); setErrore(null)
   }
 
   const registra = () => {
-    if (!azienda.trim() || !titolare.trim() || !emailCliente.trim()) return setErrore('Azienda, titolare ed email del cliente sono obbligatori.')
+    const titolare = `${titolareNome.trim()} ${titolareCognome.trim()}`.trim()
+    if (!azienda.trim() || !titolareNome.trim() || !titolareCognome.trim() || !emailCliente.trim()) return setErrore('Azienda, nome e cognome del titolare ed email del cliente sono obbligatori.')
     if (!emailCliente.includes('@')) return setErrore('Email del cliente non valida.')
-    if (dipendenti.length < 1) return setErrore('Aggiungi almeno una persona.')
-    creaPratica({ azienda: azienda.trim(), cliente: titolare.trim(), email: emailCliente.trim(), dipendenti })
+    if (dipendenti.length < 1) return setErrore('Aggiungi almeno una persona da valutare.')
+    creaPratica({ azienda: azienda.trim(), cliente: titolare, email: emailCliente.trim(), dipendenti })
     onCreata(azienda.trim()); onChiudi()
   }
 
   return (
     <div className="card-sollevabile rounded-2xl border border-linea bg-carta p-5 shadow-sm">
-      <h3 className="font-display font-bold tracking-tight text-inchiostro">Fase 1 — Registra il cliente</h3>
-      <p className="mt-0.5 text-xs text-inchiostro/50">Dati del cliente e persone da valutare. Semplice: nome, email, ruolo.</p>
+      <h3 className="font-display font-bold tracking-tight text-inchiostro">Registra il cliente — avvia la pipeline (step 0)</h3>
+      <p className="mt-0.5 text-xs text-inchiostro/50">
+        Registrare il cliente crea il progetto allo <strong>step 0</strong> (vendita registrata, documenti mancanti). Poi Elisa carica i documenti.
+      </p>
 
-      {/* Cliente */}
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <div>
+      {/* Cliente / azienda */}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="lg:col-span-1">
           <label className="mb-1 block text-xs font-semibold text-inchiostro/60">Azienda *</label>
           <input value={azienda} onChange={(e) => setAzienda(e.target.value)} placeholder="Es. Rossi S.r.l." className={classiInput} />
         </div>
         <div>
           <label className="mb-1 block text-xs font-semibold text-inchiostro/60">Nome titolare *</label>
-          <input value={titolare} onChange={(e) => setTitolare(e.target.value)} placeholder="Nome e cognome" className={classiInput} />
+          <input value={titolareNome} onChange={(e) => setTitolareNome(e.target.value)} placeholder="Nome" className={classiInput} />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-inchiostro/60">Cognome titolare *</label>
+          <input value={titolareCognome} onChange={(e) => setTitolareCognome(e.target.value)} placeholder="Cognome" className={classiInput} />
         </div>
         <div>
           <label className="mb-1 block text-xs font-semibold text-inchiostro/60">Email cliente *</label>
@@ -117,13 +113,17 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
         </div>
       </div>
 
-      {/* Dipendenti */}
+      {/* Persone */}
       <div className="mt-5">
-        <label className="mb-1 block text-xs font-semibold text-inchiostro/60">Persone da valutare * — nomi ESATTI (finiscono sui report)</label>
-        <div className="flex flex-wrap items-start gap-2">
-          <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome e cognome" className={`${classiInput} min-w-40 flex-1`} />
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" className={`${classiInput} min-w-40 flex-1`} />
-          <select value={ruolo} onChange={(e) => setRuolo(e.target.value)} aria-label="Ruolo" className={`${classiInput} w-40 shrink-0`}>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <label className="block text-xs font-semibold text-inchiostro/60">Persone da valutare * — nome, cognome, email (per l&rsquo;AssessFirst), qualifica</label>
+          <span className="text-[11px] text-inchiostro/45">{nSoci} titolare/soci · <span className={nDipendenti >= MAX_DIPENDENTI ? 'font-bold text-amber-700' : ''}>{nDipendenti}/{MAX_DIPENDENTI} dipendenti</span></span>
+        </div>
+        <div className="mt-1 flex flex-wrap items-start gap-2">
+          <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome" className={`${classiInput} min-w-28 flex-1`} />
+          <input value={cognome} onChange={(e) => setCognome(e.target.value)} placeholder="Cognome" className={`${classiInput} min-w-28 flex-1`} />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email *" className={`${classiInput} min-w-40 flex-1`} />
+          <select value={ruolo} onChange={(e) => setRuolo(e.target.value)} aria-label="Qualifica" className={`${classiInput} w-40 shrink-0`}>
             {RUOLI.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
           {ruolo === 'Altro' && (
@@ -135,16 +135,18 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
             + Aggiungi
           </button>
         </div>
+        <p className="mt-1 text-[11px] text-inchiostro/40">Titolare e soci: illimitati. Dipendenti: massimo {MAX_DIPENDENTI} per azienda.</p>
 
         {dipendenti.length > 0 && (
           <ul className="mt-2 space-y-1.5">
             {dipendenti.map((d) => {
-              const rel = relazioneAF({ dipendenti, cliente: titolare || '—' }, d)
+              const rel = relazioneAF({ dipendenti, cliente: `${titolareNome} ${titolareCognome}`.trim() || '—' }, d)
+              const badge = d.qualifica === 'dipendente' ? 'bg-sky-100 text-sky-700' : 'bg-indigo-100 text-indigo-700'
               return (
                 <li key={d.nome} className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-900">
                   <span className="font-semibold">{d.nome}</span>
-                  {d.email && <span className="text-indigo-800/70">{d.email}</span>}
-                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">{d.ruolo}</span>
+                  <span className="text-indigo-800/70">{d.email}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge}`}>{d.ruolo} · {d.qualifica}</span>
                   <span className="ml-auto text-xs text-indigo-500">report AF: caso {rel.caso}</span>
                   <button onClick={() => setDipendenti(dipendenti.filter((x) => x.nome !== d.nome))} aria-label={`Rimuovi ${d.nome}`} className="text-indigo-400 transition hover:text-indigo-700">✕</button>
                 </li>
@@ -164,254 +166,32 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
   )
 }
 
-// ─── Slot di caricamento REALE di un singolo file ───
-function SlotUpload({ pratica, categoria, sottotipo, dipendente, label }: {
-  pratica: Pratica; categoria: DocumentoAllegato['tipo']; sottotipo?: string; dipendente?: string; label: string
-}) {
-  const { registraAllegato, rimuoviAllegato } = useApp()
-  const [inCorso, setInCorso] = useState(false)
-  const [errore, setErrore] = useState('')
-  const esistente = pratica.allegati.find(
-    (a) => a.tipo === categoria && (a.dipendente ?? '') === (dipendente ?? '') && (a.sottotipo ?? '') === (sottotipo ?? '')
-  )
-
-  const onFile = async (f: File | null) => {
-    if (!f) return
-    setErrore(''); setInCorso(true)
-    try {
-      const c = await caricaFile(f, { praticaId: pratica.id, categoria, dipendente, sottotipo })
-      registraAllegato(pratica.id, {
-        id: uid(), nome: c.nome, tipo: categoria, sottotipo, dipendente,
-        fileId: c.id, dimensione: c.dimensione, caricatoDa: 'Venditore', dataCaricamento: new Date().toISOString(),
-      })
-    } catch (e) {
-      setErrore(e instanceof Error ? e.message : 'caricamento fallito')
-    } finally {
-      setInCorso(false)
-    }
-  }
-
-  return (
-    <div className={`rounded-xl border px-3 py-2 ${esistente ? 'border-green-200 bg-green-50/60' : 'border-linea bg-carta'}`}>
-      <div className="flex items-center gap-2">
-        <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${esistente ? 'bg-green-100 text-green-700' : 'border-2 border-inchiostro/15 bg-carta text-inchiostro/30'}`}>
-          {esistente ? '✓' : ''}
-        </span>
-        <span className="min-w-24 shrink-0 text-xs font-semibold text-inchiostro/70">{label}</span>
-        {esistente ? (
-          <>
-            <span className="truncate text-xs text-inchiostro/60">{esistente.nome}</span>
-            <button
-              onClick={() => { if (esistente.fileId) cancellaFile(esistente.fileId); rimuoviAllegato(pratica.id, esistente.id) }}
-              className="ml-auto shrink-0 text-xs text-rose-400 transition hover:text-rose-700"
-            >
-              rimuovi
-            </button>
-          </>
-        ) : (
-          <label className="ml-auto shrink-0 cursor-pointer rounded-lg border border-linea px-2.5 py-1 text-xs font-semibold text-inchiostro/60 transition hover:border-petrolio/40 hover:text-petrolio">
-            {inCorso ? 'Carico…' : 'Scegli file'}
-            <input type="file" className="hidden" disabled={inCorso}
-              onChange={(e) => { onFile(e.target.files?.[0] ?? null); e.target.value = '' }} />
-          </label>
-        )}
-      </div>
-      {errore && <p className="mt-1 pl-7 text-xs text-rose-600">{errore}</p>}
-    </div>
-  )
-}
-
-// ─── I 4 AssessFirst di UNA persona: un solo caricamento, riconoscimento dal nome ───
-function CaricaAssessFirst({ pratica, persona }: { pratica: Pratica; persona: PersonaAF }) {
-  const { registraAllegato, rimuoviAllegato } = useApp()
-  const [inCorso, setInCorso] = useState(false)
-  const [daAssegnare, setDaAssegnare] = useState<File[]>([])
-  const [errore, setErrore] = useState('')
-
-  const slot = (s: string) =>
-    pratica.allegati.find((a) => a.tipo === 'assessfirst' && a.dipendente === persona.nome && a.sottotipo === s)
-
-  const salva = async (f: File, sottotipo: string) => {
-    const c = await caricaFile(f, { praticaId: pratica.id, categoria: 'assessfirst', dipendente: persona.nome, sottotipo })
-    registraAllegato(pratica.id, {
-      id: uid(), nome: c.nome, tipo: 'assessfirst', sottotipo, dipendente: persona.nome,
-      fileId: c.id, dimensione: c.dimensione, caricatoDa: 'Venditore', dataCaricamento: new Date().toISOString(),
-    })
-  }
-
-  // Riconosce e carica una manciata di file in un colpo solo.
-  const processa = async (files: File[]) => {
-    setErrore(''); setInCorso(true)
-    const nonRiconosciuti: File[] = []
-    try {
-      for (const f of files) {
-        const cat = categoriaDaNome(f.name)
-        if (cat) await salva(f, cat)
-        else nonRiconosciuti.push(f)
-      }
-    } catch (e) {
-      setErrore(e instanceof Error ? e.message : 'caricamento fallito')
-    } finally {
-      setInCorso(false)
-      setDaAssegnare(nonRiconosciuti)
-    }
-  }
-
-  const completa = ASSESSFIRST_TIPI.every((s) => slot(s))
-
-  return (
-    <div className={`rounded-xl border p-3 ${completa ? 'border-green-200 bg-green-50/40' : 'border-linea bg-inchiostro/[0.015]'}`}>
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold text-inchiostro">{persona.nome}</span>
-        <span className="rounded-full bg-inchiostro/5 px-2 py-0.5 text-[11px] text-inchiostro/55">{persona.ruolo}</span>
-        <label className="ml-auto shrink-0 cursor-pointer rounded-lg bg-petrolio px-3 py-1 text-xs font-semibold text-white transition hover:bg-petrolio-scuro">
-          {inCorso ? 'Carico…' : completa ? 'Ricarica i file' : 'Carica i 4 file insieme'}
-          <input type="file" multiple accept=".pdf" className="hidden" disabled={inCorso}
-            onChange={(e) => { processa(Array.from(e.target.files ?? [])); e.target.value = '' }} />
-        </label>
-        {completa && <span className="text-xs font-semibold text-green-700">4/4 ✓</span>}
-      </div>
-
-      {/* stato dei 4: riconosciuto automaticamente, con controllo che il nome sia della persona */}
-      <div className="grid gap-1.5 sm:grid-cols-2">
-        {ASSESSFIRST_TIPI.map((s) => {
-          const a = slot(s)
-          const nomeOk = a ? nomeCorrisponde(a.nome, persona.nome) : true
-          return (
-            <div key={s} className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${
-              a ? (nomeOk ? 'border-green-200 bg-green-50/60' : 'border-amber-300 bg-amber-50') : 'border-linea bg-carta'}`}>
-              <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                a ? (nomeOk ? 'bg-green-100 text-green-700' : 'bg-amber-200 text-amber-800') : 'border-2 border-inchiostro/15 text-transparent'}`}>
-                {a ? (nomeOk ? '✓' : '!') : ''}
-              </span>
-              <span className="w-24 shrink-0 font-semibold text-inchiostro/70">{s}</span>
-              {a ? (
-                <>
-                  <span className="truncate text-inchiostro/60" title={a.nome}>{a.nome}</span>
-                  <button onClick={() => { if (a.fileId) cancellaFile(a.fileId); rimuoviAllegato(pratica.id, a.id) }}
-                    className="ml-auto shrink-0 text-rose-400 transition hover:text-rose-700">rimuovi</button>
-                </>
-              ) : (
-                <span className="text-inchiostro/35">manca</span>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {/* avviso: qualche slot ha il nome di un'altra persona → da correggere */}
-      {ASSESSFIRST_TIPI.some((s) => { const a = slot(s); return a && !nomeCorrisponde(a.nome, persona.nome) }) && (
-        <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
-          ⚠ Un file (giallo, «!») non ha nel nome «{persona.nome}»: controlla che sia davvero suo, altrimenti rimuovilo e ricarica quello giusto.
-        </p>
-      )}
-
-      {/* file caricati ma non riconosciuti: assegnazione manuale */}
-      {daAssegnare.length > 0 && (
-        <div className="mt-2 space-y-1.5">
-          {daAssegnare.map((f, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs text-rose-800">
-              <span className="truncate">Non riconosciuto: <strong>{f.name}</strong></span>
-              <select defaultValue="" aria-label="Assegna a" className="ml-auto rounded border border-rose-200 bg-white px-1.5 py-0.5 text-xs"
-                onChange={async (e) => {
-                  if (!e.target.value) return
-                  await salva(f, e.target.value)
-                  setDaAssegnare(daAssegnare.filter((_, j) => j !== i))
-                }}>
-                <option value="">assegna a…</option>
-                {ASSESSFIRST_TIPI.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-          ))}
-        </div>
-      )}
-      {errore && <p className="mt-2 text-xs text-rose-600">{errore}</p>}
-    </div>
-  )
-}
-
-// ─── FASE 2: caricamento documenti (reale) ───
-function CartaRaccolta({ pratica, onConfermata }: { pratica: Pratica; onConfermata: (azienda: string) => void }) {
-  const { clientePronto } = useApp()
-  const pronti = documentiTutorPronti(pratica)
-
-  return (
-    <div className="card-sollevabile rounded-2xl border border-linea bg-carta p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h3 className="truncate font-display font-bold tracking-tight text-inchiostro">{pratica.azienda}</h3>
-          <p className="truncate text-sm text-inchiostro/50">{pratica.cliente} · {pratica.email}</p>
-          <p className="mt-1 text-xs text-inchiostro/40">
-            Registrato il {dataIt(pratica.dataCreazione)} · {pratica.dipendenti.length} {pratica.dipendenti.length === 1 ? 'persona' : 'persone'}
-          </p>
-        </div>
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
-          <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" /> Fase 2 — documenti
-        </span>
-      </div>
-
-      {/* Documenti dell'azienda */}
-      <div className="mt-4">
-        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Documenti dell&rsquo;azienda</p>
-        <div className="space-y-1.5">
-          <SlotUpload pratica={pratica} categoria="questionario" label="Questionario" />
-          <SlotUpload pratica={pratica} categoria="trascrizione" label="Trascrizione" />
-        </div>
-      </div>
-
-      {/* AssessFirst per persona: UN caricamento, i 4 file riconosciuti dal nome */}
-      <div className="mt-4">
-        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-inchiostro/40">
-          AssessFirst — carica i 4 file di ogni persona insieme (SWIPE, DRIVE, BRAIN, Comportamenti riconosciuti dal nome)
-        </p>
-        <div className="space-y-3">
-          {pratica.dipendenti.map((d) => (
-            <CaricaAssessFirst key={d.nome} pratica={pratica} persona={d} />
-          ))}
-        </div>
-      </div>
-
-      <button
-        onClick={() => { clientePronto(pratica.id); onConfermata(pratica.azienda) }}
-        disabled={!pronti}
-        className={`mt-5 w-full rounded-xl px-4 py-2.5 text-sm font-semibold transition ${pronti ? 'bg-ambra text-white hover:bg-amber-700' : 'cursor-not-allowed border border-linea bg-carta text-inchiostro/30'}`}
-      >
-        🚀 Completo — avvia generazione e report AssessFirst
-      </button>
-      {!pronti && (
-        <p className="mt-2 text-xs text-inchiostro/40">
-          Il bottone si attiva quando ci sono questionario, trascrizione e tutti e 4 gli AssessFirst di ogni persona.
-        </p>
-      )}
-    </div>
-  )
-}
-
 export default function PaginaTutor() {
   const { state } = useApp()
   const [formAperto, setFormAperto] = useState(false)
   const [aziendaCreata, setAziendaCreata] = useState<string | null>(null)
-  const [aziendaConfermata, setAziendaConfermata] = useState<string | null>(null)
 
-  const inRaccolta = state.pratiche.filter((p) => p.faseCorrente === 'vendita' || p.faseCorrente === 'raccolta-documenti')
+  const step0 = state.pratiche.filter((p) => p.faseCorrente === 'vendita' || p.faseCorrente === 'raccolta-documenti')
   const inLavorazione = state.pratiche.filter((p) => indiceFase(p.faseCorrente) >= indiceFase('generazione'))
 
   return (
     <RoleShell
       ruolo="Tutor"
       colore="bg-indigo-500"
-      sottotitolo="Fase 1: registri il cliente. Fase 2: carichi i documenti e avvii la pipeline."
+      sottotitolo="Registri il cliente e le persone: è il via della pipeline (step 0). Poi Elisa carica i documenti."
       notifiche={contaNotifiche(state, 'tutor')}
     >
       <div className="space-y-10">
-        {/* FASE 1 */}
+        {/* Registrazione */}
         <section className="anima anima-1">
-          <TitoloSezione titolo="Fase 1 — Nuovo cliente" />
-          <p className="mt-1 text-xs text-inchiostro/45">Registra azienda, titolare e le persone da valutare (nome, email, ruolo).</p>
+          <TitoloSezione titolo="Nuovo cliente — step 0" />
+          <p className="mt-1 text-xs text-inchiostro/45">
+            Registra azienda, titolare e le persone da valutare. La registrazione avvia la pipeline: il cliente entra allo step 0 in attesa dei documenti di Elisa.
+          </p>
           <div className="mt-3 space-y-3">
             {aziendaCreata && (
               <BannerConferma
-                testo={<>Cliente <strong>{aziendaCreata}</strong> registrato: ora carica i documenti nella Fase 2 qui sotto.</>}
+                testo={<>Cliente <strong>{aziendaCreata}</strong> registrato allo <strong>step 0</strong>. Ora Elisa carica i documenti per farlo passare allo step 1.</>}
                 onChiudi={() => setAziendaCreata(null)}
               />
             )}
@@ -425,34 +205,41 @@ export default function PaginaTutor() {
           </div>
         </section>
 
-        {/* FASE 2 */}
+        {/* Step 0: in attesa dei documenti di Elisa */}
         <section className="anima anima-2">
-          <TitoloSezione titolo="Fase 2 — Documenti da caricare" conteggio={`${inRaccolta.length} in raccolta`} />
+          <TitoloSezione titolo="Step 0 — in attesa dei documenti (Elisa)" conteggio={`${step0.length} client${step0.length === 1 ? 'e' : 'i'}`} />
           <p className="mt-1 text-xs text-inchiostro/45">
-            Il venditore carica questionario e trascrizione dell&rsquo;azienda e i 4 AssessFirst di ogni persona. I file restano a sistema fino al report AssessFirst.
+            Clienti registrati per cui Elisa deve ancora caricare tutti i documenti. Quando li completa, passano allo step 1 (Copy).
           </p>
-          <div className="mt-3 space-y-4">
-            {aziendaConfermata && (
-              <BannerConferma
-                testo={<>Pipeline avviata per <strong>{aziendaConfermata}</strong>: generazione e report AssessFirst in corso.</>}
-                onChiudi={() => setAziendaConfermata(null)}
-              />
-            )}
-            {inRaccolta.length === 0 ? (
-              <EmptyState titolo="Nessun cliente in raccolta documenti" sottotitolo="Registra un cliente nella Fase 1: comparirà qui per il caricamento dei documenti." icona="📂" />
+          <div className="mt-3 space-y-3">
+            {step0.length === 0 ? (
+              <EmptyState titolo="Nessun cliente allo step 0" sottotitolo="Registra un cliente qui sopra: comparirà in attesa dei documenti di Elisa." icona="📂" />
             ) : (
-              inRaccolta.map((p) => <CartaRaccolta key={p.id} pratica={p} onConfermata={setAziendaConfermata} />)
+              step0.map((p) => (
+                <div key={p.id} className="flex items-center justify-between gap-3 rounded-2xl border border-linea bg-carta px-4 py-3 shadow-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-display font-bold text-inchiostro">{p.azienda}</p>
+                    <p className="truncate text-xs text-inchiostro/50">{p.cliente} · {p.dipendenti.length} {p.dipendenti.length === 1 ? 'persona' : 'persone'} · registrato {dataIt(p.dataCreazione)}</p>
+                  </div>
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> step 0 · documenti da Elisa
+                  </span>
+                </div>
+              ))
             )}
           </div>
+          <p className="mt-3 text-xs text-inchiostro/45">
+            I documenti li carica <Link href="/commerciale/elisa" className="font-semibold text-petrolio hover:underline">Elisa</Link>.
+          </p>
         </section>
 
         {/* In lavorazione */}
         <section className="anima anima-3">
-          <TitoloSezione titolo="In lavorazione" conteggio={`${inLavorazione.length} pratiche`} />
-          <p className="mt-1 text-xs text-inchiostro/45">Da qui in poi lavorano Irene e il team copy: questi macro-stati ti bastano per aggiornare il cliente.</p>
+          <TitoloSezione titolo="In lavorazione" conteggio={`${inLavorazione.length} client${inLavorazione.length === 1 ? 'e' : 'i'}`} />
+          <p className="mt-1 text-xs text-inchiostro/45">Dallo step 1 in poi lavorano il team copy e la pipeline: questi macro-stati ti bastano per aggiornare il cliente.</p>
           <div className="mt-3 space-y-3">
             {inLavorazione.length === 0 ? (
-              <EmptyState titolo="Nessuna pratica in lavorazione" sottotitolo="Le pratiche avviate compariranno qui con il loro stato." icona="🗂️" />
+              <EmptyState titolo="Nessun cliente in lavorazione" sottotitolo="I clienti avviati compariranno qui con il loro stato." icona="🗂️" />
             ) : (
               inLavorazione.map((p) => {
                 const stato = statoCommerciale(p.faseCorrente)

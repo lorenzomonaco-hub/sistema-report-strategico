@@ -566,6 +566,9 @@ export function contaNotifiche(state: AppState, ruolo: string): number {
     case 'tutor':
       // vendite da completare + cartelle in raccolta documenti
       return inFase(['vendita', 'raccolta-documenti'])
+    case 'elisa':
+      // clienti allo step 0 per cui Elisa deve caricare i documenti
+      return inFase(['vendita', 'raccolta-documenti'])
     case 'irene':
       // supervisione step 4a: generazioni in corso + report AF con problemi
       return (

@@ -29,12 +29,12 @@ const PERSONE: CardPersona[] = [
   {
     href: '/commerciale/tutor',
     nome: 'Tutor',
-    compito: 'Apre la pratica, raccoglie tutti i documenti e avvia la pipeline automatica.',
+    compito: 'Registra il cliente e le persone: è il via della pipeline (step 0).',
     passi: [
-      'Registra la vendita con i dipendenti coinvolti',
-      'Invia assessment e questionario al cliente',
-      'Carica questionario, trascrizione e AssessFirst',
-      'Preme «Cliente pronto» quando è tutto presente',
+      'Registra azienda e titolare',
+      'Aggiunge le persone: nome, cognome, email, qualifica',
+      'Soci illimitati, dipendenti max 3 per azienda',
+      'Alla registrazione il cliente entra allo step 0',
     ],
     anima: 'anima-2',
     barra: 'bg-indigo-500',
@@ -42,6 +42,23 @@ const PERSONE: CardPersona[] = [
     titoloHover: 'group-hover:text-indigo-700',
     richiamo: 'text-indigo-600 group-hover:text-indigo-700',
     ruolo: 'tutor',
+  },
+  {
+    href: '/commerciale/elisa',
+    nome: 'Elisa',
+    compito: 'Carica i documenti dei clienti registrati e li porta allo step 1.',
+    passi: [
+      'Vede i clienti allo step 0',
+      'Carica questionario, trascrizione e AssessFirst',
+      'Controlla che i file siano della persona giusta',
+      '«Documenti completi» → step 0 → 1 (Copy)',
+    ],
+    anima: 'anima-3',
+    barra: 'bg-amber-500',
+    pallino: 'bg-amber-500',
+    titoloHover: 'group-hover:text-amber-700',
+    richiamo: 'text-amber-600 group-hover:text-amber-700',
+    ruolo: 'elisa',
   },
   {
     href: '/commerciale/irene',
@@ -53,7 +70,7 @@ const PERSONE: CardPersona[] = [
       'Verifica che le email ai tutor partano',
       'Interviene solo se qualcosa va storto',
     ],
-    anima: 'anima-3',
+    anima: 'anima-4',
     barra: 'bg-violet-500',
     pallino: 'bg-violet-500',
     titoloHover: 'group-hover:text-violet-700',
@@ -77,13 +94,13 @@ export default function AreaCommerciale() {
             Area Commerciale
           </h1>
           <p className="mx-auto mt-3 max-w-2xl leading-7 text-inchiostro/50">
-            Il Tutor apre la pratica e raccoglie i documenti, Irene la completa e la invia in
-            produzione. Scegli la tua area di lavoro.
+            Il Tutor registra il cliente (step 0), Elisa carica i documenti e lo porta allo step 1,
+            Irene supervisiona lo step autonomo. Scegli la tua area di lavoro.
           </p>
         </header>
 
-        {/* Le due persone */}
-        <section className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2">
+        {/* I tre ruoli */}
+        <section className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {PERSONE.map((p) => {
             const notifiche = contaNotifiche(state, p.ruolo)
             return (
@@ -127,12 +144,11 @@ export default function AreaCommerciale() {
         </section>
 
         {/* Nota di area */}
-        <footer className="anima anima-4 mt-12 rounded-2xl border border-linea bg-carta p-5 text-center shadow-sm">
+        <footer className="anima anima-5 mt-12 rounded-2xl border border-linea bg-carta p-5 text-center shadow-sm">
           <p className="mx-auto max-w-2xl text-sm leading-6 text-inchiostro/50">
-            Quando il Tutor conferma i <strong className="font-semibold text-inchiostro">dati completi</strong>,
-            la pratica passa a Irene. Quando Irene la segna come{' '}
-            <strong className="font-semibold text-inchiostro">completa</strong>, il blocco entra nella
-            lavorazione di Erogazione Copy.
+            La registrazione del Tutor crea il cliente allo <strong className="font-semibold text-inchiostro">step 0</strong> (vendita
+            registrata, documenti mancanti). Quando <strong className="font-semibold text-inchiostro">Elisa</strong> completa i documenti,
+            il cliente passa allo <strong className="font-semibold text-inchiostro">step 1</strong> ed entra nella pipeline (Copy).
           </p>
         </footer>
       </div>

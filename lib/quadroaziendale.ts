@@ -272,7 +272,7 @@ export const TEAM_RESIDUO = ['Paolo', 'Carlo'] // le uniche persone che restano 
 // Giorno di attivazione degli agenti: da qui il "portafoglio risparmi" inizia a
 // crescere. Configurabile — cambia questa data quando gli agenti vanno davvero
 // in produzione, il contatore si adegua da solo.
-export const ATTIVAZIONE_AGENTI = new Date(2026, 6, 14) // 14 lug 2026
+export const ATTIVAZIONE_AGENTI = new Date(2026, 6, 15) // 15 lug 2026
 
 export const fmtEuro = (n: number) =>
   new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n))

@@ -20,7 +20,9 @@ export type RigaFrank = {
   entrata?: Date       // questionario ricevuto — ingresso in produzione
   copyDone?: Date      // copy completato (invio a Grippo)
   grippoDone?: Date    // revisione testo Grippo completata (ricevuto da Grippo)
-  consulenzaFrank?: Date // step finale: data della consulenza con Frank (dal foglio maestro, se fissata)
+  consulenzaFrank?: Date // step FINALE del progetto: data della consulenza con Frank, dal calendario
+                         // ufficiale "Consulenze Frank" › foglio "CONSULENZE FRANK 2026". Il progetto
+                         // si considera concluso quando questa consulenza è avvenuta.
   branding?: boolean   // il progetto passa dalla revisione dell'avvocato Jelo (fase 2)
 }
 
@@ -50,7 +52,7 @@ export const CONSULENZE_FRANK: RigaFrank[] = [
 
   { cliente: 'Ferrario', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(15, 7), nota: 'Manca la grafica del punto 5 — ordine mantenuto come fornito.', entrata: d(15, 5) },
   { cliente: 'Simone Tomasini', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(15, 7), nota: '', entrata: d(11, 2), copyDone: d(3, 6) },
-  { cliente: 'Giuseppe Di Guida', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(16, 7), nota: '', entrata: d(31, 3), copyDone: d(15, 6) },
+  { cliente: 'Giuseppe Di Guida', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(16, 7), nota: '', entrata: d(31, 3), copyDone: d(15, 6), consulenzaFrank: d(27, 11) },
   { cliente: 'Davide Raimondi', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(16, 7), nota: '', entrata: d(20, 1), copyDone: d(25, 5), grippoDone: d(2, 7), consulenzaFrank: d(30, 9) },
   { cliente: 'Emanuele Soffiotto', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(17, 7), nota: '', entrata: d(15, 4), copyDone: d(29, 6), grippoDone: d(8, 7) },
   { cliente: 'Francesco Surace', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(17, 7), nota: '', entrata: d(21, 4), copyDone: d(6, 7), grippoDone: d(6, 7) },

@@ -9,7 +9,7 @@
 
 import Link from 'next/link'
 import { CONSULENZE_FRANK, FASI_FRANK, FRANK_OGGI, FaseFrank, RigaFrank, slugFrank } from '@/lib/consulenzeFrank'
-import { SILO_TO_FASE, useSilos } from '@/lib/pipelineSilos'
+import { SILOS, SILO_TO_FASE, SiloId, useSilos } from '@/lib/pipelineSilos'
 import { GIORNO_MS, fmtData } from '@/lib/quadroaziendale'
 
 const LARGHEZZA_TABELLA = 300
@@ -143,8 +143,9 @@ export default function ConsulenzeFrank() {
     }
   }
 
-  const perFase = ([1, 2, 3, 4, 5, 6] as FaseFrank[]).map((f) => CONSULENZE_FRANK.filter((r) => faseDi(r) === f).length)
-  const ultima = righe[righe.length - 1]
+  const contaSilo = (id: SiloId) => CONSULENZE_FRANK.filter((r) => (silos[slugFrank(r.cliente)] ?? 'copy') === id).length
+  const consProgrammate = CONSULENZE_FRANK.filter((r) => r.consulenzaFrank).length
+  const consFatte = CONSULENZE_FRANK.filter((r) => r.consulenzaFrank && r.consulenzaFrank.getTime() <= oggiMs).length
 
   return (
     <div className="min-h-screen flex-1 sfondo-trama">
@@ -164,11 +165,32 @@ export default function ConsulenzeFrank() {
           </div>
         </header>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Statistica label={`${CONSULENZE_FRANK.length} clienti totali`} valore={fmtData(ultima.consegnaPrevista)} sub="ultima consegna prevista" tinta="text-petrolio-scuro" grande />
-          <Statistica label="Copy da scrivere (fase 1)" valore={String(perFase[0])} sub="+ 5 dall'avvocato Jelo (fase 2)" tinta={RAMPA[1].testo} />
-          <Statistica label="Dall'agente AI (fasi 3-5)" valore={String(perFase[2] + perFase[3] + perFase[4])} sub="Grippo, Caputo, Valentino" tinta={RAMPA[4].testo} />
-          <Statistica label="Consegnati" valore={String(perFase[5])} sub="fase 6" tinta="text-green-800" />
+        {/* conteggio dettagliato per singola fase (silo) + consulenza finale */}
+        <div className="mt-6">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Quanti clienti in ogni fase</h3>
+            <span className="text-[11px] text-inchiostro/45">{CONSULENZE_FRANK.length} clienti · il progetto si chiude con la consulenza con Frank</span>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+            {SILOS.map((s) => (
+              <div key={s.id} className="rounded-xl border border-linea bg-carta p-3 shadow-sm">
+                <div className="flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${s.colore.punto}`} />
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-inchiostro/45">{s.ordine}</span>
+                </div>
+                <p className={`font-display mt-0.5 text-2xl font-bold ${s.colore.testo}`}>{contaSilo(s.id)}</p>
+                <p className="truncate text-[10.5px] text-inchiostro/50" title={s.label}>{s.label}</p>
+              </div>
+            ))}
+            <div className="rounded-xl border border-linea bg-carta p-3 shadow-sm">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rotate-45 bg-green-800" />
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-inchiostro/45">fine</span>
+              </div>
+              <p className="font-display mt-0.5 text-2xl font-bold text-green-800">{consProgrammate}</p>
+              <p className="truncate text-[10.5px] text-inchiostro/50" title="Consulenza con Frank">Consulenza Frank{consFatte > 0 ? ` · ${consFatte} fatte` : ''}</p>
+            </div>
+          </div>
         </div>
 
         <div className="mt-6">

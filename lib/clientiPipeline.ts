@@ -7,7 +7,7 @@
 //     condiviso) — nascono allo step 0 e non hanno ancora una data di consegna.
 // La posizione nel silo di TUTTI viene dallo stato condiviso (useApp().silos).
 
-import { CONSULENZE_FRANK, RigaFrank, slugFrank } from './consulenzeFrank'
+import { CONSULENZE_FRANK, IN_ATTESA, RigaFrank, slugFrank } from './consulenzeFrank'
 import { SiloId } from './pipelineSilos'
 import { Pratica } from './types'
 import { slugPratica, useApp } from './store'
@@ -22,7 +22,9 @@ export type ClientePipeline = {
   silo: SiloId
   /** data di consegna prevista: null per i nuovi (ancora da programmare) */
   consegnaPrevista: Date | null
-  origine: 'frank' | 'nuovo'
+  /** 'frank' = 34 ufficiali; 'nuovo' = registrati in commerciale;
+   *  'attesa' = clienti reali senza questionario ancora compilato (step 0) */
+  origine: 'frank' | 'nuovo' | 'attesa'
   /** presente per i 34: dà accesso a milestone, timeline e pagina di log */
   riga?: RigaFrank
   /** presente per i nuovi */
@@ -69,5 +71,17 @@ export function useClientiPipeline(): ClientePipeline[] {
     nDipendenti: p.dipendenti.length,
   }))
 
-  return [...frank, ...nuovi]
+  // Clienti reali che NON hanno ancora compilato il questionario: entrano nella
+  // pipeline come nuovi clienti allo step 0, in attesa dei documenti.
+  const attesa: ClientePipeline[] = IN_ATTESA.map((c, i) => ({
+    slug: `attesa-${i}-${slugFrank(c.azienda || c.nome)}`,
+    nome: c.azienda || c.nome,
+    owner: c.nome,
+    tutor: c.tutor,
+    silo: 'documenti' as SiloId,
+    consegnaPrevista: null,
+    origine: 'attesa' as const,
+  }))
+
+  return [...frank, ...nuovi, ...attesa]
 }

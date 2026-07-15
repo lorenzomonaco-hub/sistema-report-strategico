@@ -32,6 +32,7 @@ export default function PaginaSilos() {
   const ordinati = useMemo(() => [...clienti].sort(perConsegna), [clienti])
   const perSilo = (id: SiloId) => ordinati.filter((c) => c.silo === id)
   const nuovi = clienti.filter((c) => c.origine === 'nuovo').length
+  const attesa = clienti.filter((c) => c.origine === 'attesa').length
 
   return (
     <div className="min-h-screen flex-1 sfondo-trama">
@@ -41,7 +42,7 @@ export default function PaginaSilos() {
             <p className="text-xs font-semibold uppercase tracking-widest text-ambra">Erogazione · pipeline a silos</p>
             <h1 className="font-display mt-1 text-3xl font-bold tracking-tight text-inchiostro">Il flusso di lavoro, per silo</h1>
             <p className="mt-1 max-w-3xl text-sm text-inchiostro/55">
-              {clienti.length} clienti nei {SILOS.length} silos{nuovi > 0 ? ` (${nuovi} nuovi dall'area commerciale)` : ''}. Trascina una card (o usa le frecce) per spostarla al silo successivo — Gantt e vista tutor si aggiornano da soli. I clienti nuovi entrano allo <b>step 0</b> e Elisa li fa avanzare quando i documenti sono completi.
+              {clienti.length} clienti nei {SILOS.length} silos{nuovi > 0 ? ` · ${nuovi} nuovi` : ''}{attesa > 0 ? ` · ${attesa} in attesa (questionario mancante)` : ''}. Trascina una card (o usa le frecce) per spostarla al silo successivo — Gantt e vista tutor si aggiornano da soli. I clienti entrano allo <b>step 0</b> e avanzano quando Elisa completa i documenti. Chi non ha ancora il questionario resta fermo allo step 0.
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -109,11 +110,13 @@ export default function PaginaSilos() {
                     {carte.map((c) => {
                       const prev = siloPrecedente(c.silo)
                       const next = siloSuccessivo(c.silo)
+                      const bloccato = c.origine === 'attesa' // niente questionario: non si sposta
                       const intestazione = (
                         <>
                           <div className="flex items-center gap-1.5">
                             <h3 className="truncate text-[13px] font-bold text-inchiostro">{c.nome}</h3>
                             {c.origine === 'nuovo' && <span className="shrink-0 rounded-full bg-petrolio/10 px-1.5 py-0.5 text-[9px] font-bold uppercase text-petrolio">nuovo</span>}
+                            {c.origine === 'attesa' && <span className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-rose-600">in attesa</span>}
                           </div>
                           <p className="truncate text-[11px] text-inchiostro/45">{c.owner}</p>
                         </>
@@ -121,10 +124,10 @@ export default function PaginaSilos() {
                       return (
                         <div
                           key={c.slug}
-                          draggable
-                          onDragStart={(e) => { e.dataTransfer.setData('text/plain', c.slug); e.dataTransfer.effectAllowed = 'move'; haTrascinatoRef.current = true; setInTrascinamento(c.slug) }}
-                          onDragEnd={() => { setInTrascinamento(null); window.setTimeout(() => { haTrascinatoRef.current = false }, 0) }}
-                          className={`card-sollevabile block cursor-grab rounded-2xl border border-linea bg-carta p-3 shadow-sm ${inTrascinamento === c.slug ? 'opacity-50' : ''}`}
+                          draggable={!bloccato}
+                          onDragStart={bloccato ? undefined : (e) => { e.dataTransfer.setData('text/plain', c.slug); e.dataTransfer.effectAllowed = 'move'; haTrascinatoRef.current = true; setInTrascinamento(c.slug) }}
+                          onDragEnd={bloccato ? undefined : () => { setInTrascinamento(null); window.setTimeout(() => { haTrascinatoRef.current = false }, 0) }}
+                          className={`card-sollevabile block rounded-2xl border border-linea bg-carta p-3 shadow-sm ${bloccato ? 'cursor-default' : 'cursor-grab'} ${inTrascinamento === c.slug ? 'opacity-50' : ''}`}
                         >
                           {c.origine === 'frank' ? (
                             <Link href={`/amministrazione/consulenze-frank/${c.slug}`} className="block" onClick={(e) => { if (haTrascinatoRef.current) e.preventDefault() }}>
@@ -134,15 +137,17 @@ export default function PaginaSilos() {
                             <div>{intestazione}</div>
                           )}
                           <div className="mt-1.5 flex items-center justify-between">
-                            <span className={`text-[10.5px] font-semibold ${s.colore.testo}`}>
-                              {c.consegnaPrevista ? `consegna ${fmtData(c.consegnaPrevista)}` : 'da programmare'}
+                            <span className={`text-[10.5px] font-semibold ${bloccato ? 'text-rose-600' : s.colore.testo}`}>
+                              {bloccato ? 'questionario mancante' : c.consegnaPrevista ? `consegna ${fmtData(c.consegnaPrevista)}` : 'da programmare'}
                             </span>
-                            <div className="flex items-center gap-1">
-                              <button disabled={!prev} onClick={() => indietreggiaSilo(c.slug)}
-                                className="rounded-md border border-linea px-1.5 py-0.5 text-[11px] font-bold text-inchiostro/50 enabled:hover:bg-inchiostro/[0.04] disabled:opacity-30" title="Silo precedente">◀</button>
-                              <button disabled={!next} onClick={() => avanzaSilo(c.slug)}
-                                className="rounded-md border border-linea px-1.5 py-0.5 text-[11px] font-bold text-petrolio enabled:hover:bg-petrolio/10 disabled:opacity-30" title="Silo successivo">▶</button>
-                            </div>
+                            {!bloccato && (
+                              <div className="flex items-center gap-1">
+                                <button disabled={!prev} onClick={() => indietreggiaSilo(c.slug)}
+                                  className="rounded-md border border-linea px-1.5 py-0.5 text-[11px] font-bold text-inchiostro/50 enabled:hover:bg-inchiostro/[0.04] disabled:opacity-30" title="Silo precedente">◀</button>
+                                <button disabled={!next} onClick={() => avanzaSilo(c.slug)}
+                                  className="rounded-md border border-linea px-1.5 py-0.5 text-[11px] font-bold text-petrolio enabled:hover:bg-petrolio/10 disabled:opacity-30" title="Silo successivo">▶</button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )

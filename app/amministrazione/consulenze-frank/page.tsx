@@ -205,8 +205,8 @@ export default function ConsulenzeFrank() {
         {senzaData.length > 0 && (
           <div className="mt-6">
             <div className="flex flex-wrap items-baseline gap-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Nuovi clienti — ancora senza data di consegna</h3>
-              <span className="text-[11px] text-inchiostro/45">{senzaData.length} registrati in area commerciale · entrano dallo step 0, la data si fissa più avanti</span>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Nuovi clienti — step 0, ancora senza data di consegna</h3>
+              <span className="text-[11px] text-inchiostro/45">{senzaData.length} clienti · registrati in commerciale o in attesa del questionario · la data si fissa quando entrano in produzione</span>
             </div>
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {senzaData.map((c) => {

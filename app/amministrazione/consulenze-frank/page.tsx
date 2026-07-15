@@ -9,6 +9,7 @@
 
 import Link from 'next/link'
 import { CONSULENZE_FRANK, FASI_FRANK, FRANK_OGGI, FaseFrank, RigaFrank, slugFrank } from '@/lib/consulenzeFrank'
+import { SILO_TO_FASE, useSilos } from '@/lib/pipelineSilos'
 import { GIORNO_MS, fmtData } from '@/lib/quadroaziendale'
 
 const LARGHEZZA_TABELLA = 300
@@ -52,8 +53,8 @@ function Stepper({ fase }: { fase: FaseFrank }) {
   )
 }
 
-function RigaGantt({ r, pct }: { r: RigaFrank; pct: (ms: number) => number }) {
-  const c = RAMPA[r.fase]
+function RigaGantt({ r, fase, pct }: { r: RigaFrank; fase: FaseFrank; pct: (ms: number) => number }) {
+  const c = RAMPA[fase]
   const oggiMs = FRANK_OGGI.getTime()
   const consegnaMs = r.consegnaPrevista.getTime()
   const inizioMs = r.entrata ? r.entrata.getTime() : oggiMs
@@ -84,13 +85,13 @@ function RigaGantt({ r, pct }: { r: RigaFrank; pct: (ms: number) => number }) {
         <div className="flex items-baseline gap-2">
           <span className="font-display truncate text-sm font-bold tracking-tight text-inchiostro">{r.cliente}</span>
           <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${c.track} ${c.testo}`}>
-            {r.fase === 6 ? 'consegnato' : `${r.fase} · ${FASI_FRANK[r.fase].label}`}
+            {fase === 6 ? 'consegnato' : `${fase} · ${FASI_FRANK[fase].label}`}
           </span>
         </div>
         <div className="mt-0.5 truncate text-[11px] text-inchiostro/45">{r.owner}</div>
-        <Stepper fase={r.fase} />
+        <Stepper fase={fase} />
         <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[10.5px] text-inchiostro/50">
-          {r.fase !== 6 && <span className={`font-semibold ${c.testo}`}>consegna {fmtData(r.consegnaPrevista)}</span>}
+          {fase !== 6 && <span className={`font-semibold ${c.testo}`}>consegna {fmtData(r.consegnaPrevista)}</span>}
           {testoStorico && <span className="text-inchiostro/45">✓ {testoStorico}</span>}
           <span className="text-petrolio/70 underline decoration-dotted">log →</span>
         </div>
@@ -116,6 +117,11 @@ function RigaGantt({ r, pct }: { r: RigaFrank; pct: (ms: number) => number }) {
 }
 
 export default function ConsulenzeFrank() {
+  const silos = useSilos()
+  const faseDi = (r: RigaFrank): FaseFrank => {
+    const s = silos[slugFrank(r.cliente)]
+    return s ? SILO_TO_FASE[s] : r.fase
+  }
   const righe = [...CONSULENZE_FRANK].sort((a, b) => a.consegnaPrevista.getTime() - b.consegnaPrevista.getTime())
   const oggiMs = FRANK_OGGI.getTime()
 
@@ -137,7 +143,7 @@ export default function ConsulenzeFrank() {
     }
   }
 
-  const perFase = ([1, 2, 3, 4, 5, 6] as FaseFrank[]).map((f) => CONSULENZE_FRANK.filter((r) => r.fase === f).length)
+  const perFase = ([1, 2, 3, 4, 5, 6] as FaseFrank[]).map((f) => CONSULENZE_FRANK.filter((r) => faseDi(r) === f).length)
   const ultima = righe[righe.length - 1]
 
   return (
@@ -211,7 +217,7 @@ export default function ConsulenzeFrank() {
                   </div>
                 </div>
 
-                {righe.map((r, i) => <RigaGantt key={r.cliente + i} r={r} pct={pct} />)}
+                {righe.map((r, i) => <RigaGantt key={r.cliente + i} r={r} fase={faseDi(r)} pct={pct} />)}
               </div>
             </div>
           </div>

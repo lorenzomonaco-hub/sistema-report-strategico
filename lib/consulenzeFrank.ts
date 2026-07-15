@@ -6,6 +6,8 @@
 // esclusi) e la priorità di coda fase 5 → 4 → 3 → 1 → 2. Se il piano cambia,
 // aggiornare qui i valori con il nuovo file ufficiale.
 
+import { EROG_CLIENTI } from './quadroaziendale'
+
 export type FaseFrank = 1 | 2 | 3 | 4 | 5 | 6
 
 export type RigaFrank = {
@@ -98,28 +100,48 @@ export function frankBySlug(slug: string): RigaFrank | null {
 }
 
 // ── Vista per tutor ──
-export type RiepilogoTutorFrank = {
-  tutor: string
-  slug: string
-  totale: number
-  senzaConsulenza: number // clienti attivi senza consulenza con Frank prenotata
-}
+// Oltre ai clienti in produzione (CONSULENZE_FRANK) includiamo anche i clienti
+// ancora "in attesa" — quelli che non hanno ancora compilato questionario o
+// AssessFirst (stadio 1 "informazioni mancanti" del dataset erogazione).
 
-export const TUTOR_FRANK: RiepilogoTutorFrank[] = Array.from(new Set(CONSULENZE_FRANK.map((r) => r.tutor)))
-  .sort((a, b) => a.localeCompare(b))
-  .map((tutor) => {
-    const clienti = CONSULENZE_FRANK.filter((r) => r.tutor === tutor)
-    return {
-      tutor,
-      slug: slugFrank(tutor),
-      totale: clienti.length,
-      senzaConsulenza: clienti.filter((r) => !r.consulenzaFrank).length,
-    }
-  })
+export type ClienteAttesa = { nome: string; azienda: string; tutor: string }
+
+export const IN_ATTESA: ClienteAttesa[] = EROG_CLIENTI
+  .filter((r) => r.stadio === 1)
+  .map((r) => ({ nome: r.nome, azienda: r.azienda, tutor: r.tutor }))
 
 export function clientiTutorFrank(tutor: string): RigaFrank[] {
   return CONSULENZE_FRANK.filter((r) => r.tutor === tutor)
 }
+export function attesaTutor(tutor: string): ClienteAttesa[] {
+  return IN_ATTESA.filter((c) => c.tutor === tutor)
+}
+
+export type RiepilogoTutorFrank = {
+  tutor: string
+  slug: string
+  produzione: number
+  inAttesa: number
+  totale: number
+  senzaConsulenza: number // clienti in produzione senza consulenza con Frank prenotata
+}
+
+export const TUTOR_FRANK: RiepilogoTutorFrank[] = Array.from(
+  new Set([...CONSULENZE_FRANK.map((r) => r.tutor), ...IN_ATTESA.map((c) => c.tutor)]),
+)
+  .sort((a, b) => a.localeCompare(b))
+  .map((tutor) => {
+    const prod = clientiTutorFrank(tutor)
+    const attesa = attesaTutor(tutor)
+    return {
+      tutor,
+      slug: slugFrank(tutor),
+      produzione: prod.length,
+      inAttesa: attesa.length,
+      totale: prod.length + attesa.length,
+      senzaConsulenza: prod.filter((r) => !r.consulenzaFrank).length,
+    }
+  })
 
 export function tutorFrankDaSlug(slug: string): string | null {
   return TUTOR_FRANK.find((t) => t.slug === slug)?.tutor ?? null

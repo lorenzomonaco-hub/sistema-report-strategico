@@ -5,7 +5,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
-  FASI_FRANK, FaseFrank, RigaFrank, TUTOR_FRANK, clientiTutorFrank,
+  FASI_FRANK, FaseFrank, RigaFrank, TUTOR_FRANK, attesaTutor, clientiTutorFrank,
   slugFrank, tutorFrankDaSlug,
 } from '@/lib/consulenzeFrank'
 import { fmtData } from '@/lib/quadroaziendale'
@@ -71,6 +71,7 @@ export default async function TutorPage({ params }: { params: Promise<{ slug: st
 
   const clienti = clientiTutorFrank(tutor).sort((a, b) => a.consegnaPrevista.getTime() - b.consegnaPrevista.getTime())
   const senzaCons = clienti.filter((r) => !r.consulenzaFrank)
+  const attesa = attesaTutor(tutor)
 
   return (
     <div className="min-h-screen flex-1 sfondo-trama">
@@ -79,7 +80,7 @@ export default async function TutorPage({ params }: { params: Promise<{ slug: st
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-ambra">Solo amministratori</p>
             <h1 className="font-display mt-1 text-3xl font-bold tracking-tight text-inchiostro">{tutor}</h1>
-            <p className="mt-1 text-sm text-inchiostro/55">{clienti.length} clienti in produzione seguiti da questo tutor.</p>
+            <p className="mt-1 text-sm text-inchiostro/55">{clienti.length} in produzione · {attesa.length} in attesa (questionario/AssessFirst).</p>
           </div>
           <div className="ml-auto">
             <Link href="/amministrazione/tutor" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
@@ -95,9 +96,32 @@ export default async function TutorPage({ params }: { params: Promise<{ slug: st
           </div>
         )}
 
-        <div className="mt-6 overflow-hidden rounded-2xl border border-linea bg-carta shadow-sm">
-          {clienti.map((r, i) => <RigaCliente key={r.cliente + i} r={r} />)}
-        </div>
+        {clienti.length > 0 && (
+          <>
+            <h3 className="mt-6 text-xs font-semibold uppercase tracking-wide text-inchiostro/40">In produzione ({clienti.length})</h3>
+            <div className="mt-2 overflow-hidden rounded-2xl border border-linea bg-carta shadow-sm">
+              {clienti.map((r, i) => <RigaCliente key={r.cliente + i} r={r} />)}
+            </div>
+          </>
+        )}
+
+        {attesa.length > 0 && (
+          <>
+            <h3 className="mt-6 text-xs font-semibold uppercase tracking-wide text-inchiostro/40">In attesa — questionario / AssessFirst da compilare ({attesa.length})</h3>
+            <p className="text-[11px] text-inchiostro/45">Non ancora in produzione: mancano il questionario o gli AssessFirst. Nessuna data finché non arrivano.</p>
+            <div className="mt-2 overflow-hidden rounded-2xl border border-linea bg-carta shadow-sm">
+              {attesa.map((c, i) => (
+                <div key={c.nome + c.azienda + i} className="flex items-center justify-between gap-3 border-b border-linea/70 px-3 py-2.5 last:border-b-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-bold text-inchiostro">{c.nome}</p>
+                    <p className="truncate text-[11px] text-inchiostro/45">{c.azienda}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">in attesa</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

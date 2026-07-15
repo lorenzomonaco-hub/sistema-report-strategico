@@ -266,7 +266,13 @@ export const RISPARMIO_PERSONALE: { nome: string; ruolo: string; salario: number
 ]
 export const RISPARMIO_ANNUO = RISPARMIO_PERSONALE.reduce((s, p) => s + p.salario * p.frazione, 0)
 export const RISPARMIO_GIORNO = RISPARMIO_ANNUO / 365
+export const RISPARMIO_SECONDO = RISPARMIO_ANNUO / (365 * 24 * 60 * 60)
 export const TEAM_RESIDUO = ['Paolo', 'Carlo'] // le uniche persone che restano sulla pipeline (copy)
+
+// Giorno di attivazione degli agenti: da qui il "portafoglio risparmi" inizia a
+// crescere. Configurabile — cambia questa data quando gli agenti vanno davvero
+// in produzione, il contatore si adegua da solo.
+export const ATTIVAZIONE_AGENTI = new Date(2026, 6, 14) // 14 lug 2026
 
 export const fmtEuro = (n: number) =>
   new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.round(n))

@@ -6,14 +6,38 @@
 // quanto fanno risparmiare gli agenti e l'andamento delle vendite.
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import {
-  AGENTE_IMPAG, AGENTE_SLIDE, AGENTE_TESTO, MEDIANA_STAGE2_RECENTE, MEDIANA_STAGE3_RECENTE,
-  MEDIANA_STAGE4_RECENTE, RISPARMIO_ANNUO, RISPARMIO_GIORNO, RISPARMIO_PERSONALE, TEAM_RESIDUO,
-  VENDITE_MENSILI, fmtEuro,
+  AGENTE_IMPAG, AGENTE_SLIDE, AGENTE_TESTO, ATTIVAZIONE_AGENTI, MEDIANA_STAGE2_RECENTE, MEDIANA_STAGE3_RECENTE,
+  MEDIANA_STAGE4_RECENTE, RISPARMIO_ANNUO, RISPARMIO_GIORNO, RISPARMIO_PERSONALE, RISPARMIO_SECONDO,
+  TEAM_RESIDUO, VENDITE_MENSILI, fmtData, fmtEuro,
 } from '@/lib/quadroaziendale'
+
+const fmtEuroDec = (n: number) =>
+  new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
 
 function Carta({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <div className={`rounded-2xl border border-linea bg-carta p-4 shadow-sm ${className}`}>{children}</div>
+}
+
+/** Portafoglio risparmi: cresce ogni secondo dal giorno di attivazione degli agenti. */
+function Portafoglio() {
+  const [ora, setOra] = useState<number | null>(null)
+  useEffect(() => {
+    setOra(Date.now())
+    const t = setInterval(() => setOra(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const accumulato = ora === null ? 0 : Math.max(0, ((ora - ATTIVAZIONE_AGENTI.getTime()) / 1000) * RISPARMIO_SECONDO)
+  return (
+    <Carta className="bg-green-600/10">
+      <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Portafoglio risparmi — dal {fmtData(ATTIVAZIONE_AGENTI)}</p>
+      <p className="font-display mt-1 text-4xl font-bold tracking-tight text-green-700 tabular-nums">
+        {ora === null ? fmtEuro(0) : fmtEuroDec(accumulato)}
+      </p>
+      <p className="mt-1 text-[11px] text-inchiostro/50">cresce di {fmtEuro(RISPARMIO_GIORNO)} al giorno · {fmtEuro(RISPARMIO_ANNUO)} all&apos;anno</p>
+    </Carta>
+  )
 }
 
 function SezioneImpatto() {
@@ -22,18 +46,9 @@ function SezioneImpatto() {
   const totalePrimaGg = MEDIANA_STAGE2_RECENTE + MEDIANA_STAGE3_RECENTE + MEDIANA_STAGE4_RECENTE
   return (
     <div className="space-y-4">
-      {/* headline risparmio */}
+      {/* headline: portafoglio che cresce + chi resta */}
       <div className="grid gap-3 sm:grid-cols-3">
-        <Carta className="bg-green-600/10">
-          <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Risparmio dagli agenti — all&apos;anno</p>
-          <p className="font-display mt-1 text-3xl font-bold tracking-tight text-green-700">{fmtEuro(RISPARMIO_ANNUO)}</p>
-          <p className="mt-1 text-[11px] text-inchiostro/50">lavoro su questa pipeline assorbito dagli agenti AI</p>
-        </Carta>
-        <Carta className="bg-green-600/10">
-          <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">…ovvero al giorno</p>
-          <p className="font-display mt-1 text-3xl font-bold tracking-tight text-green-700">{fmtEuro(RISPARMIO_GIORNO)}</p>
-          <p className="mt-1 text-[11px] text-inchiostro/50">ogni giorno di calendario ({fmtEuro(RISPARMIO_ANNUO)} ÷ 365)</p>
-        </Carta>
+        <div className="sm:col-span-2"><Portafoglio /></div>
         <Carta>
           <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Restano sulla pipeline</p>
           <p className="font-display mt-1 text-2xl font-bold tracking-tight text-petrolio-scuro">{TEAM_RESIDUO.join(' + ')}</p>
@@ -48,13 +63,13 @@ function SezioneImpatto() {
           <div className="min-w-[620px]">
             <div className="grid items-center gap-3 border-b border-linea bg-inchiostro/[0.03] px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/40"
                  style={{ gridTemplateColumns: '1fr 130px 90px 110px 100px' }}>
-              <div>Persona · ruolo</div><div>Salario/anno</div><div>% su pipeline</div><div className="text-right">Risparmio/anno</div><div className="text-right">Al giorno</div>
+              <div>Persona · ruolo</div><div>Salario/anno (stima)</div><div>% tempo sul progetto</div><div className="text-right">Risparmio/anno</div><div className="text-right">Al giorno</div>
             </div>
             {RISPARMIO_PERSONALE.map((p) => (
               <div key={p.nome} className="grid items-center gap-3 border-b border-linea/70 px-3 py-2.5 last:border-b-0"
                    style={{ gridTemplateColumns: '1fr 130px 90px 110px 100px' }}>
                 <div><span className="text-[13px] font-bold text-inchiostro">{p.nome}</span> <span className="text-[11px] text-inchiostro/45">· {p.ruolo}</span></div>
-                <div className="text-[12px] tabular-nums text-inchiostro/70">{fmtEuro(p.salario)}</div>
+                <div className="text-[12px] tabular-nums text-inchiostro/70">~{fmtEuro(p.salario)}</div>
                 <div className="text-[12px] tabular-nums text-inchiostro/70">{Math.round(p.frazione * 100)}%</div>
                 <div className="text-right text-[12.5px] font-bold tabular-nums text-green-700">{fmtEuro(p.salario * p.frazione)}</div>
                 <div className="text-right text-[12px] tabular-nums text-green-700/80">{fmtEuro((p.salario * p.frazione) / 365)}</div>
@@ -68,6 +83,9 @@ function SezioneImpatto() {
             </div>
           </div>
         </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-inchiostro/45">
+          Salari indicati come <b className="text-inchiostro/60">stima</b>. La colonna «% tempo sul progetto» è la quota del tempo che ciascuno dedicava al progetto <b className="text-inchiostro/60">report consulenze</b> (non al totale del suo lavoro).
+        </p>
       </div>
 
       {/* capacità: prima vs ora */}
@@ -86,9 +104,13 @@ function SezioneImpatto() {
           <p className="mt-2 text-[11px] text-ambra">⚠ Il tempo di consegna reale end-to-end col nuovo modello è ancora in raccolta: questa è la proiezione dai tempi degli agenti, non una media misurata.</p>
         </Carta>
       </div>
-      <p className="text-[11px] leading-relaxed text-inchiostro/45">
-        Oltre al costo del personale, il risparmio vero è la <b className="text-inchiostro/70">capacità produttiva e di vendita</b>: azzerando le settimane di coda dei revisori si consegnano molti più report nello stesso tempo, quindi si possono evadere più vendite. Il moltiplicatore esatto lo fisseremo quando avremo il dato reale di consegna col nuovo modello.
-      </p>
+      <Carta className="border-dashed">
+        <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Guadagno da capacità — in arrivo</p>
+        <p className="mt-2 text-[12.5px] leading-relaxed text-inchiostro/75">
+          Il portafoglio qui sopra conta per ora solo il <b className="text-inchiostro">costo del personale</b> assorbito. Si aggiungerà in automatico un secondo pezzo, molto più grande: <b className="text-inchiostro">quanto guadagnavamo</b> con un cliente che ci metteva in media <b className="text-inchiostro">94 giorni</b> alla consegna, contro <b className="text-inchiostro">quanto guadagneremo/risparmieremo</b> col nuovo metodo (più report consegnati nello stesso tempo = più vendite evadibili).
+        </p>
+        <p className="mt-2 text-[11px] text-ambra">⚠ Questo dato comparirà <b>solo quando la pipeline sarà aggiornata con i clienti veri</b> e avremo i tempi di consegna reali del nuovo metodo — non prima, e non con numeri messi a caso.</p>
+      </Carta>
     </div>
   )
 }

@@ -8,8 +8,10 @@
 // Ogni cliente è cliccabile → log completo della timeline del progetto.
 
 import Link from 'next/link'
-import { CONSULENZE_FRANK, FASI_FRANK, FRANK_OGGI, FaseFrank, RigaFrank, slugFrank } from '@/lib/consulenzeFrank'
-import { SILOS, SILO_TO_FASE, SiloId, useSilos } from '@/lib/pipelineSilos'
+import { FASI_FRANK, FRANK_OGGI, FaseFrank, RigaFrank, slugFrank } from '@/lib/consulenzeFrank'
+import { SILOS, SILO_TO_FASE, SiloId, siloById } from '@/lib/pipelineSilos'
+import { useClientiPipeline } from '@/lib/clientiPipeline'
+import { useApp } from '@/lib/store'
 import { GIORNO_MS, fmtData } from '@/lib/quadroaziendale'
 
 const LARGHEZZA_TABELLA = 300
@@ -117,12 +119,19 @@ function RigaGantt({ r, fase, pct }: { r: RigaFrank; fase: FaseFrank; pct: (ms: 
 }
 
 export default function ConsulenzeFrank() {
-  const silos = useSilos()
+  const { silos } = useApp()
+  const clienti = useClientiPipeline()
   const faseDi = (r: RigaFrank): FaseFrank => {
     const s = silos[slugFrank(r.cliente)]
     return s ? SILO_TO_FASE[s] : r.fase
   }
-  const righe = [...CONSULENZE_FRANK].sort((a, b) => a.consegnaPrevista.getTime() - b.consegnaPrevista.getTime())
+  // Calendario: solo i clienti con una data di consegna (i 34 ufficiali).
+  const righe = clienti
+    .filter((c) => c.consegnaPrevista && c.riga)
+    .map((c) => c.riga!)
+    .sort((a, b) => a.consegnaPrevista.getTime() - b.consegnaPrevista.getTime())
+  // Senza data: i clienti nuovi (step 0 / in lavorazione), ancora da programmare.
+  const senzaData = clienti.filter((c) => !c.consegnaPrevista)
   const oggiMs = FRANK_OGGI.getTime()
 
   const inizi = righe.map((r) => (r.entrata ? r.entrata.getTime() : oggiMs))
@@ -143,9 +152,9 @@ export default function ConsulenzeFrank() {
     }
   }
 
-  const contaSilo = (id: SiloId) => CONSULENZE_FRANK.filter((r) => (silos[slugFrank(r.cliente)] ?? 'copy') === id).length
-  const consProgrammate = CONSULENZE_FRANK.filter((r) => r.consulenzaFrank).length
-  const consFatte = CONSULENZE_FRANK.filter((r) => r.consulenzaFrank && r.consulenzaFrank.getTime() <= oggiMs).length
+  const contaSilo = (id: SiloId) => clienti.filter((c) => c.silo === id).length
+  const consProgrammate = clienti.filter((c) => c.riga?.consulenzaFrank).length
+  const consFatte = clienti.filter((c) => c.riga?.consulenzaFrank && c.riga.consulenzaFrank.getTime() <= oggiMs).length
 
   return (
     <div className="min-h-screen flex-1 sfondo-trama">
@@ -155,7 +164,7 @@ export default function ConsulenzeFrank() {
             <p className="text-xs font-semibold uppercase tracking-widest text-ambra">Solo amministratori</p>
             <h1 className="font-display mt-1 text-3xl font-bold tracking-tight text-inchiostro">Consulenze Frank — Gantt ufficiale</h1>
             <p className="mt-1 max-w-2xl text-sm text-inchiostro/55">
-              {CONSULENZE_FRANK.length} clienti su un&apos;unica timeline. Colore dal rosso (appena iniziato) al verde (consegnato); i rombi sono i passaggi completati, l&apos;ultimo è la consulenza con Frank. Clicca un cliente per il log completo del progetto. La linea arancione è oggi.
+              {righe.length} clienti pianificati su un&apos;unica timeline{senzaData.length > 0 ? ` + ${senzaData.length} nuovi da programmare` : ''}. Colore dal rosso (appena iniziato) al verde (consegnato); i rombi sono i passaggi completati, l&apos;ultimo è la consulenza con Frank. Clicca un cliente per il log completo del progetto. La linea arancione è oggi.
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -169,9 +178,9 @@ export default function ConsulenzeFrank() {
         <div className="mt-6">
           <div className="flex flex-wrap items-baseline gap-2">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Quanti clienti in ogni fase</h3>
-            <span className="text-[11px] text-inchiostro/45">{CONSULENZE_FRANK.length} clienti · il progetto si chiude con la consulenza con Frank</span>
+            <span className="text-[11px] text-inchiostro/45">{clienti.length} clienti · il progetto si chiude con la consulenza con Frank</span>
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-9">
             {SILOS.map((s) => (
               <div key={s.id} className="rounded-xl border border-linea bg-carta p-3 shadow-sm">
                 <div className="flex items-center gap-1.5">
@@ -192,6 +201,31 @@ export default function ConsulenzeFrank() {
             </div>
           </div>
         </div>
+
+        {senzaData.length > 0 && (
+          <div className="mt-6">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Nuovi clienti — ancora senza data di consegna</h3>
+              <span className="text-[11px] text-inchiostro/45">{senzaData.length} registrati in area commerciale · entrano dallo step 0, la data si fissa più avanti</span>
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {senzaData.map((c) => {
+                const s = siloById(c.silo)
+                return (
+                  <div key={c.slug} className="flex items-center justify-between gap-3 rounded-xl border border-linea bg-carta px-3 py-2.5 shadow-sm">
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-bold text-inchiostro">{c.nome}</p>
+                      <p className="truncate text-[11px] text-inchiostro/45">{c.owner}{c.nDipendenti ? ` · ${c.nDipendenti} person${c.nDipendenti === 1 ? 'a' : 'e'}` : ''}</p>
+                    </div>
+                    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${s.colore.track} ${s.colore.testo}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${s.colore.punto}`} /> {s.ordine === 0 ? 'step 0' : `${s.ordine}`} · {s.label}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="mt-6">
           <div className="flex flex-wrap items-center gap-3">

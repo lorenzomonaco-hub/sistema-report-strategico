@@ -191,4 +191,9 @@ export interface AppState {
   pratiche: Pratica[]
   apprendimenti: Apprendimento[]
   prompts: PromptTemplate[]
+  /** Posizione nel silo di OGNI cliente della pipeline Consulenze Frank
+   *  (slug → SiloId): i 34 ufficiali + i clienti nuovi registrati in area
+   *  commerciale. Fonte condivisa per board /erogazione, Gantt e vista tutor.
+   *  Opzionale per retro-compatibilità con stati salvati prima. */
+  siloClienti?: Record<string, string>
 }

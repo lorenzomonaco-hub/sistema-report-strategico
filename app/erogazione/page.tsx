@@ -1,45 +1,47 @@
 'use client'
 
 // ─── Erogazione — Pipeline a silos ───
-// Board dei 5 passaggi reali del progetto Consulenze Frank + il report AssessFirst
+// Board dei passaggi reali del progetto Consulenze Frank + il report AssessFirst
 // di Irene, modellati come silos a compartimento stagno. Ogni cliente sta in un
 // silo; lo si sposta (drag & drop o frecce) al silo successivo quando quel
-// compartimento ha finito. Lo stato è vivo e condiviso: il Gantt Consulenze Frank
-// legge gli stessi silos e si aggiorna da solo.
+// compartimento ha finito. Lo stato è vivo e CONDIVISO (backend blocco-dati):
+// il Gantt Consulenze Frank e la vista tutor leggono gli stessi silos, e i
+// clienti nuovi registrati in area commerciale compaiono qui allo step 0.
 
 import { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { CONSULENZE_FRANK, slugFrank } from '@/lib/consulenzeFrank'
 import { fmtData } from '@/lib/quadroaziendale'
-import {
-  SILOS, SiloId, avanzaSilo, indietreggiaSilo, resetSilos, siloPrecedente, siloSuccessivo, spostaSilo, useSilos,
-} from '@/lib/pipelineSilos'
+import { SILOS, SiloId, siloPrecedente, siloSuccessivo } from '@/lib/pipelineSilos'
+import { ClientePipeline, useClientiPipeline } from '@/lib/clientiPipeline'
+import { useApp } from '@/lib/store'
+
+const perConsegna = (a: ClientePipeline, b: ClientePipeline) => {
+  if (a.consegnaPrevista && b.consegnaPrevista) return a.consegnaPrevista.getTime() - b.consegnaPrevista.getTime()
+  if (a.consegnaPrevista) return -1
+  if (b.consegnaPrevista) return 1
+  return a.nome.localeCompare(b.nome)
+}
 
 export default function PaginaSilos() {
-  const map = useSilos()
+  const { silos, spostaSilo, avanzaSilo, indietreggiaSilo, resetSilos } = useApp()
+  const clienti = useClientiPipeline()
   const [inTrascinamento, setInTrascinamento] = useState<string | null>(null)
   const [colonnaAttiva, setColonnaAttiva] = useState<SiloId | null>(null)
   const haTrascinatoRef = useRef(false)
 
-  // clienti con il loro silo vivo, ordinati per consegna
-  const clienti = useMemo(
-    () => CONSULENZE_FRANK
-      .map((r) => ({ r, slug: slugFrank(r.cliente), silo: (map[slugFrank(r.cliente)] ?? 'copy') as SiloId }))
-      .sort((a, b) => a.r.consegnaPrevista.getTime() - b.r.consegnaPrevista.getTime()),
-    [map],
-  )
-
-  const perSilo = (id: SiloId) => clienti.filter((c) => c.silo === id)
+  const ordinati = useMemo(() => [...clienti].sort(perConsegna), [clienti])
+  const perSilo = (id: SiloId) => ordinati.filter((c) => c.silo === id)
+  const nuovi = clienti.filter((c) => c.origine === 'nuovo').length
 
   return (
     <div className="min-h-screen flex-1 sfondo-trama">
-      <div className="mx-auto max-w-[1400px] px-6 py-10">
+      <div className="mx-auto max-w-[1500px] px-6 py-10">
         <header className="flex flex-wrap items-center gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-ambra">Erogazione · pipeline a silos</p>
             <h1 className="font-display mt-1 text-3xl font-bold tracking-tight text-inchiostro">Il flusso di lavoro, per silo</h1>
-            <p className="mt-1 max-w-2xl text-sm text-inchiostro/55">
-              {CONSULENZE_FRANK.length} clienti nei {SILOS.length} silos. Trascina una card (o usa le frecce) per spostarla al silo successivo — il Gantt Consulenze Frank si aggiorna da solo.
+            <p className="mt-1 max-w-3xl text-sm text-inchiostro/55">
+              {clienti.length} clienti nei {SILOS.length} silos{nuovi > 0 ? ` (${nuovi} nuovi dall'area commerciale)` : ''}. Trascina una card (o usa le frecce) per spostarla al silo successivo — Gantt e vista tutor si aggiornano da soli. I clienti nuovi entrano allo <b>step 0</b> e Elisa li fa avanzare quando i documenti sono completi.
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -49,7 +51,7 @@ export default function PaginaSilos() {
             <Link href="/erogazione/kanban-v2" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/50 hover:text-inchiostro">
               Board v2
             </Link>
-            <button onClick={() => { if (confirm('Ripristinare tutti i clienti alla posizione del piano ufficiale?')) resetSilos() }}
+            <button onClick={() => { if (confirm('Ripristinare i 34 clienti ufficiali alla posizione del piano? (i clienti nuovi restano dove sono)')) resetSilos() }}
               className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/50 hover:text-rose-600">
               Ripristina piano
             </button>
@@ -57,7 +59,7 @@ export default function PaginaSilos() {
         </header>
 
         {/* conteggio per silo, separato (non raggruppato) */}
-        <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
           {SILOS.map((s) => (
             <div key={s.id} className="rounded-xl border border-linea bg-carta p-3 shadow-sm">
               <div className="flex items-center gap-1.5">
@@ -104,27 +106,41 @@ export default function PaginaSilos() {
                   </div>
 
                   <div className="mt-1.5 space-y-2.5">
-                    {carte.map(({ r, slug, silo }) => {
-                      const prev = siloPrecedente(silo)
-                      const next = siloSuccessivo(silo)
+                    {carte.map((c) => {
+                      const prev = siloPrecedente(c.silo)
+                      const next = siloSuccessivo(c.silo)
+                      const intestazione = (
+                        <>
+                          <div className="flex items-center gap-1.5">
+                            <h3 className="truncate text-[13px] font-bold text-inchiostro">{c.nome}</h3>
+                            {c.origine === 'nuovo' && <span className="shrink-0 rounded-full bg-petrolio/10 px-1.5 py-0.5 text-[9px] font-bold uppercase text-petrolio">nuovo</span>}
+                          </div>
+                          <p className="truncate text-[11px] text-inchiostro/45">{c.owner}</p>
+                        </>
+                      )
                       return (
                         <div
-                          key={slug}
+                          key={c.slug}
                           draggable
-                          onDragStart={(e) => { e.dataTransfer.setData('text/plain', slug); e.dataTransfer.effectAllowed = 'move'; haTrascinatoRef.current = true; setInTrascinamento(slug) }}
+                          onDragStart={(e) => { e.dataTransfer.setData('text/plain', c.slug); e.dataTransfer.effectAllowed = 'move'; haTrascinatoRef.current = true; setInTrascinamento(c.slug) }}
                           onDragEnd={() => { setInTrascinamento(null); window.setTimeout(() => { haTrascinatoRef.current = false }, 0) }}
-                          className={`card-sollevabile block cursor-grab rounded-2xl border border-linea bg-carta p-3 shadow-sm ${inTrascinamento === slug ? 'opacity-50' : ''}`}
+                          className={`card-sollevabile block cursor-grab rounded-2xl border border-linea bg-carta p-3 shadow-sm ${inTrascinamento === c.slug ? 'opacity-50' : ''}`}
                         >
-                          <Link href={`/amministrazione/consulenze-frank/${slug}`} className="block" onClick={(e) => { if (haTrascinatoRef.current) e.preventDefault() }}>
-                            <h3 className="truncate text-[13px] font-bold text-inchiostro">{r.cliente}</h3>
-                            <p className="truncate text-[11px] text-inchiostro/45">{r.owner}</p>
-                          </Link>
+                          {c.origine === 'frank' ? (
+                            <Link href={`/amministrazione/consulenze-frank/${c.slug}`} className="block" onClick={(e) => { if (haTrascinatoRef.current) e.preventDefault() }}>
+                              {intestazione}
+                            </Link>
+                          ) : (
+                            <div>{intestazione}</div>
+                          )}
                           <div className="mt-1.5 flex items-center justify-between">
-                            <span className={`text-[10.5px] font-semibold ${s.colore.testo}`}>consegna {fmtData(r.consegnaPrevista)}</span>
+                            <span className={`text-[10.5px] font-semibold ${s.colore.testo}`}>
+                              {c.consegnaPrevista ? `consegna ${fmtData(c.consegnaPrevista)}` : 'da programmare'}
+                            </span>
                             <div className="flex items-center gap-1">
-                              <button disabled={!prev} onClick={() => indietreggiaSilo(slug)}
+                              <button disabled={!prev} onClick={() => indietreggiaSilo(c.slug)}
                                 className="rounded-md border border-linea px-1.5 py-0.5 text-[11px] font-bold text-inchiostro/50 enabled:hover:bg-inchiostro/[0.04] disabled:opacity-30" title="Silo precedente">◀</button>
-                              <button disabled={!next} onClick={() => avanzaSilo(slug)}
+                              <button disabled={!next} onClick={() => avanzaSilo(c.slug)}
                                 className="rounded-md border border-linea px-1.5 py-0.5 text-[11px] font-bold text-petrolio enabled:hover:bg-petrolio/10 disabled:opacity-30" title="Silo successivo">▶</button>
                             </div>
                           </div>

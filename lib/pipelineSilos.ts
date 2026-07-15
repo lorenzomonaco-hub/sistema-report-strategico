@@ -1,18 +1,19 @@
-// ─── Pipeline a silos (compartimenti stagni) — stato vivo ───
-// I 5 passaggi reali del progetto Consulenze Frank + il report AssessFirst di
-// Irene, modellati come silos a compartimento stagno: un cliente sta in UN silo
-// alla volta e avanza al successivo quando quel silo ha finito. Lo stato "in
-// quale silo è ogni cliente" è vivo e persistito: la board /erogazione lo muove,
-// il Gantt Consulenze Frank lo legge — stesso stato, si aggiornano insieme.
+// ─── Pipeline a silos (compartimenti stagni) — definizione ───
+// I passaggi reali del progetto Consulenze Frank modellati come silos a
+// compartimento stagno: un cliente sta in UN silo alla volta e avanza al
+// successivo quando quel silo ha finito.
 //
-// Per ora l'avanzamento è manuale (spostamento sulla board). Gli agenti reali
-// (Grippo/Caputo/Valentino) si agganceranno ai rispettivi silos rispettando il
-// contratto dei blocchi già presente nel progetto (GET /health, POST /jobs, …).
+// Lo STATO "in quale silo è ogni cliente" NON vive più qui: è nel backend
+// condiviso (AppState.siloClienti in lib/store), così board /erogazione, Gantt
+// Consulenze Frank e vista tutor leggono e scrivono la stessa fonte dati e i
+// clienti nuovi registrati in area commerciale compaiono ovunque.
+//
+// Step 0 = "documenti": la vendita è registrata ma mancano i documenti (li
+// carica Elisa). Quando i documenti sono completi il cliente passa a "copy".
 
-import { useSyncExternalStore } from 'react'
 import { CONSULENZE_FRANK, FaseFrank, slugFrank } from './consulenzeFrank'
 
-export type SiloId = 'copy' | 'jelo' | 'grippo' | 'caputo' | 'valentino' | 'irene' | 'consegnato'
+export type SiloId = 'documenti' | 'copy' | 'jelo' | 'grippo' | 'caputo' | 'valentino' | 'irene' | 'consegnato'
 
 export type Silo = {
   id: SiloId
@@ -24,8 +25,11 @@ export type Silo = {
   colore: { pieno: string; track: string; testo: string; punto: string }
 }
 
-// Scala rosso → verde lungo il flusso.
+// Step 0 (grigio, pre-pipeline) → scala rosso → verde lungo il flusso.
 export const SILOS: Silo[] = [
+  { id: 'documenti', ordine: 0, label: 'Documenti (step 0)', owner: 'Elisa',
+    spec: 'La vendita è registrata dal tutor ma mancano i documenti. Elisa carica questionario, trascrizione e i 4 AssessFirst per persona. Quando è tutto presente, il cliente passa al Copy.',
+    colore: { pieno: 'bg-slate-400', track: 'bg-slate-400/15', testo: 'text-slate-600', punto: 'bg-slate-400' } },
   { id: 'copy', ordine: 1, label: 'Creazione copy', owner: 'Copy (Carlo / Paolo / Luigi)',
     spec: 'Scrive il piano marketing o branding a partire dal questionario. Esce: bozza testo completa.',
     colore: { pieno: 'bg-red-500', track: 'bg-red-500/15', testo: 'text-red-700', punto: 'bg-red-500' } },
@@ -57,81 +61,23 @@ export const siloPrecedente = (id: SiloId): SiloId | null => {
   const s = siloById(id); const prev = SILOS.find((x) => x.ordine === s.ordine - 1); return prev ? prev.id : null
 }
 
-// La fase del Gantt (1..6) mappa sui silos. Il silo "irene" (AssessFirst) non ha
-// una fase nel Gantt storico: parte vuoto e viene popolato spostando le card.
+// La fase del Gantt (1..6) mappa sui silos di produzione. Lo step 0 "documenti"
+// e il silo "irene" (AssessFirst) non hanno una fase nel Gantt storico dei 34.
 const FASE_TO_SILO: Record<FaseFrank, SiloId> = {
   1: 'copy', 2: 'jelo', 3: 'grippo', 4: 'caputo', 5: 'valentino', 6: 'consegnato',
 }
 export const SILO_TO_FASE: Record<SiloId, FaseFrank> = {
-  copy: 1, jelo: 2, grippo: 3, caputo: 4, valentino: 5, irene: 6, consegnato: 6,
+  documenti: 1, copy: 1, jelo: 2, grippo: 3, caputo: 4, valentino: 5, irene: 6, consegnato: 6,
 }
+
+/** È uno step di produzione con una fase 1..6 nel Gantt storico? (documenti = no) */
+export const siloHaFase = (id: SiloId): boolean => id !== 'documenti'
 
 export type MappaSilos = Record<string, SiloId> // slug cliente → silo
 
-function seed(): MappaSilos {
+/** Posizione di partenza dei 34 clienti ufficiali (dal loro fase nel piano). */
+export function siloSeed(): MappaSilos {
   const m: MappaSilos = {}
   for (const r of CONSULENZE_FRANK) m[slugFrank(r.cliente)] = FASE_TO_SILO[r.fase]
   return m
-}
-
-const CHIAVE = 'pipeline-silos-v1'
-const listeners = new Set<() => void>()
-let cache: MappaSilos | null = null
-let cacheRaw: string | null = null
-const seedServer = seed()
-
-function leggi(): MappaSilos {
-  if (typeof window === 'undefined') return seedServer
-  const raw = window.localStorage.getItem(CHIAVE)
-  if (cache && raw === cacheRaw) return cache
-  cacheRaw = raw
-  if (!raw) { cache = seed(); return cache }
-  try {
-    cache = { ...seed(), ...(JSON.parse(raw) as MappaSilos) }
-  } catch {
-    cache = seed()
-  }
-  return cache
-}
-
-function salva(m: MappaSilos) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(CHIAVE, JSON.stringify(m))
-  cache = m
-  cacheRaw = JSON.stringify(m)
-  listeners.forEach((l) => l())
-}
-
-function subscribe(cb: () => void): () => void {
-  listeners.add(cb)
-  if (typeof window !== 'undefined') window.addEventListener('storage', cb)
-  return () => {
-    listeners.delete(cb)
-    if (typeof window !== 'undefined') window.removeEventListener('storage', cb)
-  }
-}
-
-/** Sposta un cliente in un silo specifico. */
-export function spostaSilo(slug: string, silo: SiloId) {
-  salva({ ...leggi(), [slug]: silo })
-}
-/** Fa avanzare/indietreggiare un cliente di un silo. */
-export function avanzaSilo(slug: string) {
-  const corr = leggi()[slug] ?? 'copy'
-  const next = siloSuccessivo(corr)
-  if (next) spostaSilo(slug, next)
-}
-export function indietreggiaSilo(slug: string) {
-  const corr = leggi()[slug] ?? 'copy'
-  const prev = siloPrecedente(corr)
-  if (prev) spostaSilo(slug, prev)
-}
-/** Ripristina lo stato al piano ufficiale di partenza. */
-export function resetSilos() {
-  salva(seed())
-}
-
-/** Hook: lo stato vivo dei silos, condiviso tra board e Gantt. */
-export function useSilos(): MappaSilos {
-  return useSyncExternalStore(subscribe, leggi, () => seedServer)
 }

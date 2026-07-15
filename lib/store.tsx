@@ -8,6 +8,7 @@ import React, { createContext, useContext, useEffect, useReducer, useRef } from 
 import { AppState, Apprendimento, DocumentoAllegato, FaseId, PersonaAF, Pratica, VersioneDocumento, relazioneAF } from './types'
 import { CronologiaFasi, leggiStatoCondiviso, scriviStatoCondiviso, tokenDati } from './datiblocco'
 import { documentiTutorPronti, faseSuccessiva, faseById } from './fasi'
+import { SiloId, siloPrecedente, siloSeed, siloSuccessivo } from './pipelineSilos'
 import { batteriaIdPerTipo, batteriaPerTipo, ETICHETTA_TIPO } from './batterie'
 import {
   REPORT_AI_MOCK,
@@ -55,9 +56,24 @@ type Azione =
   | { type: 'SALVA_REVISIONE'; praticaId: string; autore: string; testoDopo: string; note: string }
   | { type: 'APPROVA_APPRENDIMENTO'; apprendimentoId: string }
   | { type: 'SCARTA_APPRENDIMENTO'; apprendimentoId: string }
+  | { type: 'SPOSTA_SILO'; slug: string; silo: SiloId }
+  | { type: 'AVANZA_SILO'; slug: string }
+  | { type: 'INDIETREGGIA_SILO'; slug: string }
+  | { type: 'RESET_SILOS' }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 const ora = () => new Date().toISOString()
+
+/** Slug con cui un cliente NUOVO (Pratica) compare nella pipeline a silos /
+ *  Gantt. I 34 ufficiali usano slugFrank(nome); i nuovi usano l'id della pratica. */
+export const slugPratica = (praticaId: string): string => `p-${praticaId}`
+
+/** Mappa silo completa e sicura: parte dal piano ufficiale dei 34 e vi
+ *  sovrascrive lo stato salvato (che può mancare in stati vecchi). */
+const mappaSilos = (state: AppState): Record<string, SiloId> => ({
+  ...siloSeed(),
+  ...((state.siloClienti as Record<string, SiloId>) ?? {}),
+})
 
 const aggiornaPratica = (state: AppState, praticaId: string, fn: (p: Pratica) => Pratica): AppState => ({
   ...state,
@@ -160,8 +176,9 @@ function reducer(state: AppState, azione: Azione): AppState {
 
     case 'CREA_PRATICA': {
       const adesso = ora()
+      const nuovoId = `pr-${uid()}`
       const nuova: Pratica = {
-        id: `pr-${uid()}`,
+        id: nuovoId,
         azienda: azione.azienda,
         cliente: azione.cliente,
         email: azione.email,
@@ -179,7 +196,12 @@ function reducer(state: AppState, azione: Azione): AppState {
           { fase: 'raccolta-documenti', azione: 'In attesa dei documenti (questionario, trascrizione, AssessFirst)', autore: 'Sistema', dataOra: adesso },
         ],
       }
-      return { ...state, pratiche: [nuova, ...state.pratiche] }
+      // Il nuovo cliente entra nella pipeline a silos allo STEP 0 (documenti).
+      return {
+        ...state,
+        pratiche: [nuova, ...state.pratiche],
+        siloClienti: { ...mappaSilos(state), [slugPratica(nuovoId)]: 'documenti' },
+      }
     }
 
     case 'INVIA_ASSESSMENT':
@@ -255,15 +277,17 @@ function reducer(state: AppState, azione: Azione): AppState {
     case 'CLIENTE_PRONTO': {
       const pratica = state.pratiche.find((p) => p.id === azione.praticaId)
       if (!pratica || !documentiTutorPronti(pratica)) return state
-      return aggiornaPratica(state, azione.praticaId, (p) => ({
+      const avanzato = aggiornaPratica(state, azione.praticaId, (p) => ({
         ...p,
         faseCorrente: 'generazione',
         reportAF: { stato: 'in_attesa' },
         storico: [
           ...p.storico,
-          { fase: 'raccolta-documenti', azione: '«Cliente pronto» — la pipeline automatica è partita', autore: 'Giulia T. (Tutor)', dataOra: ora() },
+          { fase: 'raccolta-documenti', azione: '«Documenti completi» (Elisa) — dallo step 0 allo step 1: preso in carico dal Copy', autore: 'Elisa', dataOra: ora() },
         ],
       }))
+      // Nella pipeline a silos: dallo step 0 (documenti) allo step 1 (copy).
+      return { ...avanzato, siloClienti: { ...mappaSilos(state), [slugPratica(azione.praticaId)]: 'copy' } }
     }
 
     case 'AVANZA_STEP_AUTONOMO':
@@ -384,6 +408,25 @@ function reducer(state: AppState, azione: Azione): AppState {
         apprendimenti: state.apprendimenti.map((a) => (a.id === azione.apprendimentoId ? { ...a, stato: 'scartato' } : a)),
       }
 
+    case 'SPOSTA_SILO':
+      return { ...state, siloClienti: { ...mappaSilos(state), [azione.slug]: azione.silo } }
+
+    case 'AVANZA_SILO': {
+      const corr = mappaSilos(state)[azione.slug] ?? 'documenti'
+      const next = siloSuccessivo(corr)
+      return next ? { ...state, siloClienti: { ...mappaSilos(state), [azione.slug]: next } } : state
+    }
+
+    case 'INDIETREGGIA_SILO': {
+      const corr = mappaSilos(state)[azione.slug] ?? 'documenti'
+      const prev = siloPrecedente(corr)
+      return prev ? { ...state, siloClienti: { ...mappaSilos(state), [azione.slug]: prev } } : state
+    }
+
+    case 'RESET_SILOS':
+      // ripristina i 34 al piano ufficiale, mantiene i clienti nuovi dove sono
+      return { ...state, siloClienti: { ...mappaSilos(state), ...siloSeed() } }
+
     default:
       return state
   }
@@ -414,6 +457,12 @@ interface StoreContextValue {
   approvaApprendimento: (apprendimentoId: string) => void
   scartaApprendimento: (apprendimentoId: string) => void
   resetDemo: () => void
+  /** stato condiviso della pipeline a silos: slug cliente → silo (34 + nuovi) */
+  silos: Record<string, SiloId>
+  spostaSilo: (slug: string, silo: SiloId) => void
+  avanzaSilo: (slug: string) => void
+  indietreggiaSilo: (slug: string) => void
+  resetSilos: () => void
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -548,6 +597,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     approvaApprendimento: (apprendimentoId) => dispatch({ type: 'APPROVA_APPRENDIMENTO', apprendimentoId }),
     scartaApprendimento: (apprendimentoId) => dispatch({ type: 'SCARTA_APPRENDIMENTO', apprendimentoId }),
     resetDemo: () => dispatch({ type: 'RESET' }),
+    silos: mappaSilos(state),
+    spostaSilo: (slug, silo) => dispatch({ type: 'SPOSTA_SILO', slug, silo }),
+    avanzaSilo: (slug) => dispatch({ type: 'AVANZA_SILO', slug }),
+    indietreggiaSilo: (slug) => dispatch({ type: 'INDIETREGGIA_SILO', slug }),
+    resetSilos: () => dispatch({ type: 'RESET_SILOS' }),
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

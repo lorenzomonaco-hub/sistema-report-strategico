@@ -137,6 +137,8 @@ export interface Pratica {
   cliente: string
   email: string
   tutor: string
+  /** email del tutor (per le notifiche: report AF di Irene + completamento post-grafica) */
+  tutorEmail?: string
   /** persone (titolari, soci, dipendenti) che fanno il test AssessFirst */
   dipendenti: PersonaAF[]
   /** scelto dal sistema di generazione (Christian); null = non ancora determinato */

@@ -42,7 +42,7 @@ function targetApprendimento(pratica: Pratica): { id: string; nome: string } {
 type Azione =
   | { type: 'HYDRATE'; payload: AppState }
   | { type: 'RESET' }
-  | { type: 'CREA_PRATICA'; azienda: string; cliente: string; email: string; dipendenti: PersonaAF[] }
+  | { type: 'CREA_PRATICA'; azienda: string; cliente: string; email: string; dipendenti: PersonaAF[]; tutor?: string; tutorEmail?: string }
   | { type: 'INVIA_ASSESSMENT'; praticaId: string }
   | { type: 'REGISTRA_ALLEGATO'; praticaId: string; allegato: DocumentoAllegato }
   | { type: 'RIMUOVI_ALLEGATO'; praticaId: string; allegatoId: string }
@@ -186,12 +186,14 @@ function reducer(state: AppState, azione: Azione): AppState {
     case 'CREA_PRATICA': {
       const adesso = ora()
       const nuovoId = `pr-${uid()}`
+      const nomeTutor = azione.tutor?.trim() || 'Giulia T.'
       const nuova: Pratica = {
         id: nuovoId,
         azienda: azione.azienda,
         cliente: azione.cliente,
         email: azione.email,
-        tutor: 'Giulia T.',
+        tutor: nomeTutor,
+        tutorEmail: azione.tutorEmail,
         dipendenti: azione.dipendenti,
         tipoLavoro: null,
         // La registrazione porta dritto alla raccolta documenti (fase 2):
@@ -200,8 +202,9 @@ function reducer(state: AppState, azione: Azione): AppState {
         dataCreazione: adesso,
         allegati: [],
         versioni: [],
+        // log-time: la registrazione timbra l'inizio del progetto (misura durata erogazione)
         storico: [
-          { fase: 'vendita', azione: 'Cliente registrato dal tutor (fase 1)', autore: 'Giulia T. (Tutor)', dataOra: adesso },
+          { fase: 'vendita', azione: `Cliente registrato dal tutor ${nomeTutor}`, autore: `${nomeTutor} (Tutor)`, dataOra: adesso },
           { fase: 'raccolta-documenti', azione: 'In attesa dei documenti (questionario, trascrizione, AssessFirst)', autore: 'Sistema', dataOra: adesso },
         ],
       }
@@ -451,7 +454,7 @@ interface StoreContextValue {
   sincronizzazione: 'in-corso' | 'online' | 'offline'
   /** timbri del server: praticaId → [{fase, dataOra}] — la base del Gantt reale */
   cronologia: CronologiaFasi
-  creaPratica: (dati: { azienda: string; cliente: string; email: string; dipendenti: PersonaAF[] }) => void
+  creaPratica: (dati: { azienda: string; cliente: string; email: string; dipendenti: PersonaAF[]; tutor?: string; tutorEmail?: string }) => void
   inviaAssessment: (praticaId: string) => void
   registraAllegato: (praticaId: string, allegato: DocumentoAllegato) => void
   rimuoviAllegato: (praticaId: string, allegatoId: string) => void

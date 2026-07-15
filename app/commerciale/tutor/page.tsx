@@ -16,7 +16,17 @@ import RoleShell from '@/components/RoleShell'
 import PraticaCard from '@/components/PraticaCard'
 import EmptyState from '@/components/EmptyState'
 import { PersonaAF } from '@/lib/types'
-import { IN_ATTESA } from '@/lib/consulenzeFrank'
+import { IN_ATTESA, TUTOR_FRANK } from '@/lib/consulenzeFrank'
+
+/** Elenco tutor (nomi reali) e loro email [nome].[cognome]@metodomerenda.com */
+const TUTORS = TUTOR_FRANK.map((t) => t.tutor).sort((a, b) => a.localeCompare(b))
+function emailTutor(nome: string): string {
+  const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z]/g, '')
+  const parti = nome.trim().split(/\s+/)
+  const n = norm(parti[0] || '')
+  const c = norm(parti.slice(1).join('') || '')
+  return n && c ? `${n}.${c}@metodomerenda.com` : ''
+}
 
 const dataIt = (iso: string) =>
   new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Rome' })
@@ -63,6 +73,8 @@ function PersonaChip({ p, tono, onRimuovi }: { p: PersonaAF; tono: 'titolare' | 
 
 function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCreata: (azienda: string) => void }) {
   const { creaPratica } = useApp()
+  const [tutor, setTutor] = useState('')
+  const emailDelTutor = emailTutor(tutor)
   const [azienda, setAzienda] = useState('')
   const [titolareNome, setTitolareNome] = useState('')
   const [titolareCognome, setTitolareCognome] = useState('')
@@ -110,13 +122,14 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
   }
 
   const registra = () => {
+    if (!tutor) return setErrore('Prima di tutto seleziona il tuo nome (tutor).')
     const tn = titolareNome.trim(), tc = titolareCognome.trim(), te = titolareEmail.trim()
     if (!azienda.trim() || !tn || !tc || !te) return setErrore('Azienda, nome, cognome ed email del titolare sono obbligatori.')
     if (!te.includes('@')) return setErrore('Email titolare non valida.')
     const titolare: PersonaAF = { nome: `${tn} ${tc}`, email: te, qualifica: 'titolare', ruolo: 'Titolare' }
     // il titolare (referente) è la prima persona da valutare, poi soci e dipendenti
     const dipendenti = [titolare, ...soci, ...dip]
-    creaPratica({ azienda: azienda.trim(), cliente: titolare.nome, email: te, dipendenti })
+    creaPratica({ azienda: azienda.trim(), cliente: titolare.nome, email: te, dipendenti, tutor, tutorEmail: emailDelTutor })
     onCreata(azienda.trim()); onChiudi()
   }
 
@@ -128,6 +141,29 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
         <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Registra il cliente — avvia la pipeline (step 0)</h3>
         <p className="mt-1 text-xs text-inchiostro/50">
           Registrare il cliente crea il progetto allo <strong>step 0</strong> (vendita registrata, documenti mancanti). Poi Elisa carica i documenti.
+        </p>
+      </div>
+
+      {/* ── Tutor: prima cosa, obbligatorio. Genera l'email del tutor ── */}
+      <div className="rounded-xl border border-petrolio/25 bg-petrolio/[0.05] p-4">
+        <p className="mb-3 text-xs font-bold uppercase tracking-wide text-petrolio-scuro">Tutor — il tuo nome</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className={labelCampo}>Seleziona il tuo nome *</label>
+            <select value={tutor} onChange={(e) => setTutor(e.target.value)} aria-label="Tutor" className={classiInput}>
+              <option value="">— scegli il tutor —</option>
+              {TUTORS.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={labelCampo}>Email tutor (automatica)</label>
+            <div className={`flex h-[38px] items-center rounded-xl border border-linea px-3 text-sm ${emailDelTutor ? 'bg-carta text-inchiostro' : 'bg-inchiostro/[0.03] text-inchiostro/35'}`}>
+              {emailDelTutor || 'compare quando scegli il nome'}
+            </div>
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] text-inchiostro/45">
+          A questa email riceverai le notifiche: il <strong>report AssessFirst di Irene</strong> e il <strong>completamento</strong> dopo la grafica. La registrazione timbra l&rsquo;ora d&rsquo;inizio per misurare la durata di erogazione.
         </p>
       </div>
 

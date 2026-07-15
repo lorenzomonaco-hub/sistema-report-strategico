@@ -16,6 +16,7 @@ import RoleShell from '@/components/RoleShell'
 import PraticaCard from '@/components/PraticaCard'
 import EmptyState from '@/components/EmptyState'
 import { PersonaAF, RUOLI, qualificaDaRuolo, relazioneAF } from '@/lib/types'
+import { IN_ATTESA } from '@/lib/consulenzeFrank'
 
 const dataIt = (iso: string) =>
   new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Rome' })
@@ -202,6 +203,30 @@ export default function PaginaTutor() {
                 + Registra un cliente
               </button>
             )}
+          </div>
+        </section>
+
+        {/* In attesa del questionario — PROTOTIPO: per ora un cliente solo */}
+        <section className="anima anima-2">
+          <TitoloSezione titolo="In attesa del questionario" conteggio={`1 di ${IN_ATTESA.length} — prototipo`} />
+          <p className="mt-1 text-xs text-inchiostro/45">
+            Clienti già acquisiti che non hanno ancora compilato questionario/AssessFirst. Per ora mostriamo <strong>un solo cliente</strong> come esempio d&rsquo;interfaccia: quando approvi il formato lo replichiamo per tutti e {IN_ATTESA.length}.
+          </p>
+          <div className="mt-3">
+            {IN_ATTESA.length > 0 && (() => {
+              const c = IN_ATTESA[0]
+              return (
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-linea bg-carta px-4 py-3 shadow-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-display font-bold text-inchiostro">{c.azienda || c.nome}</p>
+                    <p className="truncate text-xs text-inchiostro/50">{c.nome} · tutor {c.tutor}</p>
+                  </div>
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-medium text-rose-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> questionario mancante
+                  </span>
+                </div>
+              )
+            })()}
           </div>
         </section>
 

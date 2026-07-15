@@ -196,4 +196,8 @@ export interface AppState {
    *  commerciale. Fonte condivisa per board /erogazione, Gantt e vista tutor.
    *  Opzionale per retro-compatibilità con stati salvati prima. */
   siloClienti?: Record<string, string>
+  /** Flag di migrazione una-tantum: quando manca (stati vecchi), le pratiche e
+   *  gli apprendimenti di DEMO vengono ripuliti al caricamento. I clienti reali
+   *  vengono creati dopo, con il flag già a true, quindi non vengono toccati. */
+  seedPulito?: boolean
 }

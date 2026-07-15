@@ -75,6 +75,15 @@ const mappaSilos = (state: AppState): Record<string, SiloId> => ({
   ...((state.siloClienti as Record<string, SiloId>) ?? {}),
 })
 
+/** Migrazione una-tantum: gli stati salvati PRIMA della pulizia contengono le
+ *  pratiche/apprendimenti di demo (dati fittizi). Al primo caricamento li
+ *  azzeriamo e alziamo il flag; i clienti reali, creati dopo, non vengono
+ *  toccati. Ritorna lo STESSO oggetto se non serve nulla (per riconoscerlo). */
+function pulisciSeed(s: AppState): AppState {
+  if (s.seedPulito) return s
+  return { ...s, pratiche: [], apprendimenti: [], seedPulito: true }
+}
+
 const aggiornaPratica = (state: AppState, praticaId: string, fn: (p: Pratica) => Pratica): AppState => ({
   ...state,
   pratiche: state.pratiche.map((p) => (p.id === praticaId ? fn(p) : p)),
@@ -486,7 +495,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const salvato = localStorage.getItem(STORAGE_KEY)
       if (salvato) {
-        statoLocale = JSON.parse(salvato) as AppState
+        statoLocale = pulisciSeed(JSON.parse(salvato) as AppState)
         dispatch({ type: 'HYDRATE', payload: statoLocale })
       }
     } catch {
@@ -507,10 +516,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     leggiStatoCondiviso(token)
       .then((doc) => {
         if (doc.stato) {
+          const pulito = pulisciSeed(doc.stato)
           daServer.current = true
-          dispatch({ type: 'HYDRATE', payload: doc.stato })
+          dispatch({ type: 'HYDRATE', payload: pulito })
           revisione.current = doc.revisione
           setCronologia(doc.cronologia ?? {})
+          if (pulito !== doc.stato) {
+            // lo stato condiviso conteneva dati di demo: riscrivo quello pulito
+            return scriviStatoCondiviso(token, pulito, doc.revisione).then((r) => {
+              revisione.current = r.revisione
+              setCronologia(r.cronologia ?? {})
+            })
+          }
         } else {
           const semina = statoLocale ?? statoCorrente.current
           return scriviStatoCondiviso(token, semina, doc.revisione).then((r) => {

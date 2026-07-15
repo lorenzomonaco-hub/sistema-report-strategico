@@ -60,23 +60,6 @@ const PERSONE: CardPersona[] = [
     richiamo: 'text-amber-600 group-hover:text-amber-700',
     ruolo: 'elisa',
   },
-  {
-    href: '/commerciale/irene',
-    nome: 'Irene',
-    compito: 'Supervisiona lo step autonomo: report AssessFirst ed email ai tutor.',
-    passi: [
-      'Vede le generazioni in corso in tempo reale',
-      'Controlla che i report AF escano formattati correttamente',
-      'Verifica che le email ai tutor partano',
-      'Interviene solo se qualcosa va storto',
-    ],
-    anima: 'anima-4',
-    barra: 'bg-violet-500',
-    pallino: 'bg-violet-500',
-    titoloHover: 'group-hover:text-violet-700',
-    richiamo: 'text-violet-600 group-hover:text-violet-700',
-    ruolo: 'irene',
-  },
 ]
 
 export default function AreaCommerciale() {
@@ -94,13 +77,13 @@ export default function AreaCommerciale() {
             Area Commerciale
           </h1>
           <p className="mx-auto mt-3 max-w-2xl leading-7 text-inchiostro/50">
-            Il Tutor registra il cliente (step 0), Elisa carica i documenti e lo porta allo step 1,
-            Irene supervisiona lo step autonomo. Scegli la tua area di lavoro.
+            Il Tutor registra il cliente (step 0) ed Elisa carica i documenti per portarlo allo
+            step 1, dove la pipeline lo prende in carico. Scegli la tua area di lavoro.
           </p>
         </header>
 
-        {/* I tre ruoli */}
-        <section className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {/* I due ruoli */}
+        <section className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2">
           {PERSONE.map((p) => {
             const notifiche = contaNotifiche(state, p.ruolo)
             return (

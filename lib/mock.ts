@@ -143,6 +143,10 @@ export const SEED_STATE: AppState = {
 
   apprendimenti: [],
 
+  // seed già pulito: nessun cliente di demo. Gli stati vecchi (senza questo
+  // flag) vengono ripuliti una volta sola al caricamento (vedi store).
+  seedPulito: true,
+
   prompts: [
     {
       id: 'batteria-consulenza',

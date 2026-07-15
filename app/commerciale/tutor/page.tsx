@@ -15,7 +15,7 @@ import { indiceFase, statoCommerciale } from '@/lib/fasi'
 import RoleShell from '@/components/RoleShell'
 import PraticaCard from '@/components/PraticaCard'
 import EmptyState from '@/components/EmptyState'
-import { PersonaAF, RUOLI, qualificaDaRuolo, relazioneAF } from '@/lib/types'
+import { PersonaAF } from '@/lib/types'
 import { IN_ATTESA } from '@/lib/consulenzeFrank'
 
 const dataIt = (iso: string) =>
@@ -45,122 +45,204 @@ function TitoloSezione({ titolo, conteggio }: { titolo: string; conteggio?: stri
 }
 
 // ─── Form nuovo cliente: il trigger della pipeline ───
+// Chip di una persona già inserita
+function PersonaChip({ p, tono, onRimuovi }: { p: PersonaAF; tono: 'titolare' | 'dipendente'; onRimuovi: () => void }) {
+  const stile = tono === 'dipendente'
+    ? 'border-sky-200 bg-sky-50 text-sky-900'
+    : 'border-indigo-200 bg-indigo-50 text-indigo-900'
+  const badge = tono === 'dipendente' ? 'bg-sky-100 text-sky-700' : 'bg-indigo-100 text-indigo-700'
+  return (
+    <li className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-3 py-2 text-sm ${stile}`}>
+      <span className="font-semibold">{p.nome}</span>
+      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${badge}`}>{p.ruolo}</span>
+      <span className="text-inchiostro/45">{p.email}</span>
+      <button onClick={onRimuovi} aria-label={`Rimuovi ${p.nome}`} className="ml-auto text-inchiostro/30 transition hover:text-rose-600">✕</button>
+    </li>
+  )
+}
+
 function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCreata: (azienda: string) => void }) {
   const { creaPratica } = useApp()
   const [azienda, setAzienda] = useState('')
   const [titolareNome, setTitolareNome] = useState('')
   const [titolareCognome, setTitolareCognome] = useState('')
-  const [emailCliente, setEmailCliente] = useState('')
-  const [dipendenti, setDipendenti] = useState<PersonaAF[]>([])
-  const [nome, setNome] = useState('')
-  const [cognome, setCognome] = useState('')
-  const [email, setEmail] = useState('')
-  const [ruolo, setRuolo] = useState<string>('Imprenditore')
-  const [ruoloAltro, setRuoloAltro] = useState('')
+  const [titolareEmail, setTitolareEmail] = useState('')
+  // Sezione 1: titolari e soci (illimitati)
+  const [soci, setSoci] = useState<PersonaAF[]>([])
+  const [sNome, setSNome] = useState('')
+  const [sCognome, setSCognome] = useState('')
+  const [sEmail, setSEmail] = useState('')
+  const [sTipo, setSTipo] = useState<'titolare' | 'socio'>('socio')
+  // Sezione 2: dipendenti strategici (max 3)
+  const [dip, setDip] = useState<PersonaAF[]>([])
+  const [dNome, setDNome] = useState('')
+  const [dCognome, setDCognome] = useState('')
+  const [dEmail, setDEmail] = useState('')
+  const [dQualifica, setDQualifica] = useState('')
   const [errore, setErrore] = useState<string | null>(null)
 
-  const nDipendenti = dipendenti.filter((d) => d.qualifica === 'dipendente').length
-  const nSoci = dipendenti.length - nDipendenti
+  const nomiUsati = () => [
+    `${titolareNome.trim()} ${titolareCognome.trim()}`.trim().toLowerCase(),
+    ...soci.map((s) => s.nome.toLowerCase()),
+    ...dip.map((d) => d.nome.toLowerCase()),
+  ].filter(Boolean)
 
-  const aggiungi = () => {
-    const n = nome.trim()
-    const c = cognome.trim()
-    const r = ruolo === 'Altro' ? ruoloAltro.trim() : ruolo
-    const em = email.trim()
-    if (!n || !c) return setErrore('Servono nome E cognome della persona.')
-    if (!r) return setErrore('Indica il ruolo (o scrivilo se hai scelto «Altro»).')
-    if (!em || !em.includes('@')) return setErrore('L’email è obbligatoria: serve per inviare il test AssessFirst.')
+  const aggiungiSocio = () => {
+    const n = sNome.trim(), c = sCognome.trim(), em = sEmail.trim()
+    if (!n || !c) return setErrore('Titolari e soci: servono nome e cognome.')
+    if (!em || !em.includes('@')) return setErrore('Titolari e soci: l’email è obbligatoria (serve per l’AssessFirst).')
     const nomeCompleto = `${n} ${c}`
-    if (dipendenti.some((d) => d.nome.toLowerCase() === nomeCompleto.toLowerCase())) return setErrore('Questa persona è già in elenco.')
-    const q = qualificaDaRuolo(r)
-    if (q === 'dipendente' && nDipendenti >= MAX_DIPENDENTI) return setErrore(`Massimo ${MAX_DIPENDENTI} dipendenti per azienda. Titolare e soci sono invece illimitati.`)
-    setDipendenti([...dipendenti, { nome: nomeCompleto, email: em, ruolo: r, qualifica: q }])
-    setNome(''); setCognome(''); setEmail(''); setRuolo('Imprenditore'); setRuoloAltro(''); setErrore(null)
+    if (nomiUsati().includes(nomeCompleto.toLowerCase())) return setErrore('Questa persona è già in elenco.')
+    setSoci([...soci, { nome: nomeCompleto, email: em, qualifica: sTipo, ruolo: sTipo === 'titolare' ? 'Titolare' : 'Socio' }])
+    setSNome(''); setSCognome(''); setSEmail(''); setErrore(null)
+  }
+
+  const aggiungiDipendente = () => {
+    const n = dNome.trim(), c = dCognome.trim(), em = dEmail.trim(), q = dQualifica.trim()
+    if (!n || !c) return setErrore('Dipendenti strategici: servono nome e cognome.')
+    if (!em || !em.includes('@')) return setErrore('Dipendenti strategici: l’email è obbligatoria (serve per l’AssessFirst).')
+    if (!q) return setErrore('Dipendenti strategici: scrivi la qualifica in azienda.')
+    if (dip.length >= MAX_DIPENDENTI) return setErrore(`Massimo ${MAX_DIPENDENTI} dipendenti strategici per azienda.`)
+    const nomeCompleto = `${n} ${c}`
+    if (nomiUsati().includes(nomeCompleto.toLowerCase())) return setErrore('Questa persona è già in elenco.')
+    setDip([...dip, { nome: nomeCompleto, email: em, qualifica: 'dipendente', ruolo: q }])
+    setDNome(''); setDCognome(''); setDEmail(''); setDQualifica(''); setErrore(null)
   }
 
   const registra = () => {
-    const titolare = `${titolareNome.trim()} ${titolareCognome.trim()}`.trim()
-    if (!azienda.trim() || !titolareNome.trim() || !titolareCognome.trim() || !emailCliente.trim()) return setErrore('Azienda, nome e cognome del titolare ed email del cliente sono obbligatori.')
-    if (!emailCliente.includes('@')) return setErrore('Email del cliente non valida.')
-    if (dipendenti.length < 1) return setErrore('Aggiungi almeno una persona da valutare.')
-    creaPratica({ azienda: azienda.trim(), cliente: titolare, email: emailCliente.trim(), dipendenti })
+    const tn = titolareNome.trim(), tc = titolareCognome.trim(), te = titolareEmail.trim()
+    if (!azienda.trim() || !tn || !tc || !te) return setErrore('Azienda, nome, cognome ed email del titolare sono obbligatori.')
+    if (!te.includes('@')) return setErrore('Email titolare non valida.')
+    const titolare: PersonaAF = { nome: `${tn} ${tc}`, email: te, qualifica: 'titolare', ruolo: 'Titolare' }
+    // il titolare (referente) è la prima persona da valutare, poi soci e dipendenti
+    const dipendenti = [titolare, ...soci, ...dip]
+    creaPratica({ azienda: azienda.trim(), cliente: titolare.nome, email: te, dipendenti })
     onCreata(azienda.trim()); onChiudi()
   }
 
-  return (
-    <div className="card-sollevabile rounded-2xl border border-linea bg-carta p-5 shadow-sm">
-      <h3 className="font-display font-bold tracking-tight text-inchiostro">Registra il cliente — avvia la pipeline (step 0)</h3>
-      <p className="mt-0.5 text-xs text-inchiostro/50">
-        Registrare il cliente crea il progetto allo <strong>step 0</strong> (vendita registrata, documenti mancanti). Poi Elisa carica i documenti.
-      </p>
+  const labelCampo = 'mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro/45'
 
-      {/* Cliente / azienda */}
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="lg:col-span-1">
-          <label className="mb-1 block text-xs font-semibold text-inchiostro/60">Azienda *</label>
-          <input value={azienda} onChange={(e) => setAzienda(e.target.value)} placeholder="Es. Rossi S.r.l." className={classiInput} />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-semibold text-inchiostro/60">Nome titolare *</label>
-          <input value={titolareNome} onChange={(e) => setTitolareNome(e.target.value)} placeholder="Nome" className={classiInput} />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-semibold text-inchiostro/60">Cognome titolare *</label>
-          <input value={titolareCognome} onChange={(e) => setTitolareCognome(e.target.value)} placeholder="Cognome" className={classiInput} />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-semibold text-inchiostro/60">Email cliente *</label>
-          <input type="email" value={emailCliente} onChange={(e) => setEmailCliente(e.target.value)} placeholder="nome@azienda.it" className={classiInput} />
+  return (
+    <div className="card-sollevabile space-y-6 rounded-2xl border border-linea bg-carta p-6 shadow-sm">
+      <div>
+        <h3 className="font-display text-lg font-bold tracking-tight text-inchiostro">Registra il cliente — avvia la pipeline (step 0)</h3>
+        <p className="mt-1 text-xs text-inchiostro/50">
+          Registrare il cliente crea il progetto allo <strong>step 0</strong> (vendita registrata, documenti mancanti). Poi Elisa carica i documenti.
+        </p>
+      </div>
+
+      {/* ── Azienda e titolare ── */}
+      <div className="rounded-xl border border-linea/70 bg-inchiostro/[0.015] p-4">
+        <p className="mb-3 text-xs font-bold uppercase tracking-wide text-inchiostro/50">Azienda e titolare</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className={labelCampo}>Azienda *</label>
+            <input value={azienda} onChange={(e) => setAzienda(e.target.value)} placeholder="Es. Rossi S.r.l." className={classiInput} />
+          </div>
+          <div>
+            <label className={labelCampo}>Nome titolare *</label>
+            <input value={titolareNome} onChange={(e) => setTitolareNome(e.target.value)} placeholder="Nome" className={classiInput} />
+          </div>
+          <div>
+            <label className={labelCampo}>Cognome titolare *</label>
+            <input value={titolareCognome} onChange={(e) => setTitolareCognome(e.target.value)} placeholder="Cognome" className={classiInput} />
+          </div>
+          <div>
+            <label className={labelCampo}>Email titolare *</label>
+            <input type="email" value={titolareEmail} onChange={(e) => setTitolareEmail(e.target.value)} placeholder="titolare@azienda.it" className={classiInput} />
+          </div>
         </div>
       </div>
 
-      {/* Persone */}
-      <div className="mt-5">
+      {/* ── Sezione 1: titolari e soci ── */}
+      <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <label className="block text-xs font-semibold text-inchiostro/60">Persone da valutare * — nome, cognome, email (per l&rsquo;AssessFirst), qualifica</label>
-          <span className="text-[11px] text-inchiostro/45">{nSoci} titolare/soci · <span className={nDipendenti >= MAX_DIPENDENTI ? 'font-bold text-amber-700' : ''}>{nDipendenti}/{MAX_DIPENDENTI} dipendenti</span></span>
+          <p className="text-sm font-bold text-indigo-900">1 · Titolari e soci</p>
+          <span className="text-[11px] font-semibold text-indigo-500">{soci.length} inseriti · illimitati</span>
         </div>
-        <div className="mt-1 flex flex-wrap items-start gap-2">
-          <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome" className={`${classiInput} min-w-28 flex-1`} />
-          <input value={cognome} onChange={(e) => setCognome(e.target.value)} placeholder="Cognome" className={`${classiInput} min-w-28 flex-1`} />
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email *" className={`${classiInput} min-w-40 flex-1`} />
-          <select value={ruolo} onChange={(e) => setRuolo(e.target.value)} aria-label="Qualifica" className={`${classiInput} w-40 shrink-0`}>
-            {RUOLI.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
-          {ruolo === 'Altro' && (
-            <input value={ruoloAltro} onChange={(e) => setRuoloAltro(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungi() } }}
-              placeholder="Quale ruolo?" className={`${classiInput} w-40 shrink-0`} />
-          )}
-          <button onClick={aggiungi} className="shrink-0 rounded-xl border border-linea bg-carta px-4 py-2.5 text-sm font-semibold text-inchiostro/70 transition hover:border-petrolio/40 hover:text-petrolio">
-            + Aggiungi
-          </button>
-        </div>
-        <p className="mt-1 text-[11px] text-inchiostro/40">Titolare e soci: illimitati. Dipendenti: massimo {MAX_DIPENDENTI} per azienda.</p>
+        <p className="mt-0.5 text-[11px] text-inchiostro/45">Il titolare qui sopra è già incluso. Aggiungi altri titolari o soci; ognuno fa l&rsquo;AssessFirst.</p>
 
-        {dipendenti.length > 0 && (
-          <ul className="mt-2 space-y-1.5">
-            {dipendenti.map((d) => {
-              const rel = relazioneAF({ dipendenti, cliente: `${titolareNome} ${titolareCognome}`.trim() || '—' }, d)
-              const badge = d.qualifica === 'dipendente' ? 'bg-sky-100 text-sky-700' : 'bg-indigo-100 text-indigo-700'
-              return (
-                <li key={d.nome} className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-900">
-                  <span className="font-semibold">{d.nome}</span>
-                  <span className="text-indigo-800/70">{d.email}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge}`}>{d.ruolo} · {d.qualifica}</span>
-                  <span className="ml-auto text-xs text-indigo-500">report AF: caso {rel.caso}</span>
-                  <button onClick={() => setDipendenti(dipendenti.filter((x) => x.nome !== d.nome))} aria-label={`Rimuovi ${d.nome}`} className="text-indigo-400 transition hover:text-indigo-700">✕</button>
-                </li>
-              )
-            })}
+        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
+          <div>
+            <label className={labelCampo}>Nome</label>
+            <input value={sNome} onChange={(e) => setSNome(e.target.value)} placeholder="Nome" className={classiInput} />
+          </div>
+          <div>
+            <label className={labelCampo}>Cognome</label>
+            <input value={sCognome} onChange={(e) => setSCognome(e.target.value)} placeholder="Cognome" className={classiInput} />
+          </div>
+          <div>
+            <label className={labelCampo}>Email</label>
+            <input type="email" value={sEmail} onChange={(e) => setSEmail(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungiSocio() } }} placeholder="email" className={classiInput} />
+          </div>
+          <div>
+            <label className={labelCampo}>Qualifica</label>
+            <div className="flex h-[38px] overflow-hidden rounded-xl border border-linea">
+              {(['titolare', 'socio'] as const).map((t) => (
+                <button key={t} onClick={() => setSTipo(t)} type="button"
+                  className={`px-3 text-xs font-semibold capitalize transition ${sTipo === t ? 'bg-indigo-500 text-white' : 'bg-carta text-inchiostro/50 hover:text-inchiostro'}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <button onClick={aggiungiSocio} className="mt-2 rounded-xl border border-indigo-200 bg-carta px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100">
+          + Aggiungi titolare/socio
+        </button>
+
+        {soci.length > 0 && (
+          <ul className="mt-3 space-y-1.5">
+            {soci.map((p) => <PersonaChip key={p.nome} p={p} tono="titolare" onRimuovi={() => setSoci(soci.filter((x) => x.nome !== p.nome))} />)}
           </ul>
         )}
       </div>
 
-      {errore && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{errore}</p>}
+      {/* ── Sezione 2: dipendenti strategici ── */}
+      <div className="rounded-xl border border-sky-100 bg-sky-50/40 p-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-sm font-bold text-sky-900">2 · Dipendenti strategici</p>
+          <span className={`text-[11px] font-semibold ${dip.length >= MAX_DIPENDENTI ? 'text-amber-700' : 'text-sky-500'}`}>{dip.length}/{MAX_DIPENDENTI}</span>
+        </div>
+        <p className="mt-0.5 text-[11px] text-inchiostro/45">Massimo {MAX_DIPENDENTI}. La qualifica la scrivi tu (testo libero).</p>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button onClick={registra} className="rounded-xl bg-petrolio px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-petrolio-scuro">Registra il cliente</button>
+        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr]">
+          <div>
+            <label className={labelCampo}>Nome</label>
+            <input value={dNome} onChange={(e) => setDNome(e.target.value)} placeholder="Nome" className={classiInput} disabled={dip.length >= MAX_DIPENDENTI} />
+          </div>
+          <div>
+            <label className={labelCampo}>Cognome</label>
+            <input value={dCognome} onChange={(e) => setDCognome(e.target.value)} placeholder="Cognome" className={classiInput} disabled={dip.length >= MAX_DIPENDENTI} />
+          </div>
+          <div>
+            <label className={labelCampo}>Email</label>
+            <input type="email" value={dEmail} onChange={(e) => setDEmail(e.target.value)} placeholder="email" className={classiInput} disabled={dip.length >= MAX_DIPENDENTI} />
+          </div>
+          <div>
+            <label className={labelCampo}>Qualifica in azienda</label>
+            <input value={dQualifica} onChange={(e) => setDQualifica(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungiDipendente() } }}
+              placeholder="Es. Responsabile commerciale" className={classiInput} disabled={dip.length >= MAX_DIPENDENTI} />
+          </div>
+        </div>
+        <button onClick={aggiungiDipendente} disabled={dip.length >= MAX_DIPENDENTI}
+          className="mt-2 rounded-xl border border-sky-200 bg-carta px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-40">
+          + Aggiungi dipendente
+        </button>
+
+        {dip.length > 0 && (
+          <ul className="mt-3 space-y-1.5">
+            {dip.map((p) => <PersonaChip key={p.nome} p={p} tono="dipendente" onRimuovi={() => setDip(dip.filter((x) => x.nome !== p.nome))} />)}
+          </ul>
+        )}
+      </div>
+
+      {errore && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{errore}</p>}
+
+      <div className="flex flex-wrap gap-2">
+        <button onClick={registra} className="rounded-xl bg-petrolio px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-petrolio-scuro">Registra il cliente</button>
         <button onClick={onChiudi} className="rounded-xl border border-linea bg-carta px-4 py-2.5 text-sm font-semibold text-inchiostro/60 transition hover:border-petrolio/40 hover:text-petrolio">Annulla</button>
       </div>
     </div>

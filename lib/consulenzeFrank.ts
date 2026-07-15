@@ -20,6 +20,16 @@ export type RigaFrank = {
   entrata?: Date       // questionario ricevuto — ingresso in produzione
   copyDone?: Date      // copy completato (invio a Grippo)
   grippoDone?: Date    // revisione testo Grippo completata (ricevuto da Grippo)
+  consulenzaFrank?: Date // step finale: data della consulenza con Frank (dal foglio maestro, se fissata)
+  branding?: boolean   // il progetto passa dalla revisione dell'avvocato Jelo (fase 2)
+}
+
+export function slugFrank(cliente: string): string {
+  return cliente
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 export const FASI_FRANK: Record<FaseFrank, { label: string; sub: string }> = {
@@ -41,13 +51,13 @@ export const CONSULENZE_FRANK: RigaFrank[] = [
   { cliente: 'Ferrario', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(15, 7), nota: 'Manca la grafica del punto 5 — ordine mantenuto come fornito.', entrata: d(15, 5) },
   { cliente: 'Simone Tomasini', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(15, 7), nota: '', entrata: d(11, 2), copyDone: d(3, 6) },
   { cliente: 'Giuseppe Di Guida', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(16, 7), nota: '', entrata: d(31, 3), copyDone: d(15, 6) },
-  { cliente: 'Davide Raimondi', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(16, 7), nota: '', entrata: d(20, 1), copyDone: d(25, 5), grippoDone: d(2, 7) },
+  { cliente: 'Davide Raimondi', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(16, 7), nota: '', entrata: d(20, 1), copyDone: d(25, 5), grippoDone: d(2, 7), consulenzaFrank: d(30, 9) },
   { cliente: 'Emanuele Soffiotto', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(17, 7), nota: '', entrata: d(15, 4), copyDone: d(29, 6), grippoDone: d(8, 7) },
   { cliente: 'Francesco Surace', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(17, 7), nota: '', entrata: d(21, 4), copyDone: d(6, 7), grippoDone: d(6, 7) },
   { cliente: 'Gaetano Rodittis', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(20, 7), nota: '', entrata: d(27, 3), copyDone: d(12, 6), grippoDone: d(9, 7) },
   { cliente: 'Marco Giaferri', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(20, 7), nota: '', entrata: d(5, 5), copyDone: d(2, 7), grippoDone: d(6, 7) },
   { cliente: 'Marco Ruggeri', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(21, 7), nota: '', entrata: d(28, 4), copyDone: d(10, 7), grippoDone: d(10, 7) },
-  { cliente: 'Michela Sartori', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(21, 7), nota: '', entrata: d(20, 2), copyDone: d(25, 5), grippoDone: d(7, 7) },
+  { cliente: 'Michela Sartori', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(21, 7), nota: '', entrata: d(20, 2), copyDone: d(25, 5), grippoDone: d(7, 7), consulenzaFrank: d(27, 8) },
   { cliente: 'Imbriano 2', fase: 5, owner: 'Agente AI Valentino', consegnaPrevista: d(22, 7), nota: '2° progetto del cliente Imbriano.', entrata: d(10, 2), copyDone: d(14, 7) },
 
   { cliente: 'Giovanni Mazzamati', fase: 4, owner: 'Agente AI Caputo', consegnaPrevista: d(22, 7), nota: '', entrata: d(2, 4), copyDone: d(22, 6) },
@@ -66,11 +76,11 @@ export const CONSULENZE_FRANK: RigaFrank[] = [
   { cliente: 'Mastella', fase: 1, owner: 'Carlo', consegnaPrevista: d(30, 7), nota: 'Data indicata trattata come fine copy. Tipologia branding da confermare.' },
   { cliente: 'Rea', fase: 1, owner: 'Carlo', consegnaPrevista: d(30, 7), nota: 'Data indicata trattata come fine copy. Tipologia branding da confermare.' },
 
-  { cliente: 'Pessot', fase: 2, owner: 'Avv. Jelo', consegnaPrevista: d(31, 7), nota: 'Attesa 2° brand avvocato.' },
-  { cliente: 'Lancia', fase: 2, owner: 'Avv. Jelo', consegnaPrevista: d(31, 7), nota: 'In attesa di approvazione Avv. Jelo.' },
-  { cliente: 'Barcello', fase: 2, owner: 'Avv. Jelo', consegnaPrevista: d(3, 8), nota: 'In attesa di approvazione Avv. Jelo.' },
-  { cliente: 'Cazan (3° brand)', fase: 2, owner: 'Avv. Jelo', consegnaPrevista: d(3, 8), nota: 'In attesa di approvazione Avv. Jelo.' },
-  { cliente: 'Imbriano 1', fase: 2, owner: 'Avv. Jelo', consegnaPrevista: d(4, 8), nota: 'Branding — in attesa di approvazione Avv. Jelo.' },
+  { cliente: 'Pessot', fase: 2, owner: 'Avv. Jelo', consegnaPrevista: d(31, 7), nota: 'Attesa 2° brand avvocato.', branding: true },
+  { cliente: 'Lancia', fase: 2, owner: 'Avv. Jelo', consegnaPrevista: d(31, 7), nota: 'In attesa di approvazione Avv. Jelo.', branding: true },
+  { cliente: 'Barcello', fase: 2, owner: 'Avv. Jelo', consegnaPrevista: d(3, 8), nota: 'In attesa di approvazione Avv. Jelo.', branding: true },
+  { cliente: 'Cazan (3° brand)', fase: 2, owner: 'Avv. Jelo', consegnaPrevista: d(3, 8), nota: 'In attesa di approvazione Avv. Jelo.', branding: true },
+  { cliente: 'Imbriano 1', fase: 2, owner: 'Avv. Jelo', consegnaPrevista: d(4, 8), nota: 'Branding — in attesa di approvazione Avv. Jelo.', branding: true },
 
   { cliente: 'Banfi', fase: 1, owner: 'Carlo', consegnaPrevista: d(4, 8), nota: 'Data indicata trattata come fine copy. Tipologia branding da confermare.' },
   { cliente: 'Donnantuono', fase: 1, owner: 'Da assegnare', consegnaPrevista: d(5, 8), nota: 'Data indicata trattata come fine copy. Tipologia branding da confermare.' },
@@ -79,3 +89,46 @@ export const CONSULENZE_FRANK: RigaFrank[] = [
 ]
 
 export const FRANK_OGGI = new Date(2026, 6, 14) // martedì 14/07/2026, stessa data di riferimento del file ufficiale
+
+export function frankBySlug(slug: string): RigaFrank | null {
+  return CONSULENZE_FRANK.find((r) => slugFrank(r.cliente) === slug) ?? null
+}
+
+export type StatoStep = 'fatto' | 'in-corso' | 'da-fare'
+
+export type EventoTimeline = {
+  step: number          // 1..7 (1-5 fasi, 6 consegna, 7 consulenza) — per il colore rosso→verde
+  titolo: string
+  owner: string
+  data?: Date           // data reale/prevista, se nota
+  dataLabel?: string    // testo alternativo quando non c'è una data (es. "da programmare")
+  stato: StatoStep
+}
+
+/**
+ * Ricostruisce il log completo della timeline di un progetto: cosa è già stato
+ * fatto (con data reale) e cosa resta (previsto). Ordine cronologico del flusso.
+ */
+export function timelineFrank(r: RigaFrank): EventoTimeline[] {
+  const ev: EventoTimeline[] = []
+  const statoFase = (n: number): StatoStep =>
+    r.fase === 6 ? 'fatto' : n < r.fase ? 'fatto' : n === r.fase ? 'in-corso' : 'da-fare'
+
+  if (r.entrata) {
+    ev.push({ step: 0, titolo: 'Ingresso in pipeline', owner: 'Questionario ricevuto', data: r.entrata, stato: 'fatto' })
+  }
+  ev.push({ step: 1, titolo: 'Creazione copy', owner: r.fase === 1 ? r.owner : 'Copy', data: r.copyDone, stato: statoFase(1) })
+  if (r.branding || r.fase === 2) {
+    ev.push({ step: 2, titolo: 'Revisione avvocato Jelo', owner: 'Avv. Jelo', dataLabel: 'solo per branding', stato: statoFase(2) })
+  }
+  ev.push({ step: 3, titolo: 'Agente AI — Grippo (Testo)', owner: 'Agente AI Grippo', data: r.grippoDone, stato: statoFase(3) })
+  ev.push({ step: 4, titolo: 'Agente AI — Caputo (Immagini)', owner: 'Agente AI Caputo', stato: statoFase(4) })
+  ev.push({ step: 5, titolo: 'Agente AI — Valentino (Grafica)', owner: 'Agente AI Valentino', stato: statoFase(5) })
+  ev.push({ step: 6, titolo: 'Consegna del report', owner: 'Delivery', data: r.consegnaPrevista, stato: r.fase === 6 ? 'fatto' : 'da-fare' })
+  ev.push({
+    step: 7, titolo: 'Consulenza con Frank', owner: 'Frank Merenda',
+    data: r.consulenzaFrank, dataLabel: r.consulenzaFrank ? undefined : 'da programmare',
+    stato: r.consulenzaFrank && r.consulenzaFrank.getTime() <= FRANK_OGGI.getTime() ? 'fatto' : 'da-fare',
+  })
+  return ev
+}

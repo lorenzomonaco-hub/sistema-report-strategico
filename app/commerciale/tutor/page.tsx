@@ -15,7 +15,11 @@ import RoleShell from '@/components/RoleShell'
 import EmptyState from '@/components/EmptyState'
 import { PersonaAF, Pratica } from '@/lib/types'
 import { documentiTutorPronti } from '@/lib/fasi'
-import { TUTOR_FRANK } from '@/lib/consulenzeFrank'
+import { TUTOR_FRANK, IN_ATTESA } from '@/lib/consulenzeFrank'
+
+/** Prodotto acquistato per i clienti importati «in attesa» (dal file di origine).
+ *  L'id della pratica è `pr-attesa-N` = indice nell'elenco IN_ATTESA. */
+const SERVIZIO_ATTESA = new Map(IN_ATTESA.map((c, i) => [`pr-attesa-${i}`, c.servizio]))
 
 /** Prodotti acquistabili (menu a tendina) */
 const PRODOTTI = ['Piano marketing', 'Branding', 'Branding + strategica', 'Strategica', 'Piano marketing + brand'] as const
@@ -501,12 +505,17 @@ export default function PaginaTutor() {
                   const aperto = apertoId === p.id
                   const pronti = documentiTutorPronti(p)
                   const nPersone = p.dipendenti.length
+                  const prodotto = p.prodotto || SERVIZIO_ATTESA.get(p.id) || ''
                   return (
                     <div key={p.id} className="overflow-hidden rounded-2xl border border-linea bg-carta shadow-sm">
                       <button onClick={() => setApertoId(aperto ? null : p.id)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-inchiostro/[0.02]">
                         <div className="min-w-0">
                           <p className="truncate font-display font-bold text-inchiostro">{p.cliente || p.azienda}</p>
-                          <p className="truncate text-xs text-inchiostro">{p.azienda} · {nPersone} {nPersone === 1 ? 'persona' : 'persone'} · {p.dataVendita ? `venduto il ${dataIt(p.dataVendita)}` : 'data vendita da inserire'}</p>
+                          <p className="truncate text-xs text-inchiostro">
+                            {p.azienda}
+                            {prodotto && <span className="font-semibold text-petrolio-scuro"> · {prodotto}</span>}
+                            {' · '}{nPersone} {nPersone === 1 ? 'persona' : 'persone'} · {p.dataVendita ? `venduto il ${dataIt(p.dataVendita)}` : 'data vendita da inserire'}
+                          </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           {nPersone === 0

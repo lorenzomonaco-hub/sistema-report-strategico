@@ -104,11 +104,11 @@ export function frankBySlug(slug: string): RigaFrank | null {
 // ancora "in attesa" — quelli che non hanno ancora compilato questionario o
 // AssessFirst (stadio 1 "informazioni mancanti" del dataset erogazione).
 
-export type ClienteAttesa = { nome: string; azienda: string; tutor: string }
+export type ClienteAttesa = { nome: string; azienda: string; tutor: string; servizio: string }
 
 export const IN_ATTESA: ClienteAttesa[] = EROG_CLIENTI
   .filter((r) => r.stadio === 1)
-  .map((r) => ({ nome: r.nome, azienda: r.azienda, tutor: r.tutor }))
+  .map((r) => ({ nome: r.nome, azienda: r.azienda, tutor: r.tutor, servizio: r.servizio }))
 
 export function clientiTutorFrank(tutor: string): RigaFrank[] {
   return CONSULENZE_FRANK.filter((r) => r.tutor === tutor)

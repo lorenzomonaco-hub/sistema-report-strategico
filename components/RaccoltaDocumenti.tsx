@@ -17,9 +17,6 @@ const dataIt = (iso: string) =>
 
 const uid = () => `al-${Math.random().toString(36).slice(2, 10)}`
 
-const classiInputSm =
-  'w-full rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35 transition focus:border-petrolio focus:outline-none focus:ring-2 focus:ring-petrolio/15'
-
 const normalizza = (s: string) =>
   (s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
 
@@ -208,32 +205,11 @@ function CaricaAssessFirst({ pratica, persona, autore, onRimuovi }: { pratica: P
 }
 
 // ─── Carta di raccolta: documenti di un cliente + avanzamento step 0 → 1 ───
-const QUALIFICHE: { val: PersonaAF['qualifica']; label: string }[] = [
-  { val: 'titolare', label: 'Titolare' },
-  { val: 'socio', label: 'Socio' },
-  { val: 'dipendente', label: 'Dipendente' },
-]
-
 export function CartaRaccolta({ pratica, autore = 'Elisa', onConfermata }: {
   pratica: Pratica; autore?: string; onConfermata?: (azienda: string) => void
 }) {
-  const { clientePronto, aggiungiPersona, rimuoviPersona } = useApp()
+  const { clientePronto } = useApp()
   const pronti = documentiTutorPronti(pratica)
-  const [pNome, setPNome] = useState('')
-  const [pCognome, setPCognome] = useState('')
-  const [pEmail, setPEmail] = useState('')
-  const [pQual, setPQual] = useState<PersonaAF['qualifica']>('titolare')
-  const [errP, setErrP] = useState('')
-
-  const aggiungi = () => {
-    const n = pNome.trim(), c = pCognome.trim()
-    if (!n || !c) return setErrP('Servono nome e cognome della persona.')
-    const nomeCompleto = `${n} ${c}`
-    if (pratica.dipendenti.some((d) => d.nome.toLowerCase() === nomeCompleto.toLowerCase())) return setErrP('Questa persona è già in elenco.')
-    const ruolo = QUALIFICHE.find((q) => q.val === pQual)!.label
-    aggiungiPersona(pratica.id, { nome: nomeCompleto, email: pEmail.trim(), qualifica: pQual, ruolo })
-    setPNome(''); setPCognome(''); setPEmail(''); setErrP('')
-  }
 
   return (
     <div className="card-sollevabile rounded-2xl border border-linea bg-carta p-5 shadow-sm">
@@ -257,36 +233,19 @@ export function CartaRaccolta({ pratica, autore = 'Elisa', onConfermata }: {
         </div>
       </div>
 
-      {/* Persone da valutare (titolari, soci, dipendenti) + AssessFirst */}
+      {/* Persone da valutare: quelle DICHIARATE DAL TUTOR (sola lettura qui) */}
       <div className="mt-4">
         <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-inchiostro">
-          Persone da valutare — titolari, soci e dipendenti (i 4 AssessFirst si caricano insieme)
+          Persone da valutare — dichiarate dal tutor (i 4 AssessFirst si caricano insieme)
         </p>
-
-        {/* aggiungi persona */}
-        <div className="rounded-xl border border-linea bg-inchiostro/[0.015] p-3">
-          <div className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto_auto]">
-            <input value={pNome} onChange={(e) => setPNome(e.target.value)} placeholder="Nome" className={classiInputSm} />
-            <input value={pCognome} onChange={(e) => setPCognome(e.target.value)} placeholder="Cognome" className={classiInputSm} />
-            <input type="email" value={pEmail} onChange={(e) => setPEmail(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungi() } }} placeholder="email" className={classiInputSm} />
-            <select value={pQual} onChange={(e) => setPQual(e.target.value as PersonaAF['qualifica'])} aria-label="Qualifica" className={classiInputSm}>
-              {QUALIFICHE.map((q) => <option key={q.val} value={q.val}>{q.label}</option>)}
-            </select>
-            <button onClick={aggiungi} className="shrink-0 rounded-xl border border-petrolio/30 bg-carta px-4 py-2 text-sm font-semibold text-petrolio transition hover:bg-petrolio/10">+ Aggiungi</button>
-          </div>
-          {errP && <p className="mt-1.5 text-xs text-rose-600">{errP}</p>}
-        </div>
-
-        {/* elenco persone con caricamento dei 4 AssessFirst */}
-        <div className="mt-3 space-y-3">
+        <div className="mt-1 space-y-3">
           {pratica.dipendenti.length === 0 ? (
             <p className="rounded-xl border border-dashed border-inchiostro/20 px-3 py-4 text-center text-xs text-inchiostro">
-              Nessuna persona ancora. Aggiungi almeno il titolare per caricare i suoi AssessFirst.
+              Nessuna persona dichiarata dal tutor. Chiedi al tutor di completare l&rsquo;anagrafica del cliente: le persone compaiono qui in automatico.
             </p>
           ) : (
             pratica.dipendenti.map((d) => (
-              <CaricaAssessFirst key={d.nome} pratica={pratica} persona={d} autore={autore} onRimuovi={() => rimuoviPersona(pratica.id, d.nome)} />
+              <CaricaAssessFirst key={d.nome} pratica={pratica} persona={d} autore={autore} />
             ))
           )}
         </div>

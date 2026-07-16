@@ -23,7 +23,7 @@ const perConsegna = (a: ClientePipeline, b: ClientePipeline) => {
 }
 
 export default function PaginaSilos() {
-  const { silos, spostaSilo, avanzaSilo, indietreggiaSilo } = useApp()
+  const { spostaSilo, avanzaSilo, indietreggiaSilo, bloccoInfo } = useApp()
   const clienti = useClientiPipeline()
   const [inTrascinamento, setInTrascinamento] = useState<string | null>(null)
   const [colonnaAttiva, setColonnaAttiva] = useState<SiloId | null>(null)
@@ -56,7 +56,7 @@ export default function PaginaSilos() {
         </header>
 
         {/* conteggio per silo, separato (non raggruppato) */}
-        <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
           {SILOS.map((s) => (
             <div key={s.id} className="rounded-xl border border-linea bg-carta p-3 shadow-sm">
               <div className="flex items-center gap-1.5">
@@ -107,6 +107,8 @@ export default function PaginaSilos() {
                       const prev = siloPrecedente(c.silo)
                       const next = siloSuccessivo(c.silo)
                       const bloccato = c.origine === 'attesa' // niente questionario: non si sposta
+                      const inBlocco = c.silo === 'bloccato'
+                      const bi = bloccoInfo[c.slug]
                       const intestazione = (
                         <>
                           <div className="flex items-center gap-1.5">
@@ -132,9 +134,14 @@ export default function PaginaSilos() {
                           ) : (
                             <div>{intestazione}</div>
                           )}
+                          {inBlocco && (
+                            <p className="mt-1 line-clamp-2 rounded-md bg-zinc-100 px-2 py-1 text-[10.5px] text-zinc-700">
+                              {bi?.nota ? bi.nota : <span className="text-inchiostro/40">nessuna nota — aprire la scheda</span>}
+                            </p>
+                          )}
                           <div className="mt-1.5 flex items-center justify-between">
-                            <span className={`text-[10.5px] font-semibold ${bloccato ? 'text-rose-600' : s.colore.testo}`}>
-                              {bloccato ? 'questionario mancante' : c.consegnaPrevista ? `consegna ${fmtData(c.consegnaPrevista)}` : 'da programmare'}
+                            <span className={`text-[10.5px] font-semibold ${bloccato ? 'text-rose-600' : inBlocco ? 'text-zinc-600' : s.colore.testo}`}>
+                              {inBlocco ? (bi?.reminder ? `reminder ${fmtData(new Date(bi.reminder))}` : 'reminder da fissare') : bloccato ? 'questionario mancante' : c.consegnaPrevista ? `consegna ${fmtData(c.consegnaPrevista)}` : 'da programmare'}
                             </span>
                             {!bloccato && (
                               <div className="flex items-center gap-1">

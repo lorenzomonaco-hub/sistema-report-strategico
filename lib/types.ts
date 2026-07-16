@@ -195,6 +195,13 @@ export interface SiloLogVoce {
   dataOra: string
 }
 
+/** Info di un cliente bloccato (silo -1): motivazione + data reminder follow-up. */
+export interface BloccoInfo {
+  nota: string
+  /** data (YYYY-MM-DD) del reminder per il follow-up al cliente */
+  reminder?: string
+}
+
 export interface AppState {
   pratiche: Pratica[]
   apprendimenti: Apprendimento[]
@@ -207,6 +214,8 @@ export interface AppState {
   /** Log dei passaggi nei silo, per cliente (slug → voci timbrate). Tiene
    *  traccia del tempo: dalla registrazione all'invio, passaggio per passaggio. */
   siloLog?: Record<string, SiloLogVoce[]>
+  /** Clienti bloccati (silo -1): slug → motivazione + reminder */
+  bloccoInfo?: Record<string, BloccoInfo>
   /** Flag di migrazione una-tantum: quando manca (stati vecchi), le pratiche e
    *  gli apprendimenti di DEMO vengono ripuliti al caricamento. I clienti reali
    *  vengono creati dopo, con il flag già a true, quindi non vengono toccati. */

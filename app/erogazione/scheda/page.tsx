@@ -37,10 +37,14 @@ function durata(ms: number): string {
 function Scheda() {
   const params = useSearchParams()
   const slug = params.get('slug') ?? ''
-  const { state, avanzaSilo } = useApp()
+  const { state, avanzaSilo, spostaSilo, bloccoInfo, setBloccoInfo } = useApp()
   const clienti = useClientiPipeline()
   const c = clienti.find((x) => x.slug === slug)
   const [mostraInnesto, setMostraInnesto] = useState(false)
+  const infoBlocco = bloccoInfo[slug]
+  const [notaBlocco, setNotaBlocco] = useState(infoBlocco?.nota ?? '')
+  const [reminderBlocco, setReminderBlocco] = useState(infoBlocco?.reminder ?? '')
+  const [salvato, setSalvato] = useState(false)
 
   if (!c) {
     return (
@@ -73,6 +77,41 @@ function Scheda() {
           <Link href="/erogazione" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">← Pipeline</Link>
         </div>
       </header>
+
+      {/* blocco (silo -1) */}
+      {c.silo === 'bloccato' ? (
+        <div className="mt-5 rounded-2xl border border-zinc-300 bg-zinc-50 p-4 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-200 px-2.5 py-0.5 text-xs font-bold text-zinc-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" /> Cliente bloccato (−1)
+            </span>
+          </div>
+          <label className="mt-3 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Motivazione del blocco (nota di Carlo)</label>
+          <textarea value={notaBlocco} onChange={(e) => { setNotaBlocco(e.target.value); setSalvato(false) }} rows={3}
+            placeholder="Es. problema interno in azienda, cambio modello di business, cliente non risponde…"
+            className="mt-1 w-full rounded-xl border border-linea bg-carta px-3 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35 focus:border-petrolio focus:outline-none focus:ring-2 focus:ring-petrolio/15" />
+          <div className="mt-2 flex flex-wrap items-end gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Reminder follow-up</label>
+              <input type="date" value={reminderBlocco} onChange={(e) => { setReminderBlocco(e.target.value); setSalvato(false) }}
+                className="mt-1 rounded-xl border border-linea bg-carta px-3 py-2 text-sm text-inchiostro focus:border-petrolio focus:outline-none focus:ring-2 focus:ring-petrolio/15" />
+            </div>
+            <button onClick={() => { setBloccoInfo(slug, notaBlocco.trim(), reminderBlocco || undefined); setSalvato(true) }}
+              className="rounded-xl bg-petrolio px-4 py-2 text-sm font-semibold text-white transition hover:bg-petrolio-scuro">Salva</button>
+            <button onClick={() => spostaSilo(slug, 'copy')}
+              className="rounded-xl border border-linea bg-carta px-4 py-2 text-sm font-semibold text-inchiostro/70 transition hover:border-petrolio/40 hover:text-petrolio">Sblocca → in lavorazione</button>
+            {salvato && <span className="text-xs font-semibold text-green-700">✓ salvato</span>}
+          </div>
+          <p className="mt-2 text-[11px] text-inchiostro/45">Il reminder resterà segnato qui; l&rsquo;invio automatico dell&rsquo;email di follow-up si collega col backend.</p>
+        </div>
+      ) : (
+        <div className="mt-5 flex justify-end">
+          <button onClick={() => spostaSilo(slug, 'bloccato')}
+            className="rounded-xl border border-zinc-300 bg-carta px-3 py-1.5 text-xs font-semibold text-zinc-600 transition hover:bg-zinc-100">
+            🚫 Segna come bloccato
+          </button>
+        </div>
+      )}
 
       {/* stato + tempo totale */}
       <div className="mt-5 grid grid-cols-2 gap-3">

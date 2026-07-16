@@ -13,7 +13,7 @@
 
 import { CONSULENZE_FRANK, FaseFrank, slugFrank } from './consulenzeFrank'
 
-export type SiloId = 'documenti' | 'copy' | 'jelo' | 'lavorazione' | 'valentino' | 'consegnato'
+export type SiloId = 'bloccato' | 'documenti' | 'copy' | 'jelo' | 'lavorazione' | 'valentino' | 'consegnato'
 
 export type Silo = {
   id: SiloId
@@ -30,6 +30,9 @@ export type Silo = {
 // «Revisione e grafici» (sarà un solo agente, più lungo). Irene NON è più nella
 // pipeline: ha un'area dedicata (/erogazione/irene) per i report AssessFirst.
 export const SILOS: Silo[] = [
+  { id: 'bloccato', ordine: -1, label: 'Bloccati', owner: 'Fuori dal flusso',
+    spec: 'Clienti fermi per un problema (blocco in azienda, cambio modello di business, ecc.). Carlo annota la motivazione e fissa una data di reminder per il follow-up.',
+    colore: { pieno: 'bg-zinc-500', track: 'bg-zinc-500/15', testo: 'text-zinc-600', punto: 'bg-zinc-500' } },
   { id: 'documenti', ordine: 0, label: 'Documenti (step 0)', owner: 'Elisa',
     spec: 'La vendita è registrata dal tutor ma mancano i documenti. Elisa carica questionario, trascrizione e i 4 AssessFirst per persona. Quando è tutto presente, il cliente passa al Copy.',
     colore: { pieno: 'bg-slate-400', track: 'bg-slate-400/15', testo: 'text-slate-600', punto: 'bg-slate-400' } },
@@ -71,7 +74,7 @@ const FASE_TO_SILO: Record<FaseFrank, SiloId> = {
   1: 'copy', 2: 'jelo', 3: 'lavorazione', 4: 'lavorazione', 5: 'valentino', 6: 'consegnato',
 }
 export const SILO_TO_FASE: Record<SiloId, FaseFrank> = {
-  documenti: 1, copy: 1, jelo: 2, lavorazione: 3, valentino: 5, consegnato: 6,
+  bloccato: 1, documenti: 1, copy: 1, jelo: 2, lavorazione: 3, valentino: 5, consegnato: 6,
 }
 
 /** È uno step di produzione con una fase 1..6 nel Gantt storico? (documenti = no) */

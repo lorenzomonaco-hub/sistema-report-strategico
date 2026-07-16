@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/lib/store";
+import NavGlobale from "@/components/NavGlobale";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
@@ -30,7 +31,10 @@ export default function RootLayout({
       className={`${bricolage.variable} ${figtree.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
-        <AppProvider>{children}</AppProvider>
+        <AppProvider>
+          <NavGlobale />
+          {children}
+        </AppProvider>
       </body>
     </html>
   );

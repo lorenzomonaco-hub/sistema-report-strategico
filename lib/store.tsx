@@ -60,6 +60,7 @@ type Azione =
   | { type: 'AVANZA_SILO'; slug: string }
   | { type: 'INDIETREGGIA_SILO'; slug: string }
   | { type: 'RESET_SILOS' }
+  | { type: 'SET_BLOCCO_INFO'; slug: string; nota: string; reminder?: string }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 const ora = () => new Date().toISOString()
@@ -455,6 +456,12 @@ function reducer(state: AppState, azione: Azione): AppState {
       // ripristina i 34 al piano ufficiale, mantiene i clienti nuovi dove sono
       return { ...state, siloClienti: { ...mappaSilos(state), ...siloSeed() } }
 
+    case 'SET_BLOCCO_INFO':
+      return {
+        ...state,
+        bloccoInfo: { ...(state.bloccoInfo ?? {}), [azione.slug]: { nota: azione.nota, reminder: azione.reminder } },
+      }
+
     default:
       return state
   }
@@ -491,6 +498,9 @@ interface StoreContextValue {
   avanzaSilo: (slug: string) => void
   indietreggiaSilo: (slug: string) => void
   resetSilos: () => void
+  /** clienti bloccati (silo -1): slug → nota + reminder */
+  bloccoInfo: Record<string, { nota: string; reminder?: string }>
+  setBloccoInfo: (slug: string, nota: string, reminder?: string) => void
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -638,6 +648,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     avanzaSilo: (slug) => dispatch({ type: 'AVANZA_SILO', slug }),
     indietreggiaSilo: (slug) => dispatch({ type: 'INDIETREGGIA_SILO', slug }),
     resetSilos: () => dispatch({ type: 'RESET_SILOS' }),
+    bloccoInfo: state.bloccoInfo ?? {},
+    setBloccoInfo: (slug, nota, reminder) => dispatch({ type: 'SET_BLOCCO_INFO', slug, nota, reminder }),
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

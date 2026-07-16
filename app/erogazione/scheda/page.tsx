@@ -5,13 +5,21 @@
 // dalla registrazione all'invio, passaggio per passaggio. Per i 34 clienti
 // ufficiali mostra anche le date del piano (foglio maestro).
 
-import { Suspense } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useApp } from '@/lib/store'
 import { useClientiPipeline } from '@/lib/clientiPipeline'
-import { SILOS, siloById } from '@/lib/pipelineSilos'
+import { SILOS, siloById, siloSuccessivo } from '@/lib/pipelineSilos'
 import { fmtData } from '@/lib/quadroaziendale'
+
+/** Chi eseguirà ogni fase (per la struttura di esecuzione agente). */
+const AGENTE_FASE: Record<string, string> = {
+  copy: 'Passaggio umano — Copy (Carlo / Paolo / Luigi)',
+  jelo: 'Passaggio umano — Avv. Jelo',
+  lavorazione: 'Agente unico testo + grafici (in arrivo, non ancora caricato)',
+  valentino: 'Agente grafica — blocco-impaginazione',
+}
 
 const fmtOra = (iso: string) =>
   new Date(iso).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' })
@@ -29,9 +37,10 @@ function durata(ms: number): string {
 function Scheda() {
   const params = useSearchParams()
   const slug = params.get('slug') ?? ''
-  const { state } = useApp()
+  const { state, avanzaSilo } = useApp()
   const clienti = useClientiPipeline()
   const c = clienti.find((x) => x.slug === slug)
+  const [mostraInnesto, setMostraInnesto] = useState(false)
 
   if (!c) {
     return (
@@ -80,6 +89,33 @@ function Scheda() {
           {primo && <p className="mt-0.5 text-[11px] text-inchiostro/45">dalla registrazione {fmtOra(log[0].dataOra)}</p>}
         </div>
       </div>
+
+      {/* esecuzione agente — struttura front-end, backend da collegare */}
+      {c.silo !== 'documenti' && c.silo !== 'consegnato' && (
+        <div className="mt-4 rounded-2xl border border-petrolio/25 bg-petrolio/[0.05] p-4 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-wide text-petrolio-scuro">Esecuzione agente — {siloCorr.label}</p>
+          <p className="mt-1 text-sm text-inchiostro">{siloCorr.spec}</p>
+          <p className="mt-2 text-[12px] text-inchiostro"><b>Agente:</b> {AGENTE_FASE[c.silo] ?? '—'}</p>
+
+          {/* flusso documenti tra fasi (predisposto, automatico) */}
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 text-[11px]">
+            <div className="rounded-lg border border-dashed border-inchiostro/20 bg-carta px-3 py-2 text-inchiostro/60">Documento in ingresso — dalla fase precedente <span className="text-inchiostro/40">(automatico, in arrivo)</span></div>
+            <div className="rounded-lg border border-dashed border-inchiostro/20 bg-carta px-3 py-2 text-inchiostro/60">Documento in uscita — verso la fase successiva <span className="text-inchiostro/40">(automatico, in arrivo)</span></div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button onClick={() => setMostraInnesto(true)} className="rounded-xl bg-petrolio px-4 py-2 text-sm font-semibold text-white transition hover:bg-petrolio-scuro">▶ Esegui «{siloCorr.label}» con l&rsquo;agente</button>
+            {siloSuccessivo(c.silo) && (
+              <button onClick={() => avanzaSilo(slug)} className="rounded-xl border border-linea bg-carta px-4 py-2 text-sm font-semibold text-inchiostro/70 transition hover:border-petrolio/40 hover:text-petrolio">✓ Fatto — avanza al prossimo silo</button>
+            )}
+          </div>
+          {mostraInnesto && (
+            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Struttura pronta: qui si innesta l&rsquo;agente reale. Lo colleghiamo (backend) appena carichi gli aggiornamenti — l&rsquo;operatore lancia, l&rsquo;agente lavora, poi si revisiona e si preme «Fatto — avanza».
+            </p>
+          )}
+        </div>
+      )}
 
       {/* log dei passaggi con durate */}
       <h2 className="font-display mt-8 text-xl font-bold tracking-tight text-inchiostro">Log dei passaggi</h2>

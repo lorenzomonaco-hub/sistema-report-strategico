@@ -46,6 +46,9 @@ export default function PaginaSilos() {
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <Link href="/erogazione/irene" className="rounded-xl border border-emerald-200 bg-carta px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">
+              Report AF — Irene →
+            </Link>
             <Link href="/amministrazione/consulenze-frank" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
               Gantt Consulenze Frank →
             </Link>
@@ -53,7 +56,7 @@ export default function PaginaSilos() {
         </header>
 
         {/* conteggio per silo, separato (non raggruppato) */}
-        <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           {SILOS.map((s) => (
             <div key={s.id} className="rounded-xl border border-linea bg-carta p-3 shadow-sm">
               <div className="flex items-center gap-1.5">

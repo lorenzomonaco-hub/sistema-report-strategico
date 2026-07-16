@@ -13,7 +13,7 @@
 
 import { CONSULENZE_FRANK, FaseFrank, slugFrank } from './consulenzeFrank'
 
-export type SiloId = 'documenti' | 'copy' | 'jelo' | 'grippo' | 'caputo' | 'valentino' | 'irene' | 'consegnato'
+export type SiloId = 'documenti' | 'copy' | 'jelo' | 'lavorazione' | 'valentino' | 'consegnato'
 
 export type Silo = {
   id: SiloId
@@ -26,6 +26,9 @@ export type Silo = {
 }
 
 // Step 0 (grigio, pre-pipeline) → scala rosso → verde lungo il flusso.
+// NB: Grippo (testo) e Caputo (immagini) sono uniti in un unico passaggio
+// «Revisione e grafici» (sarà un solo agente, più lungo). Irene NON è più nella
+// pipeline: ha un'area dedicata (/erogazione/irene) per i report AssessFirst.
 export const SILOS: Silo[] = [
   { id: 'documenti', ordine: 0, label: 'Documenti (step 0)', owner: 'Elisa',
     spec: 'La vendita è registrata dal tutor ma mancano i documenti. Elisa carica questionario, trascrizione e i 4 AssessFirst per persona. Quando è tutto presente, il cliente passa al Copy.',
@@ -36,22 +39,23 @@ export const SILOS: Silo[] = [
   { id: 'jelo', ordine: 2, label: 'Revisione avvocato Jelo', owner: 'Avv. Jelo', soloBranding: true,
     spec: 'Solo per i progetti di branding: verifica legale del marchio (~3 giorni lavorativi). Esce: ok legale.',
     colore: { pieno: 'bg-orange-500', track: 'bg-orange-500/15', testo: 'text-orange-700', punto: 'bg-orange-500' } },
-  { id: 'grippo', ordine: 3, label: 'Grippo — Testo', owner: 'Agente AI Grippo',
-    spec: 'Revisione del testo. Entra: bozza copy. Esce: testo revisionato e approvato.',
+  { id: 'lavorazione', ordine: 3, label: 'Revisione e grafici', owner: 'Agente AI (testo + grafici)',
+    spec: 'Un unico passaggio: revisione del testo e inserimento di diagrammi, tabelle e immagini. Entra: bozza copy. Esce: documento revisionato e con la parte visiva.',
     colore: { pieno: 'bg-amber-500', track: 'bg-amber-500/15', testo: 'text-amber-700', punto: 'bg-amber-500' } },
-  { id: 'caputo', ordine: 4, label: 'Caputo — Immagini', owner: 'Agente AI Caputo',
-    spec: 'Inserisce diagrammi, tabelle e immagini. Entra: testo revisionato. Esce: documento con la parte visiva.',
-    colore: { pieno: 'bg-lime-500', track: 'bg-lime-500/15', testo: 'text-lime-700', punto: 'bg-lime-600' } },
-  { id: 'valentino', ordine: 5, label: 'Valentino — Grafica', owner: 'Agente AI Valentino',
-    spec: 'Impaginazione e grafica finale. Entra: documento con immagini. Esce: report impaginato.',
+  { id: 'valentino', ordine: 4, label: 'Grafica finale', owner: 'Agente AI Valentino',
+    spec: 'Impaginazione e grafica finale. Entra: documento revisionato con immagini. Esce: report impaginato.',
     colore: { pieno: 'bg-green-500', track: 'bg-green-500/15', testo: 'text-green-700', punto: 'bg-green-600' } },
-  { id: 'irene', ordine: 6, label: 'Report Irene — AssessFirst', owner: 'Irene',
-    spec: 'Report AssessFirst (uno per dipendente): Irene revisiona e approva, poi assembla lo ZIP per il tutor.',
-    colore: { pieno: 'bg-emerald-600', track: 'bg-emerald-600/15', testo: 'text-emerald-700', punto: 'bg-emerald-600' } },
-  { id: 'consegnato', ordine: 7, label: 'Consegnato', owner: 'Delivery',
+  { id: 'consegnato', ordine: 5, label: 'Consegnato', owner: 'Delivery',
     spec: 'Report consegnato al cliente. Prossimo passaggio: consulenza con Frank.',
     colore: { pieno: 'bg-green-700', track: 'bg-green-700/15', testo: 'text-green-800', punto: 'bg-green-700' } },
 ]
+
+/** Normalizza valori di silo salvati con il vecchio modello (grippo/caputo/irene). */
+export function normalizzaSilo(id: string): SiloId {
+  if (id === 'grippo' || id === 'caputo') return 'lavorazione'
+  if (id === 'irene') return 'valentino'
+  return (SILOS.some((s) => s.id === id) ? id : 'documenti') as SiloId
+}
 
 export const siloById = (id: SiloId): Silo => SILOS.find((s) => s.id === id)!
 export const siloSuccessivo = (id: SiloId): SiloId | null => {
@@ -64,10 +68,10 @@ export const siloPrecedente = (id: SiloId): SiloId | null => {
 // La fase del Gantt (1..6) mappa sui silos di produzione. Lo step 0 "documenti"
 // e il silo "irene" (AssessFirst) non hanno una fase nel Gantt storico dei 34.
 const FASE_TO_SILO: Record<FaseFrank, SiloId> = {
-  1: 'copy', 2: 'jelo', 3: 'grippo', 4: 'caputo', 5: 'valentino', 6: 'consegnato',
+  1: 'copy', 2: 'jelo', 3: 'lavorazione', 4: 'lavorazione', 5: 'valentino', 6: 'consegnato',
 }
 export const SILO_TO_FASE: Record<SiloId, FaseFrank> = {
-  documenti: 1, copy: 1, jelo: 2, grippo: 3, caputo: 4, valentino: 5, irene: 6, consegnato: 6,
+  documenti: 1, copy: 1, jelo: 2, lavorazione: 3, valentino: 5, consegnato: 6,
 }
 
 /** È uno step di produzione con una fase 1..6 nel Gantt storico? (documenti = no) */

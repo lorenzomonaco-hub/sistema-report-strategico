@@ -180,7 +180,7 @@ export default function ConsulenzeFrank() {
             <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Quanti clienti in ogni fase</h3>
             <span className="text-[11px] text-inchiostro/45">{clienti.length} clienti · il progetto si chiude con la consulenza con Frank</span>
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-9">
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
             {SILOS.map((s) => (
               <div key={s.id} className="rounded-xl border border-linea bg-carta p-3 shadow-sm">
                 <div className="flex items-center gap-1.5">

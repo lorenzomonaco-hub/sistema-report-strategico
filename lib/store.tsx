@@ -8,7 +8,7 @@ import React, { createContext, useContext, useEffect, useReducer, useRef } from 
 import { AppState, Apprendimento, DocumentoAllegato, FaseId, PersonaAF, Pratica, VersioneDocumento, relazioneAF } from './types'
 import { CronologiaFasi, leggiStatoCondiviso, scriviStatoCondiviso, tokenDati } from './datiblocco'
 import { documentiTutorPronti, faseSuccessiva, faseById } from './fasi'
-import { SiloId, siloPrecedente, siloSeed, siloSuccessivo } from './pipelineSilos'
+import { SiloId, normalizzaSilo, siloPrecedente, siloSeed, siloSuccessivo } from './pipelineSilos'
 import { batteriaIdPerTipo, batteriaPerTipo, ETICHETTA_TIPO } from './batterie'
 import {
   REPORT_AI_MOCK,
@@ -70,10 +70,13 @@ export const slugPratica = (praticaId: string): string => `p-${praticaId}`
 
 /** Mappa silo completa e sicura: parte dal piano ufficiale dei 34 e vi
  *  sovrascrive lo stato salvato (che può mancare in stati vecchi). */
-const mappaSilos = (state: AppState): Record<string, SiloId> => ({
-  ...siloSeed(),
-  ...((state.siloClienti as Record<string, SiloId>) ?? {}),
-})
+const mappaSilos = (state: AppState): Record<string, SiloId> => {
+  const grezza = { ...siloSeed(), ...((state.siloClienti as Record<string, string>) ?? {}) }
+  // normalizza eventuali valori vecchi (grippo/caputo/irene → nuovi silos)
+  const pulita: Record<string, SiloId> = {}
+  for (const k in grezza) pulita[k] = normalizzaSilo(grezza[k])
+  return pulita
+}
 
 /** Aggiunge una voce al log dei passaggi di un cliente (timbra l'ora). */
 const logSilo = (state: AppState, slug: string, silo: SiloId): Record<string, { silo: string; dataOra: string }[]> => {

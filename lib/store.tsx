@@ -64,7 +64,7 @@ type Azione =
   | { type: 'SET_BLOCCO_INFO'; slug: string; nota: string; reminder?: string }
   | { type: 'AGGIUNGI_PERSONA'; praticaId: string; persona: PersonaAF }
   | { type: 'RIMUOVI_PERSONA'; praticaId: string; nome: string }
-  | { type: 'MODIFICA_ANAGRAFICA'; praticaId: string; azienda?: string; cliente?: string; email?: string }
+  | { type: 'MODIFICA_ANAGRAFICA'; praticaId: string; azienda?: string; cliente?: string; email?: string; dataVendita?: string }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 const ora = () => new Date().toISOString()
@@ -526,6 +526,7 @@ function reducer(state: AppState, azione: Azione): AppState {
         azienda: azione.azienda ?? p.azienda,
         cliente: azione.cliente ?? p.cliente,
         email: azione.email ?? p.email,
+        dataVendita: azione.dataVendita ?? p.dataVendita,
       }))
 
     default:
@@ -569,7 +570,7 @@ interface StoreContextValue {
   setBloccoInfo: (slug: string, nota: string, reminder?: string) => void
   aggiungiPersona: (praticaId: string, persona: PersonaAF) => void
   rimuoviPersona: (praticaId: string, nome: string) => void
-  modificaAnagrafica: (praticaId: string, campi: { azienda?: string; cliente?: string; email?: string }) => void
+  modificaAnagrafica: (praticaId: string, campi: { azienda?: string; cliente?: string; email?: string; dataVendita?: string }) => void
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)

@@ -289,6 +289,7 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
 function CompletaCliente({ pratica }: { pratica: Pratica }) {
   const { aggiungiPersona, rimuoviPersona, modificaAnagrafica } = useApp()
   const [email, setEmail] = useState(pratica.email)
+  const [dataVendita, setDataVendita] = useState(pratica.dataVendita ?? '')
   const [emailMsg, setEmailMsg] = useState(false)
   // sezione 1: titolari e soci
   const [sNome, setSNome] = useState('')
@@ -332,15 +333,19 @@ function CompletaCliente({ pratica }: { pratica: Pratica }) {
 
   return (
     <div className="space-y-4 border-t border-linea bg-inchiostro/[0.015] p-4">
-      {/* email titolare */}
+      {/* email titolare + data vendita */}
       <div className="flex flex-wrap items-end gap-2">
-        <div className="flex-1">
+        <div className="min-w-[220px] flex-1">
           <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Email titolare / cliente</label>
           <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setEmailMsg(false) }} placeholder="titolare@azienda.it" className={`w-full ${inp}`} />
         </div>
-        <button onClick={() => { modificaAnagrafica(pratica.id, { email: email.trim() }); setEmailMsg(true) }}
-          className="rounded-xl border border-linea bg-carta px-3 py-2 text-sm font-semibold text-inchiostro/70 hover:border-petrolio/40 hover:text-petrolio">Salva email</button>
-        {emailMsg && <span className="text-xs font-semibold text-green-700">✓ salvata</span>}
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Data vendita</label>
+          <input type="date" value={dataVendita} onChange={(e) => { setDataVendita(e.target.value); setEmailMsg(false) }} className={inp} />
+        </div>
+        <button onClick={() => { modificaAnagrafica(pratica.id, { email: email.trim(), dataVendita: dataVendita || undefined }); setEmailMsg(true) }}
+          className="rounded-xl border border-linea bg-carta px-3 py-2 text-sm font-semibold text-inchiostro/70 hover:border-petrolio/40 hover:text-petrolio">Salva dati</button>
+        {emailMsg && <span className="text-xs font-semibold text-green-700">✓ salvati</span>}
       </div>
 
       {/* sezione 1: titolari e soci */}
@@ -481,7 +486,7 @@ export default function PaginaTutor() {
                       <button onClick={() => setApertoId(aperto ? null : p.id)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-inchiostro/[0.02]">
                         <div className="min-w-0">
                           <p className="truncate font-display font-bold text-inchiostro">{p.cliente || p.azienda}</p>
-                          <p className="truncate text-xs text-inchiostro">{p.azienda} · {nPersone} {nPersone === 1 ? 'persona' : 'persone'} · registrato {dataIt(p.dataCreazione)}</p>
+                          <p className="truncate text-xs text-inchiostro">{p.azienda} · {nPersone} {nPersone === 1 ? 'persona' : 'persone'} · {p.dataVendita ? `venduto il ${dataIt(p.dataVendita)}` : 'data vendita da inserire'}</p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           {nPersone === 0

@@ -241,7 +241,7 @@ export function CartaRaccolta({ pratica, autore = 'Elisa', onConfermata }: {
         <div className="min-w-0">
           <h3 className="truncate font-display text-lg font-bold tracking-tight text-inchiostro">{pratica.cliente}</h3>
           <p className="truncate text-sm font-semibold text-inchiostro">{pratica.azienda}</p>
-          <p className="mt-0.5 text-xs text-inchiostro">tutor {pratica.tutor} · registrato il {dataIt(pratica.dataCreazione)} · {pratica.dipendenti.length} {pratica.dipendenti.length === 1 ? 'persona' : 'persone'}</p>
+          <p className="mt-0.5 text-xs text-inchiostro">tutor {pratica.tutor} · {pratica.dataVendita ? `venduto il ${dataIt(pratica.dataVendita)}` : 'data vendita da inserire'} · {pratica.dipendenti.length} {pratica.dipendenti.length === 1 ? 'persona' : 'persone'}</p>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
           <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> Step 0 — documenti mancanti

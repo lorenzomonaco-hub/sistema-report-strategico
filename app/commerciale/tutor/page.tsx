@@ -17,12 +17,6 @@ import { PersonaAF, Pratica } from '@/lib/types'
 import { documentiTutorPronti } from '@/lib/fasi'
 import { TUTOR_FRANK } from '@/lib/consulenzeFrank'
 
-const QUALIFICHE: { val: PersonaAF['qualifica']; label: string }[] = [
-  { val: 'titolare', label: 'Titolare' },
-  { val: 'socio', label: 'Socio' },
-  { val: 'dipendente', label: 'Dipendente' },
-]
-
 /** Elenco tutor (nomi reali) e loro email [nome].[cognome]@metodomerenda.com */
 const TUTORS = TUTOR_FRANK.map((t) => t.tutor).sort((a, b) => a.localeCompare(b))
 function emailTutor(nome: string): string {
@@ -291,65 +285,125 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
 }
 
 // ─── Editor: completa l'anagrafica di un cliente esistente ───
+// Stesso schema della registrazione: Titolari e soci (illimitati) + Dipendenti (max 3).
 function CompletaCliente({ pratica }: { pratica: Pratica }) {
   const { aggiungiPersona, rimuoviPersona, modificaAnagrafica } = useApp()
   const [email, setEmail] = useState(pratica.email)
-  const [pNome, setPNome] = useState('')
-  const [pCognome, setPCognome] = useState('')
-  const [pEmail, setPEmail] = useState('')
-  const [pQual, setPQual] = useState<PersonaAF['qualifica']>('titolare')
-  const [msg, setMsg] = useState('')
+  const [emailMsg, setEmailMsg] = useState(false)
+  // sezione 1: titolari e soci
+  const [sNome, setSNome] = useState('')
+  const [sCognome, setSCognome] = useState('')
+  const [sEmail, setSEmail] = useState('')
+  const [sTipo, setSTipo] = useState<'titolare' | 'socio'>('socio')
+  // sezione 2: dipendenti (max 3)
+  const [dNome, setDNome] = useState('')
+  const [dCognome, setDCognome] = useState('')
+  const [dEmail, setDEmail] = useState('')
+  const [dQual, setDQual] = useState('')
+  const [err, setErr] = useState('')
 
-  const aggiungi = () => {
-    const n = pNome.trim(), c = pCognome.trim()
-    if (!n || !c) return setMsg('Servono nome e cognome.')
+  const soci = pratica.dipendenti.filter((d) => d.qualifica !== 'dipendente')
+  const dipendenti = pratica.dipendenti.filter((d) => d.qualifica === 'dipendente')
+  const inElenco = (nome: string) => pratica.dipendenti.some((d) => d.nome.toLowerCase() === nome.toLowerCase())
+
+  const aggiungiSocio = () => {
+    const n = sNome.trim(), c = sCognome.trim(), em = sEmail.trim()
+    if (!n || !c) return setErr('Titolari e soci: servono nome e cognome.')
+    if (!em || !em.includes('@')) return setErr('Titolari e soci: l’email è obbligatoria (per l’AssessFirst).')
     const nomeCompleto = `${n} ${c}`
-    if (pratica.dipendenti.some((d) => d.nome.toLowerCase() === nomeCompleto.toLowerCase())) return setMsg('Persona già in elenco.')
-    const ruolo = QUALIFICHE.find((q) => q.val === pQual)!.label
-    aggiungiPersona(pratica.id, { nome: nomeCompleto, email: pEmail.trim(), qualifica: pQual, ruolo })
-    setPNome(''); setPCognome(''); setPEmail(''); setMsg('')
+    if (inElenco(nomeCompleto)) return setErr('Persona già in elenco.')
+    aggiungiPersona(pratica.id, { nome: nomeCompleto, email: em, qualifica: sTipo, ruolo: sTipo === 'titolare' ? 'Titolare' : 'Socio' })
+    setSNome(''); setSCognome(''); setSEmail(''); setErr('')
   }
 
+  const aggiungiDip = () => {
+    const n = dNome.trim(), c = dCognome.trim(), em = dEmail.trim(), q = dQual.trim()
+    if (!n || !c) return setErr('Dipendenti: servono nome e cognome.')
+    if (!em || !em.includes('@')) return setErr('Dipendenti: l’email è obbligatoria (per l’AssessFirst).')
+    if (!q) return setErr('Dipendenti: scrivi la qualifica in azienda.')
+    if (dipendenti.length >= MAX_DIPENDENTI) return setErr(`Massimo ${MAX_DIPENDENTI} dipendenti per azienda.`)
+    const nomeCompleto = `${n} ${c}`
+    if (inElenco(nomeCompleto)) return setErr('Persona già in elenco.')
+    aggiungiPersona(pratica.id, { nome: nomeCompleto, email: em, qualifica: 'dipendente', ruolo: q })
+    setDNome(''); setDCognome(''); setDEmail(''); setDQual(''); setErr('')
+  }
+
+  const inp = 'rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35 focus:border-petrolio focus:outline-none focus:ring-2 focus:ring-petrolio/15'
+
   return (
-    <div className="border-t border-linea bg-inchiostro/[0.015] p-4">
-      {/* email cliente */}
+    <div className="space-y-4 border-t border-linea bg-inchiostro/[0.015] p-4">
+      {/* email titolare */}
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex-1">
           <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Email titolare / cliente</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="titolare@azienda.it"
-            className="w-full rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35 focus:border-petrolio focus:outline-none focus:ring-2 focus:ring-petrolio/15" />
+          <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setEmailMsg(false) }} placeholder="titolare@azienda.it" className={`w-full ${inp}`} />
         </div>
-        <button onClick={() => { modificaAnagrafica(pratica.id, { email: email.trim() }); setMsg('Email salvata.') }}
+        <button onClick={() => { modificaAnagrafica(pratica.id, { email: email.trim() }); setEmailMsg(true) }}
           className="rounded-xl border border-linea bg-carta px-3 py-2 text-sm font-semibold text-inchiostro/70 hover:border-petrolio/40 hover:text-petrolio">Salva email</button>
+        {emailMsg && <span className="text-xs font-semibold text-green-700">✓ salvata</span>}
       </div>
 
-      {/* aggiungi persone */}
-      <p className="mt-4 mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Persone da valutare — titolari, soci, dipendenti</p>
-      <div className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto_auto]">
-        <input value={pNome} onChange={(e) => setPNome(e.target.value)} placeholder="Nome" className="rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35" />
-        <input value={pCognome} onChange={(e) => setPCognome(e.target.value)} placeholder="Cognome" className="rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35" />
-        <input type="email" value={pEmail} onChange={(e) => setPEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungi() } }} placeholder="email" className="rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35" />
-        <select value={pQual} onChange={(e) => setPQual(e.target.value as PersonaAF['qualifica'])} aria-label="Qualifica" className="rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro">
-          {QUALIFICHE.map((q) => <option key={q.val} value={q.val}>{q.label}</option>)}
-        </select>
-        <button onClick={aggiungi} className="rounded-xl border border-petrolio/30 bg-carta px-4 py-2 text-sm font-semibold text-petrolio hover:bg-petrolio/10">+ Aggiungi</button>
+      {/* sezione 1: titolari e soci */}
+      <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-sm font-bold text-indigo-900">1 · Titolari e soci</p>
+          <span className="text-[11px] font-semibold text-indigo-500">{soci.length} inseriti · illimitati</span>
+        </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto_auto]">
+          <input value={sNome} onChange={(e) => setSNome(e.target.value)} placeholder="Nome" className={inp} />
+          <input value={sCognome} onChange={(e) => setSCognome(e.target.value)} placeholder="Cognome" className={inp} />
+          <input type="email" value={sEmail} onChange={(e) => setSEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungiSocio() } }} placeholder="email" className={inp} />
+          <div className="flex overflow-hidden rounded-lg border border-linea">
+            {(['titolare', 'socio'] as const).map((t) => (
+              <button key={t} type="button" onClick={() => setSTipo(t)} className={`px-3 text-xs font-semibold capitalize ${sTipo === t ? 'bg-indigo-500 text-white' : 'bg-carta text-inchiostro/50'}`}>{t}</button>
+            ))}
+          </div>
+          <button onClick={aggiungiSocio} className="rounded-xl border border-indigo-200 bg-carta px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">+ Aggiungi</button>
+        </div>
+        {soci.length > 0 && (
+          <ul className="mt-2 space-y-1.5">
+            {soci.map((d) => (
+              <li key={d.nome} className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-100 bg-carta px-3 py-1.5 text-sm">
+                <span className="font-semibold text-inchiostro">{d.nome}</span>
+                <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-700">{d.ruolo}</span>
+                {d.email && <span className="text-inchiostro/60">{d.email}</span>}
+                <button onClick={() => rimuoviPersona(pratica.id, d.nome)} className="ml-auto text-xs font-semibold text-rose-500 hover:text-rose-700">rimuovi</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-      {msg && <p className="mt-1.5 text-xs text-inchiostro/60">{msg}</p>}
 
-      {pratica.dipendenti.length > 0 && (
-        <ul className="mt-3 space-y-1.5">
-          {pratica.dipendenti.map((d) => (
-            <li key={d.nome} className="flex flex-wrap items-center gap-2 rounded-xl border border-linea bg-carta px-3 py-2 text-sm">
-              <span className="font-semibold text-inchiostro">{d.nome}</span>
-              <span className="rounded-full bg-inchiostro/10 px-2 py-0.5 text-[11px] font-medium text-inchiostro">{d.ruolo}</span>
-              {d.email && <span className="text-inchiostro/60">{d.email}</span>}
-              <button onClick={() => rimuoviPersona(pratica.id, d.nome)} className="ml-auto text-xs font-semibold text-rose-500 hover:text-rose-700">rimuovi</button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* sezione 2: dipendenti strategici */}
+      <div className="rounded-xl border border-sky-100 bg-sky-50/40 p-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-sm font-bold text-sky-900">2 · Dipendenti strategici</p>
+          <span className={`text-[11px] font-semibold ${dipendenti.length >= MAX_DIPENDENTI ? 'text-amber-700' : 'text-sky-500'}`}>{dipendenti.length}/{MAX_DIPENDENTI}</span>
+        </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+          <input value={dNome} onChange={(e) => setDNome(e.target.value)} placeholder="Nome" className={inp} disabled={dipendenti.length >= MAX_DIPENDENTI} />
+          <input value={dCognome} onChange={(e) => setDCognome(e.target.value)} placeholder="Cognome" className={inp} disabled={dipendenti.length >= MAX_DIPENDENTI} />
+          <input type="email" value={dEmail} onChange={(e) => setDEmail(e.target.value)} placeholder="email" className={inp} disabled={dipendenti.length >= MAX_DIPENDENTI} />
+          <input value={dQual} onChange={(e) => setDQual(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungiDip() } }} placeholder="qualifica in azienda" className={inp} disabled={dipendenti.length >= MAX_DIPENDENTI} />
+          <button onClick={aggiungiDip} disabled={dipendenti.length >= MAX_DIPENDENTI} className="rounded-xl border border-sky-200 bg-carta px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-40">+ Aggiungi</button>
+        </div>
+        {dipendenti.length > 0 && (
+          <ul className="mt-2 space-y-1.5">
+            {dipendenti.map((d) => (
+              <li key={d.nome} className="flex flex-wrap items-center gap-2 rounded-xl border border-sky-100 bg-carta px-3 py-1.5 text-sm">
+                <span className="font-semibold text-inchiostro">{d.nome}</span>
+                <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-700">{d.ruolo}</span>
+                {d.email && <span className="text-inchiostro/60">{d.email}</span>}
+                <button onClick={() => rimuoviPersona(pratica.id, d.nome)} className="ml-auto text-xs font-semibold text-rose-500 hover:text-rose-700">rimuovi</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
-      <p className="mt-3 text-[11px] text-inchiostro/60">
+      {err && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{err}</p>}
+
+      <p className="text-[11px] text-inchiostro/60">
         Completata l&rsquo;anagrafica, <Link href="/commerciale/elisa" className="font-semibold text-petrolio hover:underline">Elisa</Link> carica i documenti (questionario, trascrizione, AssessFirst) e avvia la pipeline.
       </p>
     </div>

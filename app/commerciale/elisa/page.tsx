@@ -36,7 +36,8 @@ export default function PaginaElisa() {
   const { state } = useApp()
   const [aziendaConfermata, setAziendaConfermata] = useState<string | null>(null)
 
-  const step0 = state.pratiche.filter((p) => p.faseCorrente === 'vendita' || p.faseCorrente === 'raccolta-documenti')
+  // Solo i clienti che il tutor ha esplicitamente inviato a Elisa compaiono qui.
+  const step0 = state.pratiche.filter((p) => (p.faseCorrente === 'vendita' || p.faseCorrente === 'raccolta-documenti') && p.inviatoElisa)
   const daCaricare = step0.filter((p) => !documentiTutorPronti(p))
   const pronti = step0.filter((p) => documentiTutorPronti(p))
   const avviate = state.pratiche.filter((p) => indiceFase(p.faseCorrente) >= indiceFase('generazione'))
@@ -62,7 +63,7 @@ export default function PaginaElisa() {
               />
             )}
             {step0.length === 0 ? (
-              <EmptyState titolo="Nessun cliente allo step 0" sottotitolo="Quando un tutor registra un cliente, comparirà qui per il caricamento dei documenti." icona="📂" />
+              <EmptyState titolo="Nessun cliente da lavorare" sottotitolo="Compaiono qui solo i clienti che il tutor ti invia esplicitamente dalla sua area (bottone «Invia a Elisa»)." icona="📂" />
             ) : (
               <>
                 {daCaricare.map((p) => <CartaRaccolta key={p.id} pratica={p} autore="Elisa" onConfermata={setAziendaConfermata} />)}

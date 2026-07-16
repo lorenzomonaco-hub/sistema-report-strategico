@@ -16,6 +16,7 @@ import EmptyState from '@/components/EmptyState'
 import { PersonaAF, Pratica } from '@/lib/types'
 import { documentiTutorPronti } from '@/lib/fasi'
 import { TUTOR_FRANK, IN_ATTESA } from '@/lib/consulenzeFrank'
+import { SlotUpload } from '@/components/RaccoltaDocumenti'
 
 /** Dati vendita dei clienti importati «in attesa» (dal file "Report in lavorazione"):
  *  prodotto acquistato, data fattura e prezzo. Servono a precompilare l'anagrafica
@@ -298,7 +299,11 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
 // ─── Editor: completa l'anagrafica di un cliente esistente ───
 // Stesso schema della registrazione: Titolari e soci (illimitati) + Dipendenti (max 3).
 function CompletaCliente({ pratica }: { pratica: Pratica }) {
-  const { aggiungiPersona, rimuoviPersona, modificaAnagrafica } = useApp()
+  const { aggiungiPersona, rimuoviPersona, modificaAnagrafica, inviaElisa } = useApp()
+  // I 52 clienti importati «in attesa» (id pr-attesa-*) possono avere PIÙ di 3
+  // dipendenti; per i clienti registrati ex-novo resta il limite di MAX_DIPENDENTI.
+  const dipIllimitati = pratica.id.startsWith('pr-attesa-')
+  const limiteDip = dipIllimitati ? Infinity : MAX_DIPENDENTI
   // valori dal file "Report in lavorazione" (se il cliente è tra gli importati):
   // precompilano i campi ma NON sovrascrivono quanto già inserito dal tutor.
   const fonte = VENDITA_ATTESA.get(pratica.id)
@@ -338,7 +343,7 @@ function CompletaCliente({ pratica }: { pratica: Pratica }) {
     if (!n || !c) return setErr('Dipendenti: servono nome e cognome.')
     if (!em || !em.includes('@')) return setErr('Dipendenti: l’email è obbligatoria (per l’AssessFirst).')
     if (!q) return setErr('Dipendenti: scrivi la qualifica in azienda.')
-    if (dipendenti.length >= MAX_DIPENDENTI) return setErr(`Massimo ${MAX_DIPENDENTI} dipendenti per azienda.`)
+    if (dipendenti.length >= limiteDip) return setErr(`Massimo ${MAX_DIPENDENTI} dipendenti per azienda.`)
     const nomeCompleto = `${n} ${c}`
     if (inElenco(nomeCompleto)) return setErr('Persona già in elenco.')
     aggiungiPersona(pratica.id, { nome: nomeCompleto, email: em, qualifica: 'dipendente', ruolo: q })
@@ -381,6 +386,16 @@ function CompletaCliente({ pratica }: { pratica: Pratica }) {
         </div>
       </div>
 
+      {/* documenti azienda — il tutor può già caricarli se sa che sono stati compilati */}
+      <div className="rounded-xl border border-linea bg-carta/60 p-3">
+        <p className="text-sm font-bold text-inchiostro">Documenti dell&rsquo;azienda <span className="font-normal text-inchiostro/45">— se già compilati (facoltativo)</span></p>
+        <p className="mt-0.5 text-[11px] text-inchiostro/55">Se questionario e/o trascrizione esistono già, caricali qui: Elisa se li ritrova pronti. Altrimenti li carica lei.</p>
+        <div className="mt-2 space-y-1.5">
+          <SlotUpload pratica={pratica} categoria="questionario" label="Questionario" autore={`${pratica.tutor} (Tutor)`} />
+          <SlotUpload pratica={pratica} categoria="trascrizione" label="Trascrizione" autore={`${pratica.tutor} (Tutor)`} />
+        </div>
+      </div>
+
       {/* sezione 1: titolari e soci */}
       <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -416,14 +431,16 @@ function CompletaCliente({ pratica }: { pratica: Pratica }) {
       <div className="rounded-xl border border-sky-100 bg-sky-50/40 p-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-sm font-bold text-sky-900">2 · Dipendenti strategici</p>
-          <span className={`text-[11px] font-semibold ${dipendenti.length >= MAX_DIPENDENTI ? 'text-amber-700' : 'text-sky-500'}`}>{dipendenti.length}/{MAX_DIPENDENTI}</span>
+          <span className={`text-[11px] font-semibold ${!dipIllimitati && dipendenti.length >= limiteDip ? 'text-amber-700' : 'text-sky-500'}`}>
+            {dipIllimitati ? `${dipendenti.length} inseriti · illimitati` : `${dipendenti.length}/${MAX_DIPENDENTI}`}
+          </span>
         </div>
         <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr_auto]">
-          <input value={dNome} onChange={(e) => setDNome(e.target.value)} placeholder="Nome" className={inp} disabled={dipendenti.length >= MAX_DIPENDENTI} />
-          <input value={dCognome} onChange={(e) => setDCognome(e.target.value)} placeholder="Cognome" className={inp} disabled={dipendenti.length >= MAX_DIPENDENTI} />
-          <input type="email" value={dEmail} onChange={(e) => setDEmail(e.target.value)} placeholder="email" className={inp} disabled={dipendenti.length >= MAX_DIPENDENTI} />
-          <input value={dQual} onChange={(e) => setDQual(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungiDip() } }} placeholder="qualifica in azienda" className={inp} disabled={dipendenti.length >= MAX_DIPENDENTI} />
-          <button onClick={aggiungiDip} disabled={dipendenti.length >= MAX_DIPENDENTI} className="rounded-xl border border-sky-200 bg-carta px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-40">+ Aggiungi</button>
+          <input value={dNome} onChange={(e) => setDNome(e.target.value)} placeholder="Nome" className={inp} disabled={dipendenti.length >= limiteDip} />
+          <input value={dCognome} onChange={(e) => setDCognome(e.target.value)} placeholder="Cognome" className={inp} disabled={dipendenti.length >= limiteDip} />
+          <input type="email" value={dEmail} onChange={(e) => setDEmail(e.target.value)} placeholder="email" className={inp} disabled={dipendenti.length >= limiteDip} />
+          <input value={dQual} onChange={(e) => setDQual(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungiDip() } }} placeholder="qualifica in azienda" className={inp} disabled={dipendenti.length >= limiteDip} />
+          <button onClick={aggiungiDip} disabled={dipendenti.length >= limiteDip} className="rounded-xl border border-sky-200 bg-carta px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-40">+ Aggiungi</button>
         </div>
         {dipendenti.length > 0 && (
           <ul className="mt-2 space-y-1.5">
@@ -441,9 +458,26 @@ function CompletaCliente({ pratica }: { pratica: Pratica }) {
 
       {err && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{err}</p>}
 
-      <p className="text-[11px] text-inchiostro/60">
-        Completata l&rsquo;anagrafica, <Link href="/commerciale/elisa" className="font-semibold text-petrolio hover:underline">Elisa</Link> carica i documenti (questionario, trascrizione, AssessFirst) e avvia la pipeline.
-      </p>
+      {/* invio a Elisa: SOLO i clienti inviati da qui compaiono nell'area Elisa */}
+      <div className="rounded-xl border border-petrolio/25 bg-petrolio/[0.05] p-3">
+        {pratica.inviatoElisa ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 text-[11px] font-bold text-green-700">✓ Inviato a Elisa</span>
+            <span className="text-[11px] text-inchiostro/55">Elisa lo vede nella sua area e completa i documenti.</span>
+            <button onClick={() => inviaElisa(pratica.id, false, `${pratica.tutor} (Tutor)`)}
+              className="ml-auto text-[11px] font-semibold text-rose-500 hover:text-rose-700">annulla invio</button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-inchiostro">Invia a Elisa</p>
+              <p className="text-[11px] text-inchiostro/55">Quando l&rsquo;anagrafica è a posto, invia il cliente a Elisa: solo così comparirà nella sua area per il caricamento documenti.</p>
+            </div>
+            <button onClick={() => inviaElisa(pratica.id, true, `${pratica.tutor} (Tutor)`)}
+              className="ml-auto shrink-0 rounded-xl bg-petrolio px-4 py-2 text-sm font-semibold text-white hover:bg-petrolio-scuro">📨 Invia a Elisa</button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -527,6 +561,7 @@ export default function PaginaTutor() {
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
+                          {p.inviatoElisa && <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[11px] font-semibold text-green-700">✓ inviato a Elisa</span>}
                           {nPersone === 0
                             ? <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-[11px] font-semibold text-red-700">anagrafica da completare</span>
                             : <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">{nPersone} person{nPersone === 1 ? 'a' : 'e'}{pronti ? ' · pronto' : ''}</span>}

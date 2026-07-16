@@ -67,6 +67,7 @@ type Azione =
   | { type: 'MODIFICA_ANAGRAFICA'; praticaId: string; azienda?: string; cliente?: string; email?: string; dataVendita?: string; prodotto?: string; prezzo?: string }
   | { type: 'AGGIUNGI_NOTA_CLIENTE'; chiave: string; testo: string; autore: string }
   | { type: 'RIMUOVI_NOTA_CLIENTE'; chiave: string; id: string }
+  | { type: 'INVIA_ELISA'; praticaId: string; inviato: boolean; autore: string }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 const ora = () => new Date().toISOString()
@@ -553,6 +554,16 @@ function reducer(state: AppState, azione: Azione): AppState {
       return { ...state, noteClienti: { ...note, [azione.chiave]: (note[azione.chiave] ?? []).filter((n) => n.id !== azione.id) } }
     }
 
+    case 'INVIA_ELISA':
+      return aggiornaPratica(state, azione.praticaId, (p) => ({
+        ...p,
+        inviatoElisa: azione.inviato,
+        storico: [
+          ...p.storico,
+          { fase: p.faseCorrente, azione: azione.inviato ? 'Inviato a Elisa per il caricamento documenti' : 'Invio a Elisa annullato', autore: azione.autore, dataOra: ora() },
+        ],
+      }))
+
     default:
       return state
   }
@@ -599,6 +610,8 @@ interface StoreContextValue {
   noteClienti: Record<string, NotaCliente[]>
   aggiungiNotaCliente: (chiave: string, testo: string, autore: string) => void
   rimuoviNotaCliente: (chiave: string, id: string) => void
+  /** il tutor invia (o ritira) un cliente all'area Elisa */
+  inviaElisa: (praticaId: string, inviato: boolean, autore: string) => void
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -755,6 +768,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     noteClienti: state.noteClienti ?? {},
     aggiungiNotaCliente: (chiave, testo, autore) => dispatch({ type: 'AGGIUNGI_NOTA_CLIENTE', chiave, testo, autore }),
     rimuoviNotaCliente: (chiave, id) => dispatch({ type: 'RIMUOVI_NOTA_CLIENTE', chiave, id }),
+    inviaElisa: (praticaId, inviato, autore) => dispatch({ type: 'INVIA_ELISA', praticaId, inviato, autore }),
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

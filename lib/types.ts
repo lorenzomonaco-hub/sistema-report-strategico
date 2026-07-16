@@ -158,6 +158,8 @@ export interface Pratica {
   reportAF?: StatoReportAF
   /** chat del checkpoint copy */
   chatCopy?: MessaggioChat[]
+  /** il tutor ha inviato il cliente a Elisa: SOLO questi compaiono nell'area Elisa */
+  inviatoElisa?: boolean
 }
 
 export interface Apprendimento {

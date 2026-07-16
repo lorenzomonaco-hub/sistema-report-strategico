@@ -38,7 +38,7 @@ function nomeCorrisponde(nomeFile: string, persona: string): boolean {
 }
 
 // ─── Slot di caricamento REALE di un singolo file ───
-function SlotUpload({ pratica, categoria, sottotipo, dipendente, label, autore }: {
+export function SlotUpload({ pratica, categoria, sottotipo, dipendente, label, autore }: {
   pratica: Pratica; categoria: DocumentoAllegato['tipo']; sottotipo?: string; dipendente?: string; label: string; autore: string
 }) {
   const { registraAllegato, rimuoviAllegato } = useApp()

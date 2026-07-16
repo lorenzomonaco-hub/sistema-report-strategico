@@ -31,6 +31,9 @@ export default function TutorIndex() {
             <p className="mt-1 max-w-2xl text-sm text-inchiostro/55">
               {inProd} clienti in produzione + {inAttesa} in attesa (questionario/AssessFirst non ancora compilati), {TUTOR_FRANK.length} tutor. Il badge rosso segnala chi non ha ancora prenotato la consulenza con Frank.
             </p>
+            <p className="mt-1 max-w-2xl text-[12px] text-inchiostro/50">
+              Pronto per consulenza: <b className="text-inchiostro/70">{PRONTO_CONSULENZA.length}</b> clienti col report finito · <span className="font-semibold text-green-700">{PRONTO_CONSULENZA.filter((c) => c.consulenza).length} fissate</span> · <span className="font-semibold text-rose-700">{PRONTO_CONSULENZA.filter((c) => !c.consulenza).length} da fissare</span> (elencati dentro la casella di ogni tutor).
+            </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <ExportTutorExcel />
@@ -74,16 +77,6 @@ export default function TutorIndex() {
                   <span className="shrink-0 rounded-full bg-inchiostro/[0.06] px-2 py-0.5 text-[11px] font-bold text-inchiostro/60">{t.totale}</span>
                 </div>
                 <p className="mt-1 text-[11px] text-inchiostro/45">{t.produzione} in produzione · {t.inAttesa} in attesa</p>
-                {(() => {
-                  const pc = pcMap.get(t.tutor.toUpperCase())
-                  if (!pc) return null
-                  return (
-                    <p className="mt-0.5 text-[11px] text-inchiostro/45">
-                      {pc.totale} pronto consulenza
-                      {pc.daFissare.length > 0 && <span className="font-semibold text-rose-700"> · {pc.daFissare.length} da prenotare</span>}
-                    </p>
-                  )
-                })()}
                 <div className="mt-2">
                   {t.senzaConsulenza > 0 ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700">
@@ -99,42 +92,34 @@ export default function TutorIndex() {
                     </span>
                   )}
                 </div>
+                {(() => {
+                  const pc = pcMap.get(t.tutor.toUpperCase())
+                  if (!pc) return null
+                  return (
+                    <div className="mt-3 border-t border-linea/60 pt-2">
+                      <p className="text-[11px]">
+                        <span className="font-semibold text-inchiostro/60">Pronto per consulenza</span>
+                        {' · '}<span className="font-semibold text-green-700">{pc.fissate.length} fissate</span>
+                        {pc.daFissare.length > 0 && <span className="font-semibold text-rose-700"> · {pc.daFissare.length} da fissare</span>}
+                      </p>
+                      <ul className="mt-1.5 space-y-1">
+                        {[...pc.fissate, ...pc.daFissare].map((c, i) => (
+                          <li key={c.cliente + i} className="flex items-center justify-between gap-2 border-t border-linea/50 pt-1 text-[11px] first:border-t-0 first:pt-0">
+                            <span className="min-w-0 truncate text-inchiostro">{c.cliente}</span>
+                            {c.consulenza
+                              ? <span className="shrink-0 font-semibold text-green-700">{fmtGiorno(c.consulenza)}{c.ora ? ` · ${c.ora}` : ''}</span>
+                              : <span className="shrink-0 font-semibold text-rose-600">da fissare</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )
+                })()}
               </Carta>
             </Link>
           ))}
         </div>
 
-        {/* Pronto per consulenza — per tutor (report finito, in attesa consulenza) */}
-        <div className="mt-10">
-          <div className="flex flex-wrap items-baseline gap-2">
-            <h2 className="font-display text-xl font-bold tracking-tight text-inchiostro">Pronto per consulenza — per tutor</h2>
-            <span className="text-[11px] text-inchiostro/55">{PRONTO_CONSULENZA.length} clienti col report finito · {PRONTO_CONSULENZA.filter((c) => c.consulenza).length} consulenza fissata · {PRONTO_CONSULENZA.filter((c) => !c.consulenza).length} da fissare</span>
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {pcPerTutor().map((g) => (
-              <Carta key={g.tutor} className="h-full">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-display text-base font-bold text-inchiostro">{g.tutor}</p>
-                  <span className="shrink-0 rounded-full bg-inchiostro/[0.06] px-2 py-0.5 text-[11px] font-bold text-inchiostro/60">{g.totale}</span>
-                </div>
-                <p className="mt-1 text-[11px]">
-                  <span className="font-semibold text-green-700">{g.fissate.length} fissate</span>
-                  {g.daFissare.length > 0 && <span className="font-semibold text-rose-700"> · {g.daFissare.length} da fissare</span>}
-                </p>
-                <ul className="mt-2 space-y-1">
-                  {g.totale > 0 && [...g.fissate, ...g.daFissare].map((c, i) => (
-                    <li key={c.cliente + i} className="flex items-center justify-between gap-2 border-t border-linea/60 pt-1 text-[11px] first:border-t-0 first:pt-0">
-                      <span className="min-w-0 truncate text-inchiostro">{c.cliente}</span>
-                      {c.consulenza
-                        ? <span className="shrink-0 font-semibold text-green-700">{fmtGiorno(c.consulenza)}{c.ora ? ` · ${c.ora}` : ''}</span>
-                        : <span className="shrink-0 font-semibold text-rose-600">da fissare</span>}
-                    </li>
-                  ))}
-                </ul>
-              </Carta>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   )

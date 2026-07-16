@@ -220,4 +220,7 @@ export interface AppState {
    *  gli apprendimenti di DEMO vengono ripuliti al caricamento. I clienti reali
    *  vengono creati dopo, con il flag già a true, quindi non vengono toccati. */
   seedPulito?: boolean
+  /** Flag di migrazione: i 52 clienti «in attesa questionario» sono stati
+   *  importati come Pratiche reali (una volta sola). */
+  clientiAttesaSeed?: boolean
 }

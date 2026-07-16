@@ -29,10 +29,13 @@ export default function PaginaSilos() {
   const [colonnaAttiva, setColonnaAttiva] = useState<SiloId | null>(null)
   const haTrascinatoRef = useRef(false)
 
+  const [q, setQ] = useState('')
   const ordinati = useMemo(() => [...clienti].sort(perConsegna), [clienti])
-  const perSilo = (id: SiloId) => ordinati.filter((c) => c.silo === id)
-  const nuovi = clienti.filter((c) => c.origine === 'nuovo').length
-  const attesa = clienti.filter((c) => c.origine === 'attesa').length
+  const query = q.trim().toLowerCase()
+  const combacia = (c: (typeof ordinati)[number]) =>
+    !query || c.nome.toLowerCase().includes(query) || c.owner.toLowerCase().includes(query) || c.tutor.toLowerCase().includes(query)
+  const perSilo = (id: SiloId) => ordinati.filter((c) => c.silo === id && combacia(c))
+  const trovati = query ? ordinati.filter(combacia).length : 0
 
   return (
     <div className="min-h-screen flex-1 sfondo-trama">
@@ -42,7 +45,7 @@ export default function PaginaSilos() {
             <p className="text-xs font-semibold uppercase tracking-widest text-ambra">Erogazione · pipeline a silos</p>
             <h1 className="font-display mt-1 text-3xl font-bold tracking-tight text-inchiostro">Il flusso di lavoro, per silo</h1>
             <p className="mt-1 max-w-3xl text-sm text-inchiostro/55">
-              {clienti.length} clienti nei {SILOS.length} silos{nuovi > 0 ? ` · ${nuovi} nuovi` : ''}{attesa > 0 ? ` · ${attesa} in attesa (questionario mancante)` : ''}. Trascina una card (o usa le frecce) per spostarla al silo successivo — Gantt e vista tutor si aggiornano da soli. I clienti entrano allo <b>step 0</b> e avanzano quando Elisa completa i documenti. Chi non ha ancora il questionario resta fermo allo step 0.
+              {clienti.length} clienti nei {SILOS.length} silos. Trascina una card (o usa le frecce) per spostarla al silo successivo — Gantt e reportistica si aggiornano da soli. I clienti entrano allo <b>step 0</b> e avanzano quando Elisa completa i documenti.
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -52,8 +55,25 @@ export default function PaginaSilos() {
           </div>
         </header>
 
+        {/* ricerca cliente */}
+        <div className="mt-6">
+          <div className="relative max-w-md">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-inchiostro/35">🔍</span>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Cerca un cliente per nome, azienda o tutor…"
+              className="w-full rounded-xl border border-linea bg-carta py-2 pl-9 pr-9 text-sm text-inchiostro placeholder:text-inchiostro/35 transition focus:border-petrolio focus:outline-none focus:ring-2 focus:ring-petrolio/15"
+            />
+            {q && (
+              <button onClick={() => setQ('')} aria-label="Pulisci ricerca" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-1.5 text-inchiostro/40 hover:text-inchiostro">✕</button>
+            )}
+          </div>
+          {query && <p className="mt-1 text-xs text-inchiostro/50">{trovati} client{trovati === 1 ? 'e' : 'i'} trovati per «{q}»</p>}
+        </div>
+
         {/* conteggio per silo, separato (non raggruppato) */}
-        <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
           {SILOS.map((s) => (
             <div key={s.id} className="rounded-xl border border-linea bg-carta p-3 shadow-sm">
               <div className="flex items-center gap-1.5">

@@ -9,6 +9,7 @@ import { AppState, Apprendimento, DocumentoAllegato, FaseId, PersonaAF, Pratica,
 import { CronologiaFasi, leggiStatoCondiviso, scriviStatoCondiviso, tokenDati } from './datiblocco'
 import { documentiTutorPronti, faseSuccessiva, faseById } from './fasi'
 import { SiloId, normalizzaSilo, siloPrecedente, siloSeed, siloSuccessivo } from './pipelineSilos'
+import { IN_ATTESA } from './consulenzeFrank'
 import { batteriaIdPerTipo, batteriaPerTipo, ETICHETTA_TIPO } from './batterie'
 import {
   REPORT_AI_MOCK,
@@ -93,6 +94,45 @@ function pulisciSeed(s: AppState): AppState {
   if (s.seedPulito) return s
   return { ...s, pratiche: [], apprendimenti: [], seedPulito: true }
 }
+
+/** Migrazione: importa i 52 clienti «in attesa questionario» come Pratiche reali
+ *  allo step 0 (raccolta-documenti). Una volta sola (flag clientiAttesaSeed).
+ *  Sono clienti veri: si spostano nella pipeline e si aggiornano come gli altri. */
+function seminaAttesa(s: AppState): AppState {
+  if (s.clientiAttesaSeed) return s
+  const adesso = ora()
+  const esistenti = new Set(s.pratiche.map((p) => p.id))
+  const nuove: Pratica[] = []
+  const siloAgg: Record<string, string> = {}
+  IN_ATTESA.forEach((c, i) => {
+    const id = `pr-attesa-${i}`
+    if (esistenti.has(id)) return
+    nuove.push({
+      id,
+      azienda: c.azienda || c.nome,
+      cliente: c.nome,
+      email: '',
+      tutor: c.tutor,
+      dipendenti: [],
+      tipoLavoro: null,
+      faseCorrente: 'raccolta-documenti',
+      dataCreazione: adesso,
+      allegati: [],
+      versioni: [],
+      storico: [{ fase: 'vendita', azione: 'Cliente importato — in attesa del questionario', autore: 'Import', dataOra: adesso }],
+    })
+    siloAgg[slugPratica(id)] = 'documenti'
+  })
+  return {
+    ...s,
+    pratiche: [...s.pratiche, ...nuove],
+    siloClienti: { ...(s.siloClienti ?? {}), ...siloAgg },
+    clientiAttesaSeed: true,
+  }
+}
+
+/** Prepara uno stato in ingresso: pulizia demo + import dei 52 in attesa. */
+const preparaStato = (s: AppState): AppState => seminaAttesa(pulisciSeed(s))
 
 const aggiornaPratica = (state: AppState, praticaId: string, fn: (p: Pratica) => Pratica): AppState => ({
   ...state,
@@ -520,16 +560,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   statoCorrente.current = state
 
   useEffect(() => {
-    let statoLocale: AppState | null = null
+    let base: AppState | null = null
     try {
       const salvato = localStorage.getItem(STORAGE_KEY)
-      if (salvato) {
-        statoLocale = pulisciSeed(JSON.parse(salvato) as AppState)
-        dispatch({ type: 'HYDRATE', payload: statoLocale })
-      }
+      if (salvato) base = JSON.parse(salvato) as AppState
     } catch {
       // stato corrotto: si riparte dal seed
     }
+    // prepara sempre lo stato (pulizia demo + import 52 in attesa), anche dal seed
+    const statoLocale = preparaStato(base ?? SEED_STATE)
+    dispatch({ type: 'HYDRATE', payload: statoLocale })
     idratato.current = true
     // eslint-disable-next-line react-hooks/set-state-in-effect -- idratazione intenzionale una-tantum da localStorage
     setPronto(true)
@@ -545,14 +585,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     leggiStatoCondiviso(token)
       .then((doc) => {
         if (doc.stato) {
-          const pulito = pulisciSeed(doc.stato)
+          const preparato = preparaStato(doc.stato)
           daServer.current = true
-          dispatch({ type: 'HYDRATE', payload: pulito })
+          dispatch({ type: 'HYDRATE', payload: preparato })
           revisione.current = doc.revisione
           setCronologia(doc.cronologia ?? {})
-          if (pulito !== doc.stato) {
-            // lo stato condiviso conteneva dati di demo: riscrivo quello pulito
-            return scriviStatoCondiviso(token, pulito, doc.revisione).then((r) => {
+          if (preparato !== doc.stato) {
+            // conteneva demo o mancavano i 52 in attesa: riscrivo lo stato preparato
+            return scriviStatoCondiviso(token, preparato, doc.revisione).then((r) => {
               revisione.current = r.revisione
               setCronologia(r.cronologia ?? {})
             })

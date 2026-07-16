@@ -17,6 +17,9 @@ import { PersonaAF, Pratica } from '@/lib/types'
 import { documentiTutorPronti } from '@/lib/fasi'
 import { TUTOR_FRANK } from '@/lib/consulenzeFrank'
 
+/** Prodotti acquistabili (menu a tendina) */
+const PRODOTTI = ['Piano marketing', 'Branding', 'Branding + strategica', 'Strategica', 'Piano marketing + brand'] as const
+
 /** Elenco tutor (nomi reali) e loro email [nome].[cognome]@metodomerenda.com */
 const TUTORS = TUTOR_FRANK.map((t) => t.tutor).sort((a, b) => a.localeCompare(b))
 function emailTutor(nome: string): string {
@@ -290,6 +293,8 @@ function CompletaCliente({ pratica }: { pratica: Pratica }) {
   const { aggiungiPersona, rimuoviPersona, modificaAnagrafica } = useApp()
   const [email, setEmail] = useState(pratica.email)
   const [dataVendita, setDataVendita] = useState(pratica.dataVendita ?? '')
+  const [prodotto, setProdotto] = useState(pratica.prodotto ?? '')
+  const [prezzo, setPrezzo] = useState(pratica.prezzo ?? '')
   const [emailMsg, setEmailMsg] = useState(false)
   // sezione 1: titolari e soci
   const [sNome, setSNome] = useState('')
@@ -333,19 +338,34 @@ function CompletaCliente({ pratica }: { pratica: Pratica }) {
 
   return (
     <div className="space-y-4 border-t border-linea bg-inchiostro/[0.015] p-4">
-      {/* email titolare + data vendita */}
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="min-w-[220px] flex-1">
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Email titolare / cliente</label>
-          <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setEmailMsg(false) }} placeholder="titolare@azienda.it" className={`w-full ${inp}`} />
+      {/* dati vendita: email, data, prodotto, prezzo */}
+      <div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Email titolare / cliente</label>
+            <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setEmailMsg(false) }} placeholder="titolare@azienda.it" className={`w-full ${inp}`} />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Data vendita</label>
+            <input type="date" value={dataVendita} onChange={(e) => { setDataVendita(e.target.value); setEmailMsg(false) }} className={`w-full ${inp}`} />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Prodotto acquistato</label>
+            <select value={prodotto} onChange={(e) => { setProdotto(e.target.value); setEmailMsg(false) }} className={`w-full ${inp}`}>
+              <option value="">— scegli —</option>
+              {PRODOTTI.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Prezzo (in fattura)</label>
+            <input value={prezzo} onChange={(e) => { setPrezzo(e.target.value); setEmailMsg(false) }} placeholder="€ es. 12.000" className={`w-full ${inp}`} />
+          </div>
         </div>
-        <div>
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Data vendita</label>
-          <input type="date" value={dataVendita} onChange={(e) => { setDataVendita(e.target.value); setEmailMsg(false) }} className={inp} />
+        <div className="mt-2 flex items-center gap-2">
+          <button onClick={() => { modificaAnagrafica(pratica.id, { email: email.trim(), dataVendita: dataVendita || undefined, prodotto: prodotto || undefined, prezzo: prezzo.trim() || undefined }); setEmailMsg(true) }}
+            className="rounded-xl border border-linea bg-carta px-3 py-2 text-sm font-semibold text-inchiostro/70 hover:border-petrolio/40 hover:text-petrolio">Salva dati</button>
+          {emailMsg && <span className="text-xs font-semibold text-green-700">✓ salvati</span>}
         </div>
-        <button onClick={() => { modificaAnagrafica(pratica.id, { email: email.trim(), dataVendita: dataVendita || undefined }); setEmailMsg(true) }}
-          className="rounded-xl border border-linea bg-carta px-3 py-2 text-sm font-semibold text-inchiostro/70 hover:border-petrolio/40 hover:text-petrolio">Salva dati</button>
-        {emailMsg && <span className="text-xs font-semibold text-green-700">✓ salvati</span>}
       </div>
 
       {/* sezione 1: titolari e soci */}

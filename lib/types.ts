@@ -141,6 +141,10 @@ export interface Pratica {
   tutorEmail?: string
   /** data della vendita (DATA FATTURA), YYYY-MM-DD — dato reale inserito dal tutor */
   dataVendita?: string
+  /** prodotto acquistato (una delle 5 opzioni) */
+  prodotto?: string
+  /** prezzo di acquisto (importo in fattura per questo servizio), inserito dal tutor */
+  prezzo?: string
   /** persone (titolari, soci, dipendenti) che fanno il test AssessFirst */
   dipendenti: PersonaAF[]
   /** scelto dal sistema di generazione (Christian); null = non ancora determinato */

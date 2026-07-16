@@ -123,6 +123,7 @@ export default function ConsulenzeFrank() {
   const { silos } = useApp()
   const clienti = useClientiPipeline()
   const [mostraNuovi, setMostraNuovi] = useState(false)
+  const [faseFiltro, setFaseFiltro] = useState<SiloId | null>(null)
   const faseDi = (r: RigaFrank): FaseFrank => {
     const s = silos[slugFrank(r.cliente)]
     return s ? SILO_TO_FASE[s] : r.fase
@@ -182,17 +183,26 @@ export default function ConsulenzeFrank() {
             <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Quanti clienti in ogni fase</h3>
             <span className="text-[11px] text-inchiostro/45">{clienti.length} clienti · il progetto si chiude con la consulenza con Frank</span>
           </div>
+          {faseFiltro && (
+            <p className="mt-2 text-[11px] text-inchiostro/60">
+              Filtro attivo: <b className="text-inchiostro">{siloById(faseFiltro).label}</b> · <button onClick={() => setFaseFiltro(null)} className="font-semibold text-petrolio hover:underline">mostra tutti</button>
+            </p>
+          )}
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
-            {SILOS.map((s) => (
-              <div key={s.id} className="rounded-xl border border-linea bg-carta p-3 shadow-sm">
-                <div className="flex items-center gap-1.5">
-                  <span className={`h-2 w-2 rounded-full ${s.colore.punto}`} />
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-inchiostro/45">{s.ordine}</span>
-                </div>
-                <p className={`font-display mt-0.5 text-2xl font-bold ${s.colore.testo}`}>{contaSilo(s.id)}</p>
-                <p className="truncate text-[10.5px] text-inchiostro/50" title={s.label}>{s.label}</p>
-              </div>
-            ))}
+            {SILOS.map((s) => {
+              const attivo = faseFiltro === s.id
+              return (
+                <button key={s.id} onClick={() => setFaseFiltro(attivo ? null : s.id)}
+                  className={`rounded-xl border bg-carta p-3 text-left shadow-sm transition ${attivo ? 'border-petrolio ring-2 ring-petrolio/20' : 'border-linea hover:border-petrolio/40'}`}>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`h-2 w-2 rounded-full ${s.colore.punto}`} />
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-inchiostro/45">{s.ordine}</span>
+                  </div>
+                  <p className={`font-display mt-0.5 text-2xl font-bold ${s.colore.testo}`}>{contaSilo(s.id)}</p>
+                  <p className="truncate text-[10.5px] text-inchiostro/50" title={s.label}>{s.label}</p>
+                </button>
+              )
+            })}
             <div className="rounded-xl border border-linea bg-carta p-3 shadow-sm">
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rotate-45 bg-green-800" />
@@ -279,7 +289,9 @@ export default function ConsulenzeFrank() {
                   </div>
                 </div>
 
-                {righe.map((r, i) => <RigaGantt key={r.cliente + i} r={r} fase={faseDi(r)} pct={pct} />)}
+                {righe
+                  .filter((r) => !faseFiltro || (silos[slugFrank(r.cliente)] ?? 'copy') === faseFiltro)
+                  .map((r, i) => <RigaGantt key={r.cliente + i} r={r} fase={faseDi(r)} pct={pct} />)}
               </div>
             </div>
           </div>

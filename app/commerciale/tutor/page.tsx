@@ -13,8 +13,15 @@ import Link from 'next/link'
 import { useApp, contaNotifiche } from '@/lib/store'
 import RoleShell from '@/components/RoleShell'
 import EmptyState from '@/components/EmptyState'
-import { PersonaAF } from '@/lib/types'
+import { PersonaAF, Pratica } from '@/lib/types'
+import { documentiTutorPronti } from '@/lib/fasi'
 import { TUTOR_FRANK } from '@/lib/consulenzeFrank'
+
+const QUALIFICHE: { val: PersonaAF['qualifica']; label: string }[] = [
+  { val: 'titolare', label: 'Titolare' },
+  { val: 'socio', label: 'Socio' },
+  { val: 'dipendente', label: 'Dipendente' },
+]
 
 /** Elenco tutor (nomi reali) e loro email [nome].[cognome]@metodomerenda.com */
 const TUTORS = TUTOR_FRANK.map((t) => t.tutor).sort((a, b) => a.localeCompare(b))
@@ -283,12 +290,84 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
   )
 }
 
+// ─── Editor: completa l'anagrafica di un cliente esistente ───
+function CompletaCliente({ pratica }: { pratica: Pratica }) {
+  const { aggiungiPersona, rimuoviPersona, modificaAnagrafica } = useApp()
+  const [email, setEmail] = useState(pratica.email)
+  const [pNome, setPNome] = useState('')
+  const [pCognome, setPCognome] = useState('')
+  const [pEmail, setPEmail] = useState('')
+  const [pQual, setPQual] = useState<PersonaAF['qualifica']>('titolare')
+  const [msg, setMsg] = useState('')
+
+  const aggiungi = () => {
+    const n = pNome.trim(), c = pCognome.trim()
+    if (!n || !c) return setMsg('Servono nome e cognome.')
+    const nomeCompleto = `${n} ${c}`
+    if (pratica.dipendenti.some((d) => d.nome.toLowerCase() === nomeCompleto.toLowerCase())) return setMsg('Persona già in elenco.')
+    const ruolo = QUALIFICHE.find((q) => q.val === pQual)!.label
+    aggiungiPersona(pratica.id, { nome: nomeCompleto, email: pEmail.trim(), qualifica: pQual, ruolo })
+    setPNome(''); setPCognome(''); setPEmail(''); setMsg('')
+  }
+
+  return (
+    <div className="border-t border-linea bg-inchiostro/[0.015] p-4">
+      {/* email cliente */}
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex-1">
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Email titolare / cliente</label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="titolare@azienda.it"
+            className="w-full rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35 focus:border-petrolio focus:outline-none focus:ring-2 focus:ring-petrolio/15" />
+        </div>
+        <button onClick={() => { modificaAnagrafica(pratica.id, { email: email.trim() }); setMsg('Email salvata.') }}
+          className="rounded-xl border border-linea bg-carta px-3 py-2 text-sm font-semibold text-inchiostro/70 hover:border-petrolio/40 hover:text-petrolio">Salva email</button>
+      </div>
+
+      {/* aggiungi persone */}
+      <p className="mt-4 mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Persone da valutare — titolari, soci, dipendenti</p>
+      <div className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto_auto]">
+        <input value={pNome} onChange={(e) => setPNome(e.target.value)} placeholder="Nome" className="rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35" />
+        <input value={pCognome} onChange={(e) => setPCognome(e.target.value)} placeholder="Cognome" className="rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35" />
+        <input type="email" value={pEmail} onChange={(e) => setPEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungi() } }} placeholder="email" className="rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35" />
+        <select value={pQual} onChange={(e) => setPQual(e.target.value as PersonaAF['qualifica'])} aria-label="Qualifica" className="rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro">
+          {QUALIFICHE.map((q) => <option key={q.val} value={q.val}>{q.label}</option>)}
+        </select>
+        <button onClick={aggiungi} className="rounded-xl border border-petrolio/30 bg-carta px-4 py-2 text-sm font-semibold text-petrolio hover:bg-petrolio/10">+ Aggiungi</button>
+      </div>
+      {msg && <p className="mt-1.5 text-xs text-inchiostro/60">{msg}</p>}
+
+      {pratica.dipendenti.length > 0 && (
+        <ul className="mt-3 space-y-1.5">
+          {pratica.dipendenti.map((d) => (
+            <li key={d.nome} className="flex flex-wrap items-center gap-2 rounded-xl border border-linea bg-carta px-3 py-2 text-sm">
+              <span className="font-semibold text-inchiostro">{d.nome}</span>
+              <span className="rounded-full bg-inchiostro/10 px-2 py-0.5 text-[11px] font-medium text-inchiostro">{d.ruolo}</span>
+              {d.email && <span className="text-inchiostro/60">{d.email}</span>}
+              <button onClick={() => rimuoviPersona(pratica.id, d.nome)} className="ml-auto text-xs font-semibold text-rose-500 hover:text-rose-700">rimuovi</button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="mt-3 text-[11px] text-inchiostro/60">
+        Completata l&rsquo;anagrafica, <Link href="/commerciale/elisa" className="font-semibold text-petrolio hover:underline">Elisa</Link> carica i documenti (questionario, trascrizione, AssessFirst) e avvia la pipeline.
+      </p>
+    </div>
+  )
+}
+
 export default function PaginaTutor() {
   const { state } = useApp()
   const [formAperto, setFormAperto] = useState(false)
   const [aziendaCreata, setAziendaCreata] = useState<string | null>(null)
+  const [q, setQ] = useState('')
+  const [apertoId, setApertoId] = useState<string | null>(null)
 
   const step0 = state.pratiche.filter((p) => p.faseCorrente === 'vendita' || p.faseCorrente === 'raccolta-documenti')
+  const query = q.trim().toLowerCase()
+  const step0Filtrati = query
+    ? step0.filter((p) => p.azienda.toLowerCase().includes(query) || p.cliente.toLowerCase().includes(query))
+    : step0
 
   return (
     <RoleShell
@@ -321,32 +400,50 @@ export default function PaginaTutor() {
           </div>
         </section>
 
-        {/* Step 0: in attesa dei documenti di Elisa */}
+        {/* Step 0: completa l'anagrafica di ogni cliente */}
         <section className="anima anima-2">
-          <TitoloSezione titolo="Step 0 — in attesa dei documenti (Elisa)" conteggio={`${step0.length} client${step0.length === 1 ? 'e' : 'i'}`} />
+          <TitoloSezione titolo="Clienti da completare — step 0" conteggio={`${step0.length} client${step0.length === 1 ? 'e' : 'i'}`} />
           <p className="mt-1 text-xs text-inchiostro">
-            Clienti registrati per cui Elisa deve ancora caricare tutti i documenti. Quando li completa, passano allo step 1 (Copy).
+            Apri un cliente e completa l&rsquo;anagrafica: email del titolare e persone da valutare (titolari, soci, dipendenti). Poi Elisa carica i documenti.
           </p>
-          <div className="mt-3 space-y-3">
-            {step0.length === 0 ? (
-              <EmptyState titolo="Nessun cliente allo step 0" sottotitolo="Registra un cliente qui sopra: comparirà in attesa dei documenti di Elisa." icona="📂" />
-            ) : (
-              step0.map((p) => (
-                <div key={p.id} className="flex items-center justify-between gap-3 rounded-2xl border border-linea bg-carta px-4 py-3 shadow-sm">
-                  <div className="min-w-0">
-                    <p className="truncate font-display font-bold text-inchiostro">{p.azienda}</p>
-                    <p className="truncate text-xs text-inchiostro">{p.cliente} · {p.dipendenti.length} {p.dipendenti.length === 1 ? 'persona' : 'persone'} · registrato {dataIt(p.dataCreazione)}</p>
-                  </div>
-                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
-                    <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> step 0 · documenti da Elisa
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-          <p className="mt-3 text-xs text-inchiostro">
-            I documenti li carica <Link href="/commerciale/elisa" className="font-semibold text-petrolio hover:underline">Elisa</Link>.
-          </p>
+
+          {step0.length === 0 ? (
+            <div className="mt-3"><EmptyState titolo="Nessun cliente allo step 0" sottotitolo="Registra un cliente qui sopra: comparirà qui da completare." icona="📂" /></div>
+          ) : (
+            <>
+              <div className="relative mt-3 max-w-md">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-inchiostro/35">🔍</span>
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca un cliente per nome o azienda…"
+                  className="w-full rounded-xl border border-linea bg-carta py-2 pl-9 pr-3 text-sm text-inchiostro placeholder:text-inchiostro/35 focus:border-petrolio focus:outline-none focus:ring-2 focus:ring-petrolio/15" />
+              </div>
+
+              <div className="mt-3 space-y-2">
+                {step0Filtrati.map((p) => {
+                  const aperto = apertoId === p.id
+                  const pronti = documentiTutorPronti(p)
+                  const nPersone = p.dipendenti.length
+                  return (
+                    <div key={p.id} className="overflow-hidden rounded-2xl border border-linea bg-carta shadow-sm">
+                      <button onClick={() => setApertoId(aperto ? null : p.id)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-inchiostro/[0.02]">
+                        <div className="min-w-0">
+                          <p className="truncate font-display font-bold text-inchiostro">{p.cliente || p.azienda}</p>
+                          <p className="truncate text-xs text-inchiostro">{p.azienda} · {nPersone} {nPersone === 1 ? 'persona' : 'persone'} · registrato {dataIt(p.dataCreazione)}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {nPersone === 0
+                            ? <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-[11px] font-semibold text-red-700">anagrafica da completare</span>
+                            : <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">{nPersone} person{nPersone === 1 ? 'a' : 'e'}{pronti ? ' · pronto' : ''}</span>}
+                          <span className="text-inchiostro/40">{aperto ? '▲' : '▼'}</span>
+                        </div>
+                      </button>
+                      {aperto && <CompletaCliente pratica={p} />}
+                    </div>
+                  )
+                })}
+                {step0Filtrati.length === 0 && <p className="text-xs text-inchiostro/50">Nessun cliente trovato per «{q}».</p>}
+              </div>
+            </>
+          )}
         </section>
       </div>
     </RoleShell>

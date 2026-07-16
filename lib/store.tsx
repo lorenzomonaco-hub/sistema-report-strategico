@@ -64,6 +64,7 @@ type Azione =
   | { type: 'SET_BLOCCO_INFO'; slug: string; nota: string; reminder?: string }
   | { type: 'AGGIUNGI_PERSONA'; praticaId: string; persona: PersonaAF }
   | { type: 'RIMUOVI_PERSONA'; praticaId: string; nome: string }
+  | { type: 'MODIFICA_ANAGRAFICA'; praticaId: string; azienda?: string; cliente?: string; email?: string }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 const ora = () => new Date().toISOString()
@@ -519,6 +520,14 @@ function reducer(state: AppState, azione: Azione): AppState {
         allegati: p.allegati.filter((a) => a.dipendente !== azione.nome),
       }))
 
+    case 'MODIFICA_ANAGRAFICA':
+      return aggiornaPratica(state, azione.praticaId, (p) => ({
+        ...p,
+        azienda: azione.azienda ?? p.azienda,
+        cliente: azione.cliente ?? p.cliente,
+        email: azione.email ?? p.email,
+      }))
+
     default:
       return state
   }
@@ -560,6 +569,7 @@ interface StoreContextValue {
   setBloccoInfo: (slug: string, nota: string, reminder?: string) => void
   aggiungiPersona: (praticaId: string, persona: PersonaAF) => void
   rimuoviPersona: (praticaId: string, nome: string) => void
+  modificaAnagrafica: (praticaId: string, campi: { azienda?: string; cliente?: string; email?: string }) => void
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -711,6 +721,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setBloccoInfo: (slug, nota, reminder) => dispatch({ type: 'SET_BLOCCO_INFO', slug, nota, reminder }),
     aggiungiPersona: (praticaId, persona) => dispatch({ type: 'AGGIUNGI_PERSONA', praticaId, persona }),
     rimuoviPersona: (praticaId, nome) => dispatch({ type: 'RIMUOVI_PERSONA', praticaId, nome }),
+    modificaAnagrafica: (praticaId, campi) => dispatch({ type: 'MODIFICA_ANAGRAFICA', praticaId, ...campi }),
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

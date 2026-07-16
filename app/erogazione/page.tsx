@@ -49,9 +49,6 @@ export default function PaginaSilos() {
             <Link href="/erogazione/irene" className="rounded-xl border border-emerald-200 bg-carta px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50">
               Report AF — Irene →
             </Link>
-            <Link href="/amministrazione/consulenze-frank" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
-              Gantt Consulenze Frank →
-            </Link>
           </div>
         </header>
 

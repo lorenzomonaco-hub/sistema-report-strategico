@@ -5,6 +5,7 @@
 
 import Link from 'next/link'
 import { CONSULENZE_FRANK, IN_ATTESA, TUTOR_FRANK } from '@/lib/consulenzeFrank'
+import ExportTutorExcel from '@/components/ExportTutorExcel'
 
 function Carta({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <div className={`rounded-2xl border border-linea bg-carta p-4 shadow-sm ${className}`}>{children}</div>
@@ -27,6 +28,7 @@ export default function TutorIndex() {
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <ExportTutorExcel />
             <Link href="/amministrazione/consulenze-frank" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
               Gantt Consulenze Frank →
             </Link>

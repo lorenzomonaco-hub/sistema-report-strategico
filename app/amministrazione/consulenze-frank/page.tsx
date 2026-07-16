@@ -7,6 +7,7 @@
 // colorati per step, fino alla consegna e alla consulenza finale con Frank.
 // Ogni cliente è cliccabile → log completo della timeline del progetto.
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { FASI_FRANK, FRANK_OGGI, FaseFrank, RigaFrank, slugFrank } from '@/lib/consulenzeFrank'
 import { SILOS, SILO_TO_FASE, SiloId, siloById } from '@/lib/pipelineSilos'
@@ -121,6 +122,7 @@ function RigaGantt({ r, fase, pct }: { r: RigaFrank; fase: FaseFrank; pct: (ms: 
 export default function ConsulenzeFrank() {
   const { silos } = useApp()
   const clienti = useClientiPipeline()
+  const [mostraNuovi, setMostraNuovi] = useState(false)
   const faseDi = (r: RigaFrank): FaseFrank => {
     const s = silos[slugFrank(r.cliente)]
     return s ? SILO_TO_FASE[s] : r.fase
@@ -204,10 +206,13 @@ export default function ConsulenzeFrank() {
 
         {senzaData.length > 0 && (
           <div className="mt-6">
-            <div className="flex flex-wrap items-baseline gap-2">
+            <button onClick={() => setMostraNuovi((v) => !v)} className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-linea bg-carta px-4 py-3 text-left shadow-sm hover:bg-inchiostro/[0.02]">
+              <span className="text-inchiostro/40">{mostraNuovi ? '▲' : '▼'}</span>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Nuovi clienti — step 0, ancora senza data di consegna</h3>
-              <span className="text-[11px] text-inchiostro/45">{senzaData.length} clienti · registrati in commerciale o in attesa del questionario · la data si fissa quando entrano in produzione</span>
-            </div>
+              <span className="rounded-full bg-inchiostro/[0.06] px-2 py-0.5 text-[11px] font-bold text-inchiostro/60">{senzaData.length}</span>
+              <span className="text-[11px] text-inchiostro/45">· registrati in commerciale o in attesa del questionario · {mostraNuovi ? 'clicca per chiudere' : 'clicca per aprire'}</span>
+            </button>
+            {mostraNuovi && (
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {senzaData.map((c) => {
                 const s = siloById(c.silo)
@@ -224,6 +229,7 @@ export default function ConsulenzeFrank() {
                 )
               })}
             </div>
+            )}
           </div>
         )}
 

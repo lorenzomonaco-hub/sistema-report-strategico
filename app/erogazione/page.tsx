@@ -23,7 +23,7 @@ const perConsegna = (a: ClientePipeline, b: ClientePipeline) => {
 }
 
 export default function PaginaSilos() {
-  const { silos, spostaSilo, avanzaSilo, indietreggiaSilo, resetSilos } = useApp()
+  const { silos, spostaSilo, avanzaSilo, indietreggiaSilo } = useApp()
   const clienti = useClientiPipeline()
   const [inTrascinamento, setInTrascinamento] = useState<string | null>(null)
   const [colonnaAttiva, setColonnaAttiva] = useState<SiloId | null>(null)
@@ -49,13 +49,6 @@ export default function PaginaSilos() {
             <Link href="/amministrazione/consulenze-frank" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
               Gantt Consulenze Frank →
             </Link>
-            <Link href="/erogazione/kanban-v2" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/50 hover:text-inchiostro">
-              Board v2
-            </Link>
-            <button onClick={() => { if (confirm('Ripristinare i 34 clienti ufficiali alla posizione del piano? (i clienti nuovi restano dove sono)')) resetSilos() }}
-              className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/50 hover:text-rose-600">
-              Ripristina piano
-            </button>
           </div>
         </header>
 

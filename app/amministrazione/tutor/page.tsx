@@ -19,6 +19,7 @@ export default function TutorIndex() {
   const inProd = CONSULENZE_FRANK.length
   const inAttesa = IN_ATTESA.length
   const senzaConsTot = CONSULENZE_FRANK.filter((r) => !r.consulenzaFrank).length
+  const pcMap = new Map(pcPerTutor().map((g) => [g.tutor.toUpperCase(), g]))
 
   return (
     <div className="min-h-screen flex-1 sfondo-trama">
@@ -73,6 +74,16 @@ export default function TutorIndex() {
                   <span className="shrink-0 rounded-full bg-inchiostro/[0.06] px-2 py-0.5 text-[11px] font-bold text-inchiostro/60">{t.totale}</span>
                 </div>
                 <p className="mt-1 text-[11px] text-inchiostro/45">{t.produzione} in produzione · {t.inAttesa} in attesa</p>
+                {(() => {
+                  const pc = pcMap.get(t.tutor.toUpperCase())
+                  if (!pc) return null
+                  return (
+                    <p className="mt-0.5 text-[11px] text-inchiostro/45">
+                      {pc.totale} pronto consulenza
+                      {pc.daFissare.length > 0 && <span className="font-semibold text-rose-700"> · {pc.daFissare.length} da prenotare</span>}
+                    </p>
+                  )
+                })()}
                 <div className="mt-2">
                   {t.senzaConsulenza > 0 ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700">

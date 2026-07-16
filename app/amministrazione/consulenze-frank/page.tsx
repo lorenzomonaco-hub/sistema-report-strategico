@@ -124,6 +124,7 @@ export default function ConsulenzeFrank() {
   const clienti = useClientiPipeline()
   const [mostraNuovi, setMostraNuovi] = useState(false)
   const [faseFiltro, setFaseFiltro] = useState<SiloId | null>(null)
+  const [mostraCons, setMostraCons] = useState(false)
   const faseDi = (r: RigaFrank): FaseFrank => {
     const s = silos[slugFrank(r.cliente)]
     return s ? SILO_TO_FASE[s] : r.fase
@@ -135,6 +136,9 @@ export default function ConsulenzeFrank() {
     .sort((a, b) => a.consegnaPrevista.getTime() - b.consegnaPrevista.getTime())
   // Senza data: i clienti nuovi (step 0 / in lavorazione), ancora da programmare.
   const senzaData = clienti.filter((c) => !c.consegnaPrevista && c.origine === 'nuovo')
+  const prontoCons = clienti.filter((c) => c.origine === 'consulenza')
+  const consDaPren = prontoCons.filter((c) => !c.consulenza)
+  const consFissate = prontoCons.filter((c) => c.consulenza)
   const oggiMs = FRANK_OGGI.getTime()
 
   const inizi = righe.map((r) => (r.entrata ? r.entrata.getTime() : oggiMs))
@@ -212,7 +216,7 @@ export default function ConsulenzeFrank() {
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-inchiostro/45">fine</span>
               </div>
               <p className="font-display mt-0.5 text-2xl font-bold text-green-800">{consProgrammate}</p>
-              <p className="truncate text-[10.5px] text-inchiostro/50" title="Consulenza con Frank">Consulenza Frank{consFatte > 0 ? ` · ${consFatte} fatte` : ''}</p>
+              <p className="truncate text-[10.5px] text-inchiostro/50" title="Consulenza con Frank">Consulenza Frank{consDaPren.length > 0 ? ` · ${consDaPren.length} da prenotare` : ''}</p>
             </div>
           </div>
         </div>
@@ -242,6 +246,34 @@ export default function ConsulenzeFrank() {
                 )
               })}
             </div>
+            )}
+          </div>
+        )}
+
+        {/* Pronto per consulenza — report finito, il processo si chiude quando la call è prenotata */}
+        {prontoCons.length > 0 && (
+          <div className="mt-4">
+            <button onClick={() => setMostraCons((v) => !v)} className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-linea bg-carta px-4 py-3 text-left shadow-sm hover:bg-inchiostro/[0.02]">
+              <span className="text-inchiostro/40">{mostraCons ? '▲' : '▼'}</span>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Pronto per consulenza — report finito, in attesa della call</h3>
+              {consDaPren.length > 0 && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700">{consDaPren.length} da prenotare</span>}
+              <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-700">{consFissate.length} fissate</span>
+              <span className="text-[11px] text-inchiostro/45">· il processo si chiude quando la call è prenotata</span>
+            </button>
+            {mostraCons && (
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {[...consDaPren, ...consFissate].map((c) => (
+                  <div key={c.slug} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 shadow-sm ${c.consulenza ? 'border-linea bg-carta' : 'border-rose-200 bg-rose-50/50'}`}>
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-bold text-inchiostro">{c.nome}</p>
+                      <p className="truncate text-[11px] text-inchiostro/45">{c.owner} · tutor {c.tutor}</p>
+                    </div>
+                    {c.consulenza
+                      ? <span className="shrink-0 rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-semibold text-green-700">{fmtData(new Date(c.consulenza))}{c.consulenzaOra ? ` · ${c.consulenzaOra}` : ''}</span>
+                      : <span className="shrink-0 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-700">da prenotare</span>}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}

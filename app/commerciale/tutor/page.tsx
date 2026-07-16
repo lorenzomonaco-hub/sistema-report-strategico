@@ -17,9 +17,13 @@ import { PersonaAF, Pratica } from '@/lib/types'
 import { documentiTutorPronti } from '@/lib/fasi'
 import { TUTOR_FRANK, IN_ATTESA } from '@/lib/consulenzeFrank'
 
-/** Prodotto acquistato per i clienti importati «in attesa» (dal file di origine).
+/** Dati vendita dei clienti importati «in attesa» (dal file "Report in lavorazione"):
+ *  prodotto acquistato, data fattura e prezzo. Servono a precompilare l'anagrafica
+ *  senza sovrascrivere ciò che il tutor inserisce a mano.
  *  L'id della pratica è `pr-attesa-N` = indice nell'elenco IN_ATTESA. */
-const SERVIZIO_ATTESA = new Map(IN_ATTESA.map((c, i) => [`pr-attesa-${i}`, c.servizio]))
+const VENDITA_ATTESA = new Map(
+  IN_ATTESA.map((c, i) => [`pr-attesa-${i}`, { servizio: c.servizio, dataFattura: c.dataFattura, prezzo: c.prezzo }]),
+)
 
 /** Prodotti acquistabili (menu a tendina) */
 const PRODOTTI = ['Piano marketing', 'Branding', 'Branding + strategica', 'Strategica', 'Piano marketing + brand'] as const
@@ -295,10 +299,13 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
 // Stesso schema della registrazione: Titolari e soci (illimitati) + Dipendenti (max 3).
 function CompletaCliente({ pratica }: { pratica: Pratica }) {
   const { aggiungiPersona, rimuoviPersona, modificaAnagrafica } = useApp()
+  // valori dal file "Report in lavorazione" (se il cliente è tra gli importati):
+  // precompilano i campi ma NON sovrascrivono quanto già inserito dal tutor.
+  const fonte = VENDITA_ATTESA.get(pratica.id)
   const [email, setEmail] = useState(pratica.email)
-  const [dataVendita, setDataVendita] = useState(pratica.dataVendita ?? '')
-  const [prodotto, setProdotto] = useState(pratica.prodotto ?? '')
-  const [prezzo, setPrezzo] = useState(pratica.prezzo ?? '')
+  const [dataVendita, setDataVendita] = useState(pratica.dataVendita ?? fonte?.dataFattura ?? '')
+  const [prodotto, setProdotto] = useState(pratica.prodotto ?? fonte?.servizio ?? '')
+  const [prezzo, setPrezzo] = useState(pratica.prezzo ?? (fonte?.prezzo != null ? String(fonte.prezzo) : ''))
   const [emailMsg, setEmailMsg] = useState(false)
   // sezione 1: titolari e soci
   const [sNome, setSNome] = useState('')
@@ -357,6 +364,8 @@ function CompletaCliente({ pratica }: { pratica: Pratica }) {
             <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-inchiostro">Prodotto acquistato</label>
             <select value={prodotto} onChange={(e) => { setProdotto(e.target.value); setEmailMsg(false) }} className={`w-full ${inp}`}>
               <option value="">— scegli —</option>
+              {/* prodotto importato dal file, se non è tra le opzioni canoniche */}
+              {prodotto && !PRODOTTI.includes(prodotto as (typeof PRODOTTI)[number]) && <option value={prodotto}>{prodotto} (da fattura)</option>}
               {PRODOTTI.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
@@ -505,7 +514,7 @@ export default function PaginaTutor() {
                   const aperto = apertoId === p.id
                   const pronti = documentiTutorPronti(p)
                   const nPersone = p.dipendenti.length
-                  const prodotto = p.prodotto || SERVIZIO_ATTESA.get(p.id) || ''
+                  const prodotto = p.prodotto || VENDITA_ATTESA.get(p.id)?.servizio || ''
                   return (
                     <div key={p.id} className="overflow-hidden rounded-2xl border border-linea bg-carta shadow-sm">
                       <button onClick={() => setApertoId(aperto ? null : p.id)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-inchiostro/[0.02]">

@@ -12,6 +12,7 @@ import {
   MEDIANA_STAGE4_RECENTE, RISPARMIO_ANNUO, RISPARMIO_GIORNO, RISPARMIO_PERSONALE, RISPARMIO_SECONDO,
   TEAM_RESIDUO, VENDITE_MENSILI, fmtData, fmtEuro,
 } from '@/lib/quadroaziendale'
+import { IN_ATTESA } from '@/lib/consulenzeFrank'
 
 const fmtEuroDec = (n: number) =>
   new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
@@ -152,6 +153,91 @@ function SezioneVendite() {
   )
 }
 
+/** Incassi generati dai clienti «in attesa» — importo in fattura dal file
+ *  "Report in lavorazione". Aggregati per tutor e per prodotto. */
+function SezioneIncassi() {
+  const conPrezzo = IN_ATTESA.filter((c) => typeof c.prezzo === 'number')
+  const senzaPrezzo = IN_ATTESA.length - conPrezzo.length
+  const totale = conPrezzo.reduce((s, c) => s + (c.prezzo ?? 0), 0)
+
+  const gruppo = (chiave: (c: (typeof IN_ATTESA)[number]) => string) => {
+    const m = new Map<string, { totale: number; n: number }>()
+    for (const c of conPrezzo) {
+      const k = chiave(c) || '—'
+      const g = m.get(k) ?? { totale: 0, n: 0 }
+      g.totale += c.prezzo ?? 0; g.n += 1; m.set(k, g)
+    }
+    return [...m.entries()].map(([k, v]) => ({ k, ...v })).sort((a, b) => b.totale - a.totale)
+  }
+  const perTutor = gruppo((c) => c.tutor)
+  const perProdotto = gruppo((c) => c.servizio)
+  const maxTutor = Math.max(1, ...perTutor.map((x) => x.totale))
+
+  return (
+    <div>
+      <h3 className="font-display text-xl font-bold tracking-tight text-inchiostro">Gli incassi (clienti in attesa)</h3>
+      <p className="mt-1 text-[12px] text-inchiostro/55">
+        Importo in fattura dei <b className="text-inchiostro/70">{IN_ATTESA.length} clienti in attesa del questionario</b>, dal file «Report in lavorazione». È il valore già venduto che deve ancora entrare in produzione.
+      </p>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <Carta className="bg-green-600/10">
+          <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Incassato — venduto e da erogare</p>
+          <p className="font-display mt-1 text-3xl font-bold tracking-tight text-green-700">{fmtEuro(totale)}</p>
+          <p className="mt-1 text-[11px] text-inchiostro/50">{conPrezzo.length} clienti con prezzo{senzaPrezzo > 0 ? ` · ${senzaPrezzo} senza prezzo nel file` : ''}</p>
+        </Carta>
+        <Carta>
+          <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Valore medio a cliente</p>
+          <p className="font-display mt-1 text-2xl font-bold text-inchiostro/70">{fmtEuro(conPrezzo.length ? totale / conPrezzo.length : 0)}</p>
+        </Carta>
+        <Carta>
+          <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Tutor con più incasso</p>
+          <p className="font-display mt-1 text-lg font-bold text-inchiostro">{perTutor[0]?.k ?? '—'}</p>
+          <p className="mt-1 text-[11px] text-inchiostro/50">{perTutor[0] ? `${fmtEuro(perTutor[0].totale)} · ${perTutor[0].n} clienti` : ''}</p>
+        </Carta>
+      </div>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <Carta>
+          <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Per tutor</p>
+          <div className="mt-2 space-y-1.5">
+            {perTutor.map((t) => (
+              <div key={t.k} className="flex items-center gap-2 text-[11px]">
+                <span className="w-28 shrink-0 truncate text-inchiostro/60">{t.k}</span>
+                <div className="h-3 flex-1 overflow-hidden rounded-full bg-inchiostro/[0.05]">
+                  <div className="h-full rounded-full bg-green-600/70" style={{ width: `${(t.totale / maxTutor) * 100}%` }} />
+                </div>
+                <span className="w-20 shrink-0 text-right font-bold tabular-nums text-green-700">{fmtEuro(t.totale)}</span>
+                <span className="w-6 shrink-0 text-right tabular-nums text-inchiostro/40">{t.n}</span>
+              </div>
+            ))}
+          </div>
+        </Carta>
+        <Carta>
+          <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Per prodotto</p>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full text-[11px]">
+              <tbody>
+                {perProdotto.map((p) => (
+                  <tr key={p.k} className="border-b border-linea/60 last:border-b-0">
+                    <td className="py-1.5 text-inchiostro/70">{p.k}</td>
+                    <td className="py-1.5 text-right tabular-nums text-inchiostro/40">{p.n}</td>
+                    <td className="py-1.5 text-right font-bold tabular-nums text-green-700">{fmtEuro(p.totale)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Carta>
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-inchiostro/45">
+        {senzaPrezzo > 0 && <>⚠ {senzaPrezzo} cliente/i senza importo nel file (non conteggiato). </>}
+        Alcuni importi risultano a <b className="text-inchiostro/60">€ 0 / € 0,01</b> nel file (verosimilmente bonus o non ancora fatturati): sono lasciati com&apos;erano, non corretti a mano. I clienti già in produzione e i «pronto per consulenza» non sono ancora qui: i loro prezzi nel file sono in formato non uniforme e vanno normalizzati prima di sommarli.
+      </p>
+    </div>
+  )
+}
+
 export default function QuadroAziendale() {
   return (
     <div className="min-h-screen flex-1 sfondo-trama">
@@ -178,6 +264,7 @@ export default function QuadroAziendale() {
         </header>
 
         <div className="mt-6 space-y-8">
+          <SezioneIncassi />
           <SezioneImpatto />
           <SezioneVendite />
         </div>

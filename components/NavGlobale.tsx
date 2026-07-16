@@ -31,7 +31,6 @@ const COMPARTIMENTI: Compartimento[] = [
   {
     chiave: 'amministrazione', radice: '/amministrazione', label: 'Quadro Amministrativo', colore: 'text-petrolio',
     voci: [
-      { href: '/amministrazione', label: 'Panoramica' },
       { href: '/amministrazione/consulenze-frank', label: 'Consulenze Frank' },
       { href: '/amministrazione/quadro-aziendale', label: 'Quadro Aziendale' },
       { href: '/amministrazione/tutor', label: 'Tutor' },

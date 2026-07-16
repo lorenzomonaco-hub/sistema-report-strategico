@@ -109,7 +109,7 @@ export default function Home() {
           </Link>
 
           {/* Quadro Amministrativo */}
-          <Link href="/amministrazione" className="anima anima-4 card-sollevabile group flex flex-col overflow-hidden rounded-2xl border border-linea bg-carta shadow-sm hover:border-petrolio/40">
+          <Link href="/amministrazione/consulenze-frank" className="anima anima-4 card-sollevabile group flex flex-col overflow-hidden rounded-2xl border border-linea bg-carta shadow-sm hover:border-petrolio/40">
             <div className="h-1.5 bg-petrolio" />
             <div className="flex flex-1 flex-col p-5">
               <div className="flex items-start justify-between gap-3">

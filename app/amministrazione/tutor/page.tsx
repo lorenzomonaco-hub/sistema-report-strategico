@@ -5,7 +5,11 @@
 
 import Link from 'next/link'
 import { CONSULENZE_FRANK, IN_ATTESA, TUTOR_FRANK } from '@/lib/consulenzeFrank'
+import { PRONTO_CONSULENZA, pcPerTutor } from '@/lib/prontoConsulenza'
 import ExportTutorExcel from '@/components/ExportTutorExcel'
+
+const fmtGiorno = (iso: string) =>
+  new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Rome' })
 
 function Carta({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <div className={`rounded-2xl border border-linea bg-carta p-4 shadow-sm ${className}`}>{children}</div>
@@ -87,6 +91,38 @@ export default function TutorIndex() {
               </Carta>
             </Link>
           ))}
+        </div>
+
+        {/* Pronto per consulenza — per tutor (report finito, in attesa consulenza) */}
+        <div className="mt-10">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <h2 className="font-display text-xl font-bold tracking-tight text-inchiostro">Pronto per consulenza — per tutor</h2>
+            <span className="text-[11px] text-inchiostro/55">{PRONTO_CONSULENZA.length} clienti col report finito · {PRONTO_CONSULENZA.filter((c) => c.consulenza).length} consulenza fissata · {PRONTO_CONSULENZA.filter((c) => !c.consulenza).length} da fissare</span>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {pcPerTutor().map((g) => (
+              <Carta key={g.tutor} className="h-full">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-display text-base font-bold text-inchiostro">{g.tutor}</p>
+                  <span className="shrink-0 rounded-full bg-inchiostro/[0.06] px-2 py-0.5 text-[11px] font-bold text-inchiostro/60">{g.totale}</span>
+                </div>
+                <p className="mt-1 text-[11px]">
+                  <span className="font-semibold text-green-700">{g.fissate.length} fissate</span>
+                  {g.daFissare.length > 0 && <span className="font-semibold text-rose-700"> · {g.daFissare.length} da fissare</span>}
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {g.totale > 0 && [...g.fissate, ...g.daFissare].map((c, i) => (
+                    <li key={c.cliente + i} className="flex items-center justify-between gap-2 border-t border-linea/60 pt-1 text-[11px] first:border-t-0 first:pt-0">
+                      <span className="min-w-0 truncate text-inchiostro">{c.cliente}</span>
+                      {c.consulenza
+                        ? <span className="shrink-0 font-semibold text-green-700">{fmtGiorno(c.consulenza)}{c.ora ? ` · ${c.ora}` : ''}</span>
+                        : <span className="shrink-0 font-semibold text-rose-600">da fissare</span>}
+                    </li>
+                  ))}
+                </ul>
+              </Carta>
+            ))}
+          </div>
         </div>
       </div>
     </div>

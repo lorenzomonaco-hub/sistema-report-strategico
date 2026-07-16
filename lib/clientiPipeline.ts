@@ -12,6 +12,7 @@ import { SiloId } from './pipelineSilos'
 import { Pratica } from './types'
 import { slugPratica, useApp } from './store'
 import { venditaDaNome } from './venditeElisa'
+import { PRONTO_CONSULENZA } from './prontoConsulenza'
 
 export type ClientePipeline = {
   slug: string
@@ -25,7 +26,7 @@ export type ClientePipeline = {
   consegnaPrevista: Date | null
   /** 'frank' = 34 ufficiali; 'nuovo' = registrati in commerciale;
    *  'attesa' = clienti reali senza questionario ancora compilato (step 0) */
-  origine: 'frank' | 'nuovo' | 'attesa'
+  origine: 'frank' | 'nuovo' | 'attesa' | 'consulenza'
   /** presente per i 34: dà accesso a milestone, timeline e pagina di log */
   riga?: RigaFrank
   /** presente per i nuovi */
@@ -35,6 +36,9 @@ export type ClientePipeline = {
   dataVendita?: string
   prezzo?: string
   prodotto?: string
+  /** per «pronto per consulenza»: data ISO della consulenza Frank (null = da fissare) */
+  consulenza?: string | null
+  consulenzaOra?: string
 }
 
 /** Silo di una Pratica nuova: dallo stato condiviso, con fallback dalla fase. */
@@ -85,5 +89,20 @@ export function useClientiPipeline(): ClientePipeline[] {
     }
   })
 
-  return [...frank, ...nuovi]
+  // Clienti PRONTO PER CONSULENZA (report finito, in attesa consulenza) → silo Consegnato.
+  const consulenza: ClientePipeline[] = PRONTO_CONSULENZA.map((c, i) => ({
+    slug: `pc-${i}-${slugFrank(c.azienda || c.cliente)}`,
+    nome: c.cliente,
+    owner: c.azienda,
+    tutor: c.tutor,
+    silo: 'consegnato' as SiloId,
+    consegnaPrevista: null,
+    origine: 'consulenza' as const,
+    consulenza: c.consulenza,
+    consulenzaOra: c.ora,
+    dataVendita: c.dataVendita,
+    prezzo: c.prezzo,
+  }))
+
+  return [...frank, ...nuovi, ...consulenza]
 }

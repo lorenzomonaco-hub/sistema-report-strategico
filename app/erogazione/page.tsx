@@ -123,7 +123,9 @@ export default function PaginaSilos() {
                     {carte.map((c) => {
                       const prev = siloPrecedente(c.silo)
                       const next = siloSuccessivo(c.silo)
-                      const bloccato = c.origine === 'attesa' // niente questionario: non si sposta
+                      const attesa = c.origine === 'attesa'
+                      const consulenza = c.origine === 'consulenza'
+                      const nonSpostabile = attesa || consulenza // riflettono il file: non si spostano
                       const inBlocco = c.silo === 'bloccato'
                       const bi = bloccoInfo[c.slug]
                       const intestazione = (
@@ -131,7 +133,8 @@ export default function PaginaSilos() {
                           <div className="flex items-center gap-1.5">
                             <h3 className="truncate text-[13px] font-bold text-inchiostro">{c.nome}</h3>
                             {c.origine === 'nuovo' && <span className="shrink-0 rounded-full bg-petrolio/10 px-1.5 py-0.5 text-[9px] font-bold uppercase text-petrolio">nuovo</span>}
-                            {c.origine === 'attesa' && <span className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-rose-600">in attesa</span>}
+                            {attesa && <span className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-rose-600">in attesa</span>}
+                            {consulenza && <span className="shrink-0 rounded-full bg-green-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-green-700">consulenza</span>}
                           </div>
                           <p className="truncate text-[11px] text-inchiostro/45">{c.owner}</p>
                         </>
@@ -139,12 +142,12 @@ export default function PaginaSilos() {
                       return (
                         <div
                           key={c.slug}
-                          draggable={!bloccato}
-                          onDragStart={bloccato ? undefined : (e) => { e.dataTransfer.setData('text/plain', c.slug); e.dataTransfer.effectAllowed = 'move'; haTrascinatoRef.current = true; setInTrascinamento(c.slug) }}
-                          onDragEnd={bloccato ? undefined : () => { setInTrascinamento(null); window.setTimeout(() => { haTrascinatoRef.current = false }, 0) }}
-                          className={`card-sollevabile block rounded-2xl border border-linea bg-carta p-3 shadow-sm ${bloccato ? 'cursor-default' : 'cursor-grab'} ${inTrascinamento === c.slug ? 'opacity-50' : ''}`}
+                          draggable={!nonSpostabile}
+                          onDragStart={nonSpostabile ? undefined : (e) => { e.dataTransfer.setData('text/plain', c.slug); e.dataTransfer.effectAllowed = 'move'; haTrascinatoRef.current = true; setInTrascinamento(c.slug) }}
+                          onDragEnd={nonSpostabile ? undefined : () => { setInTrascinamento(null); window.setTimeout(() => { haTrascinatoRef.current = false }, 0) }}
+                          className={`card-sollevabile block rounded-2xl border border-linea bg-carta p-3 shadow-sm ${nonSpostabile ? 'cursor-default' : 'cursor-grab'} ${inTrascinamento === c.slug ? 'opacity-50' : ''}`}
                         >
-                          {c.origine !== 'attesa' ? (
+                          {!attesa ? (
                             <Link href={`/erogazione/scheda?slug=${encodeURIComponent(c.slug)}`} className="block" onClick={(e) => { if (haTrascinatoRef.current) e.preventDefault() }}>
                               {intestazione}
                             </Link>
@@ -157,10 +160,13 @@ export default function PaginaSilos() {
                             </p>
                           )}
                           <div className="mt-1.5 flex items-center justify-between">
-                            <span className={`text-[10.5px] font-semibold ${bloccato ? 'text-rose-600' : inBlocco ? 'text-zinc-600' : s.colore.testo}`}>
-                              {inBlocco ? (bi?.reminder ? `reminder ${fmtData(new Date(bi.reminder))}` : 'reminder da fissare') : bloccato ? 'questionario mancante' : c.consegnaPrevista ? `consegna ${fmtData(c.consegnaPrevista)}` : 'da programmare'}
+                            <span className={`text-[10.5px] font-semibold ${attesa ? 'text-rose-600' : inBlocco ? 'text-zinc-600' : consulenza ? 'text-green-700' : s.colore.testo}`}>
+                              {inBlocco ? (bi?.reminder ? `reminder ${fmtData(new Date(bi.reminder))}` : 'reminder da fissare')
+                                : attesa ? 'questionario mancante'
+                                : consulenza ? (c.consulenza ? `consulenza ${fmtData(new Date(c.consulenza))}` : 'consulenza da fissare')
+                                : c.consegnaPrevista ? `consegna ${fmtData(c.consegnaPrevista)}` : 'da programmare'}
                             </span>
-                            {!bloccato && (
+                            {!nonSpostabile && (
                               <div className="flex items-center gap-1">
                                 <button disabled={!prev} onClick={() => indietreggiaSilo(c.slug)}
                                   className="rounded-md border border-linea px-1.5 py-0.5 text-[11px] font-bold text-inchiostro/50 enabled:hover:bg-inchiostro/[0.04] disabled:opacity-30" title="Silo precedente">◀</button>

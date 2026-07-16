@@ -134,7 +134,7 @@ export default function ConsulenzeFrank() {
     .map((c) => c.riga!)
     .sort((a, b) => a.consegnaPrevista.getTime() - b.consegnaPrevista.getTime())
   // Senza data: i clienti nuovi (step 0 / in lavorazione), ancora da programmare.
-  const senzaData = clienti.filter((c) => !c.consegnaPrevista)
+  const senzaData = clienti.filter((c) => !c.consegnaPrevista && c.origine === 'nuovo')
   const oggiMs = FRANK_OGGI.getTime()
 
   const inizi = righe.map((r) => (r.entrata ? r.entrata.getTime() : oggiMs))
@@ -156,8 +156,11 @@ export default function ConsulenzeFrank() {
   }
 
   const contaSilo = (id: SiloId) => clienti.filter((c) => c.silo === id).length
-  const consProgrammate = clienti.filter((c) => c.riga?.consulenzaFrank).length
-  const consFatte = clienti.filter((c) => c.riga?.consulenzaFrank && c.riga.consulenzaFrank.getTime() <= oggiMs).length
+  const consProgrammate = clienti.filter((c) => c.riga?.consulenzaFrank || c.consulenza).length
+  const consFatte = clienti.filter((c) => {
+    const d = c.riga?.consulenzaFrank ?? (c.consulenza ? new Date(c.consulenza) : null)
+    return d && d.getTime() <= oggiMs
+  }).length
 
   return (
     <div className="min-h-screen flex-1 sfondo-trama">

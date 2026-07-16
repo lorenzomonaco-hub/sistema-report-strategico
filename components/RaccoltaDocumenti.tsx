@@ -17,6 +17,9 @@ const dataIt = (iso: string) =>
 
 const uid = () => `al-${Math.random().toString(36).slice(2, 10)}`
 
+const classiInputSm =
+  'w-full rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35 transition focus:border-petrolio focus:outline-none focus:ring-2 focus:ring-petrolio/15'
+
 const normalizza = (s: string) =>
   (s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
 
@@ -67,13 +70,13 @@ function SlotUpload({ pratica, categoria, sottotipo, dipendente, label, autore }
   return (
     <div className={`rounded-xl border px-3 py-2 ${esistente ? 'border-green-200 bg-green-50/60' : 'border-linea bg-carta'}`}>
       <div className="flex items-center gap-2">
-        <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${esistente ? 'bg-green-100 text-green-700' : 'border-2 border-inchiostro/15 bg-carta text-inchiostro/30'}`}>
+        <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${esistente ? 'bg-green-100 text-green-700' : 'border-2 border-inchiostro/15 bg-carta text-inchiostro'}`}>
           {esistente ? '✓' : ''}
         </span>
-        <span className="min-w-24 shrink-0 text-xs font-semibold text-inchiostro/70">{label}</span>
+        <span className="min-w-24 shrink-0 text-xs font-semibold text-inchiostro">{label}</span>
         {esistente ? (
           <>
-            <span className="truncate text-xs text-inchiostro/60">{esistente.nome}</span>
+            <span className="truncate text-xs text-inchiostro">{esistente.nome}</span>
             <button
               onClick={() => { if (esistente.fileId) cancellaFile(esistente.fileId); rimuoviAllegato(pratica.id, esistente.id) }}
               className="ml-auto shrink-0 text-xs text-rose-400 transition hover:text-rose-700"
@@ -82,7 +85,7 @@ function SlotUpload({ pratica, categoria, sottotipo, dipendente, label, autore }
             </button>
           </>
         ) : (
-          <label className="ml-auto shrink-0 cursor-pointer rounded-lg border border-linea px-2.5 py-1 text-xs font-semibold text-inchiostro/60 transition hover:border-petrolio/40 hover:text-petrolio">
+          <label className="ml-auto shrink-0 cursor-pointer rounded-lg border border-linea px-2.5 py-1 text-xs font-semibold text-inchiostro transition hover:border-petrolio/40 hover:text-petrolio">
             {inCorso ? 'Carico…' : 'Scegli file'}
             <input type="file" className="hidden" disabled={inCorso}
               onChange={(e) => { onFile(e.target.files?.[0] ?? null); e.target.value = '' }} />
@@ -95,7 +98,7 @@ function SlotUpload({ pratica, categoria, sottotipo, dipendente, label, autore }
 }
 
 // ─── I 4 AssessFirst di UNA persona: un solo caricamento, riconoscimento dal nome ───
-function CaricaAssessFirst({ pratica, persona, autore }: { pratica: Pratica; persona: PersonaAF; autore: string }) {
+function CaricaAssessFirst({ pratica, persona, autore, onRimuovi }: { pratica: Pratica; persona: PersonaAF; autore: string; onRimuovi?: () => void }) {
   const { registraAllegato, rimuoviAllegato } = useApp()
   const [inCorso, setInCorso] = useState(false)
   const [daAssegnare, setDaAssegnare] = useState<File[]>([])
@@ -134,7 +137,10 @@ function CaricaAssessFirst({ pratica, persona, autore }: { pratica: Pratica; per
     <div className={`rounded-xl border p-3 ${ASSESSFIRST_TIPI.every((s) => slot(s)) ? 'border-green-200 bg-green-50/40' : 'border-linea bg-inchiostro/[0.015]'}`}>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-inchiostro">{persona.nome}</span>
-        <span className="rounded-full bg-inchiostro/5 px-2 py-0.5 text-[11px] text-inchiostro/55">{persona.ruolo}</span>
+        <span className="rounded-full bg-inchiostro/10 px-2 py-0.5 text-[11px] font-medium text-inchiostro">{persona.ruolo}</span>
+        {onRimuovi && (
+          <button onClick={onRimuovi} className="text-[11px] font-semibold text-rose-500 hover:text-rose-700">rimuovi persona</button>
+        )}
         <label className="ml-auto shrink-0 cursor-pointer rounded-lg bg-petrolio px-3 py-1 text-xs font-semibold text-white transition hover:bg-petrolio-scuro">
           {inCorso ? 'Carico…' : ASSESSFIRST_TIPI.every((s) => slot(s)) ? 'Ricarica i file' : 'Carica i 4 file insieme'}
           <input type="file" multiple accept=".pdf" className="hidden" disabled={inCorso}
@@ -155,15 +161,15 @@ function CaricaAssessFirst({ pratica, persona, autore }: { pratica: Pratica; per
                 a ? (nomeOk ? 'bg-green-100 text-green-700' : 'bg-amber-200 text-amber-800') : 'border-2 border-inchiostro/15 text-transparent'}`}>
                 {a ? (nomeOk ? '✓' : '!') : ''}
               </span>
-              <span className="w-24 shrink-0 font-semibold text-inchiostro/70">{s}</span>
+              <span className="w-24 shrink-0 font-semibold text-inchiostro">{s}</span>
               {a ? (
                 <>
-                  <span className="truncate text-inchiostro/60" title={a.nome}>{a.nome}</span>
+                  <span className="truncate text-inchiostro" title={a.nome}>{a.nome}</span>
                   <button onClick={() => { if (a.fileId) cancellaFile(a.fileId); rimuoviAllegato(pratica.id, a.id) }}
                     className="ml-auto shrink-0 text-rose-400 transition hover:text-rose-700">rimuovi</button>
                 </>
               ) : (
-                <span className="text-inchiostro/35">manca</span>
+                <span className="text-inchiostro">manca</span>
               )}
             </div>
           )
@@ -202,21 +208,40 @@ function CaricaAssessFirst({ pratica, persona, autore }: { pratica: Pratica; per
 }
 
 // ─── Carta di raccolta: documenti di un cliente + avanzamento step 0 → 1 ───
+const QUALIFICHE: { val: PersonaAF['qualifica']; label: string }[] = [
+  { val: 'titolare', label: 'Titolare' },
+  { val: 'socio', label: 'Socio' },
+  { val: 'dipendente', label: 'Dipendente' },
+]
+
 export function CartaRaccolta({ pratica, autore = 'Elisa', onConfermata }: {
   pratica: Pratica; autore?: string; onConfermata?: (azienda: string) => void
 }) {
-  const { clientePronto } = useApp()
+  const { clientePronto, aggiungiPersona, rimuoviPersona } = useApp()
   const pronti = documentiTutorPronti(pratica)
+  const [pNome, setPNome] = useState('')
+  const [pCognome, setPCognome] = useState('')
+  const [pEmail, setPEmail] = useState('')
+  const [pQual, setPQual] = useState<PersonaAF['qualifica']>('titolare')
+  const [errP, setErrP] = useState('')
+
+  const aggiungi = () => {
+    const n = pNome.trim(), c = pCognome.trim()
+    if (!n || !c) return setErrP('Servono nome e cognome della persona.')
+    const nomeCompleto = `${n} ${c}`
+    if (pratica.dipendenti.some((d) => d.nome.toLowerCase() === nomeCompleto.toLowerCase())) return setErrP('Questa persona è già in elenco.')
+    const ruolo = QUALIFICHE.find((q) => q.val === pQual)!.label
+    aggiungiPersona(pratica.id, { nome: nomeCompleto, email: pEmail.trim(), qualifica: pQual, ruolo })
+    setPNome(''); setPCognome(''); setPEmail(''); setErrP('')
+  }
 
   return (
     <div className="card-sollevabile rounded-2xl border border-linea bg-carta p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h3 className="truncate font-display font-bold tracking-tight text-inchiostro">{pratica.azienda}</h3>
-          <p className="truncate text-sm text-inchiostro/50">{pratica.cliente} · {pratica.email}</p>
-          <p className="mt-1 text-xs text-inchiostro/40">
-            Registrato dal tutor il {dataIt(pratica.dataCreazione)} · {pratica.dipendenti.length} {pratica.dipendenti.length === 1 ? 'persona' : 'persone'}
-          </p>
+          <h3 className="truncate font-display text-lg font-bold tracking-tight text-inchiostro">{pratica.cliente}</h3>
+          <p className="truncate text-sm font-semibold text-inchiostro">{pratica.azienda}</p>
+          <p className="mt-0.5 text-xs text-inchiostro">tutor {pratica.tutor} · registrato il {dataIt(pratica.dataCreazione)} · {pratica.dipendenti.length} {pratica.dipendenti.length === 1 ? 'persona' : 'persone'}</p>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
           <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> Step 0 — documenti mancanti
@@ -225,34 +250,57 @@ export function CartaRaccolta({ pratica, autore = 'Elisa', onConfermata }: {
 
       {/* Documenti dell'azienda */}
       <div className="mt-4">
-        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Documenti dell&rsquo;azienda</p>
+        <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-inchiostro">Documenti dell&rsquo;azienda</p>
         <div className="space-y-1.5">
           <SlotUpload pratica={pratica} categoria="questionario" label="Questionario" autore={autore} />
           <SlotUpload pratica={pratica} categoria="trascrizione" label="Trascrizione" autore={autore} />
         </div>
       </div>
 
-      {/* AssessFirst per persona: UN caricamento, i 4 file riconosciuti dal nome */}
+      {/* Persone da valutare (titolari, soci, dipendenti) + AssessFirst */}
       <div className="mt-4">
-        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-inchiostro/40">
-          AssessFirst — carica i 4 file di ogni persona insieme (SWIPE, DRIVE, BRAIN, Comportamenti riconosciuti dal nome)
+        <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-inchiostro">
+          Persone da valutare — titolari, soci e dipendenti (i 4 AssessFirst si caricano insieme)
         </p>
-        <div className="space-y-3">
-          {pratica.dipendenti.map((d) => (
-            <CaricaAssessFirst key={d.nome} pratica={pratica} persona={d} autore={autore} />
-          ))}
+
+        {/* aggiungi persona */}
+        <div className="rounded-xl border border-linea bg-inchiostro/[0.015] p-3">
+          <div className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto_auto]">
+            <input value={pNome} onChange={(e) => setPNome(e.target.value)} placeholder="Nome" className={classiInputSm} />
+            <input value={pCognome} onChange={(e) => setPCognome(e.target.value)} placeholder="Cognome" className={classiInputSm} />
+            <input type="email" value={pEmail} onChange={(e) => setPEmail(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); aggiungi() } }} placeholder="email" className={classiInputSm} />
+            <select value={pQual} onChange={(e) => setPQual(e.target.value as PersonaAF['qualifica'])} aria-label="Qualifica" className={classiInputSm}>
+              {QUALIFICHE.map((q) => <option key={q.val} value={q.val}>{q.label}</option>)}
+            </select>
+            <button onClick={aggiungi} className="shrink-0 rounded-xl border border-petrolio/30 bg-carta px-4 py-2 text-sm font-semibold text-petrolio transition hover:bg-petrolio/10">+ Aggiungi</button>
+          </div>
+          {errP && <p className="mt-1.5 text-xs text-rose-600">{errP}</p>}
+        </div>
+
+        {/* elenco persone con caricamento dei 4 AssessFirst */}
+        <div className="mt-3 space-y-3">
+          {pratica.dipendenti.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-inchiostro/20 px-3 py-4 text-center text-xs text-inchiostro">
+              Nessuna persona ancora. Aggiungi almeno il titolare per caricare i suoi AssessFirst.
+            </p>
+          ) : (
+            pratica.dipendenti.map((d) => (
+              <CaricaAssessFirst key={d.nome} pratica={pratica} persona={d} autore={autore} onRimuovi={() => rimuoviPersona(pratica.id, d.nome)} />
+            ))
+          )}
         </div>
       </div>
 
       <button
         onClick={() => { clientePronto(pratica.id); onConfermata?.(pratica.azienda) }}
         disabled={!pronti}
-        className={`mt-5 w-full rounded-xl px-4 py-2.5 text-sm font-semibold transition ${pronti ? 'bg-ambra text-white hover:bg-amber-700' : 'cursor-not-allowed border border-linea bg-carta text-inchiostro/30'}`}
+        className={`mt-5 w-full rounded-xl px-4 py-2.5 text-sm font-semibold transition ${pronti ? 'bg-ambra text-white hover:bg-amber-700' : 'cursor-not-allowed border border-linea bg-carta text-inchiostro'}`}
       >
         🚀 Documenti completi — avvia la pipeline (step 0 → 1: Copy)
       </button>
       {!pronti && (
-        <p className="mt-2 text-xs text-inchiostro/40">
+        <p className="mt-2 text-xs text-inchiostro">
           Il bottone si attiva quando ci sono questionario, trascrizione e tutti e 4 gli AssessFirst di ogni persona.
         </p>
       )}

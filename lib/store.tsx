@@ -62,6 +62,8 @@ type Azione =
   | { type: 'INDIETREGGIA_SILO'; slug: string }
   | { type: 'RESET_SILOS' }
   | { type: 'SET_BLOCCO_INFO'; slug: string; nota: string; reminder?: string }
+  | { type: 'AGGIUNGI_PERSONA'; praticaId: string; persona: PersonaAF }
+  | { type: 'RIMUOVI_PERSONA'; praticaId: string; nome: string }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 const ora = () => new Date().toISOString()
@@ -502,6 +504,21 @@ function reducer(state: AppState, azione: Azione): AppState {
         bloccoInfo: { ...(state.bloccoInfo ?? {}), [azione.slug]: { nota: azione.nota, reminder: azione.reminder } },
       }
 
+    case 'AGGIUNGI_PERSONA':
+      return aggiornaPratica(state, azione.praticaId, (p) =>
+        p.dipendenti.some((d) => d.nome.toLowerCase() === azione.persona.nome.toLowerCase())
+          ? p
+          : { ...p, dipendenti: [...p.dipendenti, azione.persona] }
+      )
+
+    case 'RIMUOVI_PERSONA':
+      return aggiornaPratica(state, azione.praticaId, (p) => ({
+        ...p,
+        dipendenti: p.dipendenti.filter((d) => d.nome !== azione.nome),
+        // togli anche gli AssessFirst caricati per quella persona
+        allegati: p.allegati.filter((a) => a.dipendente !== azione.nome),
+      }))
+
     default:
       return state
   }
@@ -541,6 +558,8 @@ interface StoreContextValue {
   /** clienti bloccati (silo -1): slug → nota + reminder */
   bloccoInfo: Record<string, { nota: string; reminder?: string }>
   setBloccoInfo: (slug: string, nota: string, reminder?: string) => void
+  aggiungiPersona: (praticaId: string, persona: PersonaAF) => void
+  rimuoviPersona: (praticaId: string, nome: string) => void
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -690,6 +709,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     resetSilos: () => dispatch({ type: 'RESET_SILOS' }),
     bloccoInfo: state.bloccoInfo ?? {},
     setBloccoInfo: (slug, nota, reminder) => dispatch({ type: 'SET_BLOCCO_INFO', slug, nota, reminder }),
+    aggiungiPersona: (praticaId, persona) => dispatch({ type: 'AGGIUNGI_PERSONA', praticaId, persona }),
+    rimuoviPersona: (praticaId, nome) => dispatch({ type: 'RIMUOVI_PERSONA', praticaId, nome }),
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

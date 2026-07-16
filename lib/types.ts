@@ -208,10 +208,22 @@ export interface BloccoInfo {
   reminder?: string
 }
 
+/** Nota/aggiornamento su un cliente, inserita dall'amministrazione a partire da
+ *  ciò che riferiscono i tutor. Registro cronologico per cliente. */
+export interface NotaCliente {
+  id: string
+  testo: string
+  autore: string
+  dataOra: string
+}
+
 export interface AppState {
   pratiche: Pratica[]
   apprendimenti: Apprendimento[]
   prompts: PromptTemplate[]
+  /** Note/aggiornamenti per cliente (chiave cliente → registro cronologico).
+   *  Alimentate dall'amministrazione con gli update dei tutor. */
+  noteClienti?: Record<string, NotaCliente[]>
   /** Posizione nel silo di OGNI cliente della pipeline Consulenze Frank
    *  (slug → SiloId): i 34 ufficiali + i clienti nuovi registrati in area
    *  commerciale. Fonte condivisa per board /erogazione, Gantt e vista tutor.

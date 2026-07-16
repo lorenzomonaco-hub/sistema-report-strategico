@@ -5,7 +5,7 @@
 // pipeline v2 — ogni step autonomo qui è un'azione "simula avanzamento".
 
 import React, { createContext, useContext, useEffect, useReducer, useRef } from 'react'
-import { AppState, Apprendimento, DocumentoAllegato, FaseId, PersonaAF, Pratica, VersioneDocumento, relazioneAF } from './types'
+import { AppState, Apprendimento, DocumentoAllegato, FaseId, NotaCliente, PersonaAF, Pratica, VersioneDocumento, relazioneAF } from './types'
 import { CronologiaFasi, leggiStatoCondiviso, scriviStatoCondiviso, tokenDati } from './datiblocco'
 import { documentiTutorPronti, faseSuccessiva, faseById } from './fasi'
 import { SiloId, normalizzaSilo, siloPrecedente, siloSeed, siloSuccessivo } from './pipelineSilos'
@@ -65,9 +65,18 @@ type Azione =
   | { type: 'AGGIUNGI_PERSONA'; praticaId: string; persona: PersonaAF }
   | { type: 'RIMUOVI_PERSONA'; praticaId: string; nome: string }
   | { type: 'MODIFICA_ANAGRAFICA'; praticaId: string; azienda?: string; cliente?: string; email?: string; dataVendita?: string; prodotto?: string; prezzo?: string }
+  | { type: 'AGGIUNGI_NOTA_CLIENTE'; chiave: string; testo: string; autore: string }
+  | { type: 'RIMUOVI_NOTA_CLIENTE'; chiave: string; id: string }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 const ora = () => new Date().toISOString()
+
+/** Chiave stabile con cui salviamo le note di un cliente (nome + azienda
+ *  normalizzati). Funziona per clienti Frank, in attesa e pronto-consulenza. */
+export const chiaveNoteCliente = (cliente: string, azienda?: string): string => {
+  const n = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+  return `${n(cliente)}--${n(azienda ?? '')}`
+}
 
 /** Slug con cui un cliente NUOVO (Pratica) compare nella pipeline a silos /
  *  Gantt. I 34 ufficiali usano slugFrank(nome); i nuovi usano l'id della pratica. */
@@ -531,6 +540,19 @@ function reducer(state: AppState, azione: Azione): AppState {
         prezzo: azione.prezzo ?? p.prezzo,
       }))
 
+    case 'AGGIUNGI_NOTA_CLIENTE': {
+      const testo = azione.testo.trim()
+      if (!testo) return state
+      const nota: NotaCliente = { id: `n-${uid()}`, testo, autore: azione.autore, dataOra: ora() }
+      const note = state.noteClienti ?? {}
+      return { ...state, noteClienti: { ...note, [azione.chiave]: [...(note[azione.chiave] ?? []), nota] } }
+    }
+
+    case 'RIMUOVI_NOTA_CLIENTE': {
+      const note = state.noteClienti ?? {}
+      return { ...state, noteClienti: { ...note, [azione.chiave]: (note[azione.chiave] ?? []).filter((n) => n.id !== azione.id) } }
+    }
+
     default:
       return state
   }
@@ -573,6 +595,10 @@ interface StoreContextValue {
   aggiungiPersona: (praticaId: string, persona: PersonaAF) => void
   rimuoviPersona: (praticaId: string, nome: string) => void
   modificaAnagrafica: (praticaId: string, campi: { azienda?: string; cliente?: string; email?: string; dataVendita?: string; prodotto?: string; prezzo?: string }) => void
+  /** note/aggiornamenti per cliente (chiave → registro cronologico) */
+  noteClienti: Record<string, NotaCliente[]>
+  aggiungiNotaCliente: (chiave: string, testo: string, autore: string) => void
+  rimuoviNotaCliente: (chiave: string, id: string) => void
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -725,6 +751,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     aggiungiPersona: (praticaId, persona) => dispatch({ type: 'AGGIUNGI_PERSONA', praticaId, persona }),
     rimuoviPersona: (praticaId, nome) => dispatch({ type: 'RIMUOVI_PERSONA', praticaId, nome }),
     modificaAnagrafica: (praticaId, campi) => dispatch({ type: 'MODIFICA_ANAGRAFICA', praticaId, ...campi }),
+
+    noteClienti: state.noteClienti ?? {},
+    aggiungiNotaCliente: (chiave, testo, autore) => dispatch({ type: 'AGGIUNGI_NOTA_CLIENTE', chiave, testo, autore }),
+    rimuoviNotaCliente: (chiave, id) => dispatch({ type: 'RIMUOVI_NOTA_CLIENTE', chiave, id }),
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

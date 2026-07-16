@@ -10,6 +10,7 @@ import {
 } from '@/lib/consulenzeFrank'
 import { fmtData } from '@/lib/quadroaziendale'
 import { pcPerTutor } from '@/lib/prontoConsulenza'
+import NoteCliente from '@/components/NoteCliente'
 
 export function generateStaticParams() {
   return TUTOR_FRANK.map((t) => ({ slug: t.slug }))
@@ -42,29 +43,32 @@ function Stepper({ fase }: { fase: FaseFrank }) {
 function RigaCliente({ r }: { r: RigaFrank }) {
   const c = FASE_COL[r.fase]
   return (
-    <Link href={`/amministrazione/consulenze-frank/${slugFrank(r.cliente)}`}
-          className="block border-b border-linea/70 px-3 py-3 last:border-b-0 hover:bg-inchiostro/[0.02]">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[13.5px] font-bold text-inchiostro">{r.cliente}</span>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${c.testo}`}>
-          {r.fase === 6 ? 'consegnato' : `${r.fase} · ${FASI_FRANK[r.fase].label}`}
-        </span>
-      </div>
-      <p className="mt-0.5 text-[11px] text-inchiostro/45">{r.owner}</p>
-      <div className="mt-1 max-w-[240px]"><Stepper fase={r.fase} /></div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-        <span className={`font-semibold ${c.testo}`}>consegna prevista {fmtData(r.consegnaPrevista)}</span>
-        {r.consulenzaFrank ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 font-bold text-green-700">
-            ✓ consulenza {fmtData(r.consulenzaFrank)}
+    <div className="border-b border-linea/70 px-3 py-3 last:border-b-0">
+      <Link href={`/amministrazione/consulenze-frank/${slugFrank(r.cliente)}`}
+            className="block rounded-lg hover:bg-inchiostro/[0.02]">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[13.5px] font-bold text-inchiostro">{r.cliente}</span>
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${c.testo}`}>
+            {r.fase === 6 ? 'consegnato' : `${r.fase} · ${FASI_FRANK[r.fase].label}`}
           </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 font-bold text-rose-700">
-            ⚠ consulenza da prenotare
-          </span>
-        )}
-      </div>
-    </Link>
+        </div>
+        <p className="mt-0.5 text-[11px] text-inchiostro/45">{r.owner}</p>
+        <div className="mt-1 max-w-[240px]"><Stepper fase={r.fase} /></div>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+          <span className={`font-semibold ${c.testo}`}>consegna prevista {fmtData(r.consegnaPrevista)}</span>
+          {r.consulenzaFrank ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 font-bold text-green-700">
+              ✓ consulenza {fmtData(r.consulenzaFrank)}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 font-bold text-rose-700">
+              ⚠ consulenza da prenotare
+            </span>
+          )}
+        </div>
+      </Link>
+      <NoteCliente cliente={r.cliente} nome={r.cliente} />
+    </div>
   )
 }
 
@@ -116,12 +120,15 @@ export default async function TutorPage({ params }: { params: Promise<{ slug: st
             <p className="text-[11px] text-inchiostro/45">Non ancora in produzione: mancano il questionario o gli AssessFirst. Nessuna data finché non arrivano.</p>
             <div className="mt-2 overflow-hidden rounded-2xl border border-linea bg-carta shadow-sm">
               {attesa.map((c, i) => (
-                <div key={c.nome + c.azienda + i} className="flex items-center justify-between gap-3 border-b border-linea/70 px-3 py-2.5 last:border-b-0">
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-bold text-inchiostro">{c.nome}</p>
-                    <p className="truncate text-[11px] text-inchiostro/45">{c.azienda}</p>
+                <div key={c.nome + c.azienda + i} className="border-b border-linea/70 px-3 py-2.5 last:border-b-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-bold text-inchiostro">{c.nome}</p>
+                      <p className="truncate text-[11px] text-inchiostro/45">{c.azienda}{c.servizio ? ` · ${c.servizio}` : ''}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">in attesa</span>
                   </div>
-                  <span className="shrink-0 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">in attesa</span>
+                  <NoteCliente cliente={c.nome} azienda={c.azienda} nome={c.nome} />
                 </div>
               ))}
             </div>
@@ -140,13 +147,16 @@ export default async function TutorPage({ params }: { params: Promise<{ slug: st
             <p className="text-[11px] text-inchiostro/45">Report finito: il processo si chiude quando la call con Frank è prenotata.</p>
             <div className="mt-2 overflow-hidden rounded-2xl border border-linea bg-carta shadow-sm">
               {[...pc.fissate, ...pc.daFissare].map((c, i) => (
-                <div key={c.cliente + i} className="flex items-center justify-between gap-3 border-b border-linea/70 px-3 py-2.5 last:border-b-0">
-                  <p className="min-w-0 truncate text-[13px] font-bold text-inchiostro">{c.cliente}</p>
-                  {c.consulenza ? (
-                    <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">✓ {fmtGiorno(c.consulenza)}{c.ora ? ` · ${c.ora}` : ''}</span>
-                  ) : (
-                    <span className="shrink-0 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">⚠ da fissare</span>
-                  )}
+                <div key={c.cliente + i} className="border-b border-linea/70 px-3 py-2.5 last:border-b-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="min-w-0 truncate text-[13px] font-bold text-inchiostro">{c.cliente}</p>
+                    {c.consulenza ? (
+                      <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">✓ {fmtGiorno(c.consulenza)}{c.ora ? ` · ${c.ora}` : ''}</span>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">⚠ da fissare</span>
+                    )}
+                  </div>
+                  <NoteCliente cliente={c.cliente} azienda={c.azienda} nome={c.cliente} />
                 </div>
               ))}
             </div>

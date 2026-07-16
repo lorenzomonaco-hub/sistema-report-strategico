@@ -7,23 +7,35 @@
 
 import { CONSULENZE_FRANK, FASI_FRANK, IN_ATTESA } from '@/lib/consulenzeFrank'
 import { fmtData } from '@/lib/quadroaziendale'
+import { venditaDaNome } from '@/lib/venditeElisa'
+
+const dataIt = (iso: string) =>
+  new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Rome' })
 
 function scarica() {
-  const intest = ['Tutor', 'Cliente', 'Azienda', 'Stato', 'Fase', 'Consegna prevista', 'Consulenza Frank']
+  const intest = ['Tutor', 'Cliente', 'Azienda', 'Stato', 'Fase', 'Consegna prevista', 'Consulenza Frank', 'Data vendita', 'Prezzo']
   const righeProd = [...CONSULENZE_FRANK]
     .sort((a, b) => a.tutor.localeCompare(b.tutor) || a.consegnaPrevista.getTime() - b.consegnaPrevista.getTime())
-    .map((r) => [
-      r.tutor,
-      r.cliente,
-      '',
-      'In produzione',
-      r.fase === 6 ? 'Consegnato' : `${r.fase} · ${FASI_FRANK[r.fase]?.label ?? ''}`,
-      fmtData(r.consegnaPrevista),
-      r.consulenzaFrank ? fmtData(r.consulenzaFrank) : 'da prenotare',
-    ])
+    .map((r) => {
+      const v = venditaDaNome(r.cliente)
+      return [
+        r.tutor,
+        r.cliente,
+        v?.azienda ?? '',
+        'In produzione',
+        r.fase === 6 ? 'Consegnato' : `${r.fase} · ${FASI_FRANK[r.fase]?.label ?? ''}`,
+        fmtData(r.consegnaPrevista),
+        r.consulenzaFrank ? fmtData(r.consulenzaFrank) : 'da prenotare',
+        v ? dataIt(v.dataVendita) : '',
+        v?.prezzo ?? '',
+      ]
+    })
   const righeAttesa = [...IN_ATTESA]
     .sort((a, b) => a.tutor.localeCompare(b.tutor) || a.nome.localeCompare(b.nome))
-    .map((c) => [c.tutor, c.nome, c.azienda, 'In attesa (questionario mancante)', '', '', ''])
+    .map((c) => {
+      const v = venditaDaNome(c.nome, c.azienda)
+      return [c.tutor, c.nome, c.azienda, 'In attesa (questionario mancante)', '', '', '', v ? dataIt(v.dataVendita) : '', v?.prezzo ?? '']
+    })
 
   const tutte = [intest, ...righeProd, ...righeAttesa]
   const csv = '\uFEFF' + tutte

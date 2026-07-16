@@ -11,6 +11,7 @@ import { CONSULENZE_FRANK, RigaFrank, slugFrank } from './consulenzeFrank'
 import { SiloId } from './pipelineSilos'
 import { Pratica } from './types'
 import { slugPratica, useApp } from './store'
+import { venditaDaNome } from './venditeElisa'
 
 export type ClientePipeline = {
   slug: string
@@ -30,6 +31,10 @@ export type ClientePipeline = {
   /** presente per i nuovi */
   praticaId?: string
   nDipendenti?: number
+  /** dati vendita: dal cliente (Pratica) o dal foglio di elisa.mazza (match cognome) */
+  dataVendita?: string
+  prezzo?: string
+  prodotto?: string
 }
 
 /** Silo di una Pratica nuova: dallo stato condiviso, con fallback dalla fase. */
@@ -47,6 +52,7 @@ export function useClientiPipeline(): ClientePipeline[] {
 
   const frank: ClientePipeline[] = CONSULENZE_FRANK.map((r) => {
     const slug = slugFrank(r.cliente)
+    const v = venditaDaNome(r.cliente)
     return {
       slug,
       nome: r.cliente,
@@ -56,20 +62,28 @@ export function useClientiPipeline(): ClientePipeline[] {
       consegnaPrevista: r.consegnaPrevista,
       origine: 'frank' as const,
       riga: r,
+      dataVendita: v?.dataVendita,
+      prezzo: v?.prezzo,
     }
   })
 
-  const nuovi: ClientePipeline[] = state.pratiche.map((p) => ({
-    slug: slugPratica(p.id),
-    nome: p.azienda,
-    owner: p.cliente,
-    tutor: p.tutor,
-    silo: siloDaPratica(p, silos),
-    consegnaPrevista: null,
-    origine: 'nuovo' as const,
-    praticaId: p.id,
-    nDipendenti: p.dipendenti.length,
-  }))
+  const nuovi: ClientePipeline[] = state.pratiche.map((p) => {
+    const v = venditaDaNome(p.azienda, p.cliente)
+    return {
+      slug: slugPratica(p.id),
+      nome: p.azienda,
+      owner: p.cliente,
+      tutor: p.tutor,
+      silo: siloDaPratica(p, silos),
+      consegnaPrevista: null,
+      origine: 'nuovo' as const,
+      praticaId: p.id,
+      nDipendenti: p.dipendenti.length,
+      dataVendita: p.dataVendita || v?.dataVendita,
+      prezzo: p.prezzo || v?.prezzo,
+      prodotto: p.prodotto,
+    }
+  })
 
   return [...frank, ...nuovi]
 }

@@ -113,6 +113,15 @@ function Scheda() {
         </div>
       )}
 
+      {/* dati vendita (prodotto, prezzo, data) */}
+      {(c.prodotto || c.prezzo || c.dataVendita) && (
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl border border-linea bg-carta px-4 py-3 text-sm shadow-sm">
+          {c.prodotto && <span className="text-inchiostro"><span className="text-inchiostro/45">Prodotto:</span> <b>{c.prodotto}</b></span>}
+          {c.prezzo && <span className="text-inchiostro"><span className="text-inchiostro/45">Prezzo:</span> <b>{c.prezzo}</b></span>}
+          {c.dataVendita && <span className="text-inchiostro"><span className="text-inchiostro/45">Venduto il:</span> <b>{new Date(c.dataVendita).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Rome' })}</b></span>}
+        </div>
+      )}
+
       {/* stato + tempo totale */}
       <div className="mt-5 grid grid-cols-2 gap-3">
         <div className="rounded-2xl border border-linea bg-carta p-4 shadow-sm">

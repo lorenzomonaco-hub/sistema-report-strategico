@@ -341,6 +341,7 @@ export default function AreaIrene() {
   const [modello, setModello] = useState<string | null>(null)
   const [limiti, setLimiti] = useState<LimitiReportAF | null>(null)
   const [saluteErr, setSaluteErr] = useState(false)
+  const [q, setQ] = useState('')
 
   useEffect(() => { setToken(tokenDati()) }, [])
   useEffect(() => {
@@ -353,6 +354,13 @@ export default function AreaIrene() {
 
   // clienti in EROGAZIONE: report in lavorazione nella pipeline (fuori da step 0, consegnato, bloccato)
   const inErogazione = clienti.filter((c) => c.silo !== 'documenti' && c.silo !== 'consegnato' && c.silo !== 'bloccato')
+  // ricerca: se scrivi, spazia su TUTTI i clienti (anche pronto-consulenza / attesa);
+  // se vuoto, resta la lista degli «in erogazione».
+  const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+  const query = norm(q.trim())
+  const mostrati = query
+    ? clienti.filter((c) => norm(`${c.nome} ${c.owner} ${c.tutor}`).includes(query))
+    : inErogazione
 
   return (
     <div className="min-h-screen flex-1 sfondo-trama">
@@ -375,11 +383,18 @@ export default function AreaIrene() {
         )}
         {!token && <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">⚠️ Token del blocco assente in questo browser: la generazione non partirà finché non è configurato.</div>}
 
-        <div className="mt-6 space-y-3">
-          {inErogazione.length === 0 ? (
-            <p className="rounded-2xl border border-linea bg-carta px-4 py-10 text-center text-sm text-inchiostro/80">Nessun cliente in erogazione al momento.</p>
+        <div className="relative mt-6 max-w-md">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-inchiostro/50">🔍</span>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca un cliente per nome (anche fuori erogazione, es. pronto-consulenza)…"
+            className="w-full rounded-xl border border-linea bg-carta py-2 pl-9 pr-3 text-sm text-inchiostro placeholder:text-inchiostro/40 focus:border-petrolio focus:outline-none focus:ring-2 focus:ring-petrolio/15" />
+        </div>
+        <p className="mt-1 text-[11px] text-inchiostro/70">{query ? `${mostrati.length} risultati per «${q}»` : `${inErogazione.length} clienti in erogazione — cerca per lavorarne altri (pronto-consulenza, in attesa…)`}</p>
+
+        <div className="mt-4 space-y-3">
+          {mostrati.length === 0 ? (
+            <p className="rounded-2xl border border-linea bg-carta px-4 py-10 text-center text-sm text-inchiostro/80">{query ? `Nessun cliente trovato per «${q}».` : 'Nessun cliente in erogazione al momento.'}</p>
           ) : (
-            inErogazione.map((c) => <CartaCliente key={c.slug} cliente={c} token={token} modello={modello} limiti={limiti} />)
+            mostrati.map((c) => <CartaCliente key={c.slug} cliente={c} token={token} modello={modello} limiti={limiti} />)
           )}
         </div>
       </div>

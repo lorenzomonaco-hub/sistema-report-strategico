@@ -57,7 +57,7 @@ export function statoCartella(p: Pratica) {
   const personeComplete = p.dipendenti.filter((d) => assessFirstCompleti(p, d.nome))
   const voci = [
     { chiave: 'questionario', label: 'Questionario aziendale', responsabile: 'Venditore', fatto: ha('questionario') },
-    { chiave: 'trascrizione', label: 'Trascrizione analisi', responsabile: 'Venditore', fatto: ha('trascrizione') },
+    { chiave: 'trascrizione', label: 'Trascrizione analisi', responsabile: 'Venditore', fatto: ha('trascrizione') || !!p.senzaTrascrizione },
     {
       chiave: 'assessfirst',
       label: `AssessFirst per persona — 4 file a testa (${personeComplete.length}/${p.dipendenti.length} complete)`,

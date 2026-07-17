@@ -68,6 +68,7 @@ type Azione =
   | { type: 'AGGIUNGI_NOTA_CLIENTE'; chiave: string; testo: string; autore: string }
   | { type: 'RIMUOVI_NOTA_CLIENTE'; chiave: string; id: string }
   | { type: 'INVIA_ELISA'; praticaId: string; inviato: boolean; autore: string }
+  | { type: 'SET_SENZA_TRASCRIZIONE'; praticaId: string; valore: boolean }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 const ora = () => new Date().toISOString()
@@ -554,6 +555,9 @@ function reducer(state: AppState, azione: Azione): AppState {
       return { ...state, noteClienti: { ...note, [azione.chiave]: (note[azione.chiave] ?? []).filter((n) => n.id !== azione.id) } }
     }
 
+    case 'SET_SENZA_TRASCRIZIONE':
+      return aggiornaPratica(state, azione.praticaId, (p) => ({ ...p, senzaTrascrizione: azione.valore }))
+
     case 'INVIA_ELISA':
       return aggiornaPratica(state, azione.praticaId, (p) => ({
         ...p,
@@ -612,6 +616,8 @@ interface StoreContextValue {
   rimuoviNotaCliente: (chiave: string, id: string) => void
   /** il tutor invia (o ritira) un cliente all'area Elisa */
   inviaElisa: (praticaId: string, inviato: boolean, autore: string) => void
+  /** segna che il cliente non ha la trascrizione (la rende non obbligatoria) */
+  setSenzaTrascrizione: (praticaId: string, valore: boolean) => void
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -769,6 +775,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     aggiungiNotaCliente: (chiave, testo, autore) => dispatch({ type: 'AGGIUNGI_NOTA_CLIENTE', chiave, testo, autore }),
     rimuoviNotaCliente: (chiave, id) => dispatch({ type: 'RIMUOVI_NOTA_CLIENTE', chiave, id }),
     inviaElisa: (praticaId, inviato, autore) => dispatch({ type: 'INVIA_ELISA', praticaId, inviato, autore }),
+    setSenzaTrascrizione: (praticaId, valore) => dispatch({ type: 'SET_SENZA_TRASCRIZIONE', praticaId, valore }),
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

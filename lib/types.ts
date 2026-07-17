@@ -160,6 +160,8 @@ export interface Pratica {
   chatCopy?: MessaggioChat[]
   /** il tutor ha inviato il cliente a Elisa: SOLO questi compaiono nell'area Elisa */
   inviatoElisa?: boolean
+  /** il cliente non ha la trascrizione: la trascrizione smette di essere obbligatoria */
+  senzaTrascrizione?: boolean
 }
 
 export interface Apprendimento {

@@ -299,7 +299,7 @@ function FormNuovoCliente({ onChiudi, onCreata }: { onChiudi: () => void; onCrea
 // ─── Editor: completa l'anagrafica di un cliente esistente ───
 // Stesso schema della registrazione: Titolari e soci (illimitati) + Dipendenti (max 3).
 function CompletaCliente({ pratica }: { pratica: Pratica }) {
-  const { aggiungiPersona, rimuoviPersona, modificaAnagrafica, inviaElisa } = useApp()
+  const { aggiungiPersona, rimuoviPersona, modificaAnagrafica, inviaElisa, setSenzaTrascrizione } = useApp()
   // I 52 clienti importati «in attesa» (id pr-attesa-*) possono avere PIÙ di 3
   // dipendenti; per i clienti registrati ex-novo resta il limite di MAX_DIPENDENTI.
   const dipIllimitati = pratica.id.startsWith('pr-attesa-')
@@ -327,6 +327,11 @@ function CompletaCliente({ pratica }: { pratica: Pratica }) {
   const soci = pratica.dipendenti.filter((d) => d.qualifica !== 'dipendente')
   const dipendenti = pratica.dipendenti.filter((d) => d.qualifica === 'dipendente')
   const inElenco = (nome: string) => pratica.dipendenti.some((d) => d.nome.toLowerCase() === nome.toLowerCase())
+
+  // requisiti per l'invio a Elisa: questionario sempre; trascrizione salvo spunta
+  const haQuestionario = pratica.allegati.some((a) => a.tipo === 'questionario')
+  const haTrascrizione = pratica.allegati.some((a) => a.tipo === 'trascrizione') || !!pratica.senzaTrascrizione
+  const prontoInvio = haQuestionario && haTrascrizione
 
   const aggiungiSocio = () => {
     const n = sNome.trim(), c = sCognome.trim(), em = sEmail.trim()
@@ -386,14 +391,18 @@ function CompletaCliente({ pratica }: { pratica: Pratica }) {
         </div>
       </div>
 
-      {/* documenti azienda — il tutor può già caricarli se sa che sono stati compilati */}
+      {/* documenti azienda — questionario obbligatorio, trascrizione obbligatoria (salvo spunta) */}
       <div className="rounded-xl border border-linea bg-carta/60 p-3">
-        <p className="text-sm font-bold text-inchiostro">Documenti dell&rsquo;azienda <span className="font-normal text-inchiostro/45">— se già compilati (facoltativo)</span></p>
-        <p className="mt-0.5 text-[11px] text-inchiostro/55">Se questionario e/o trascrizione esistono già, caricali qui: Elisa se li ritrova pronti. Altrimenti li carica lei.</p>
+        <p className="text-sm font-bold text-inchiostro">Documenti dell&rsquo;azienda <span className="font-normal text-rose-600">— obbligatori per l&rsquo;invio a Elisa</span></p>
+        <p className="mt-0.5 text-[11px] text-inchiostro/55">Il <b>questionario</b> è sempre obbligatorio. La <b>trascrizione</b> lo è, a meno che tu non spunti «Il cliente non ha la trascrizione».</p>
         <div className="mt-2 space-y-1.5">
           <SlotUpload pratica={pratica} categoria="questionario" label="Questionario" autore={`${pratica.tutor} (Tutor)`} />
           <SlotUpload pratica={pratica} categoria="trascrizione" label="Trascrizione" autore={`${pratica.tutor} (Tutor)`} />
         </div>
+        <label className="mt-2 flex cursor-pointer items-center gap-2 text-[12px] text-inchiostro/70">
+          <input type="checkbox" checked={!!pratica.senzaTrascrizione} onChange={(e) => setSenzaTrascrizione(pratica.id, e.target.checked)} className="h-4 w-4 accent-rose-600" />
+          <span>❌ Il cliente non ha la trascrizione <span className="text-inchiostro/45">(la rende non obbligatoria)</span></span>
+        </label>
       </div>
 
       {/* sezione 1: titolari e soci */}
@@ -471,10 +480,16 @@ function CompletaCliente({ pratica }: { pratica: Pratica }) {
           <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0">
               <p className="text-sm font-bold text-inchiostro">Invia a Elisa</p>
-              <p className="text-[11px] text-inchiostro/55">Quando l&rsquo;anagrafica è a posto, invia il cliente a Elisa: solo così comparirà nella sua area per il caricamento documenti.</p>
+              <p className="text-[11px] text-inchiostro/55">Serve il questionario{pratica.senzaTrascrizione ? '' : ' e la trascrizione'} caricati. Solo dopo l&rsquo;invio il cliente comparirà nell&rsquo;area di Elisa.</p>
+              {!prontoInvio && (
+                <p className="mt-1 text-[11px] font-semibold text-rose-600">
+                  Manca: {[!haQuestionario && 'questionario', !haTrascrizione && 'trascrizione (o spunta «non ha la trascrizione»)'].filter(Boolean).join(' + ')}
+                </p>
+              )}
             </div>
             <button onClick={() => inviaElisa(pratica.id, true, `${pratica.tutor} (Tutor)`)}
-              className="ml-auto shrink-0 rounded-xl bg-petrolio px-4 py-2 text-sm font-semibold text-white hover:bg-petrolio-scuro">📨 Invia a Elisa</button>
+              disabled={!prontoInvio}
+              className="ml-auto shrink-0 rounded-xl bg-petrolio px-4 py-2 text-sm font-semibold text-white hover:bg-petrolio-scuro disabled:cursor-not-allowed disabled:opacity-40">📨 Invia a Elisa</button>
           </div>
         )}
       </div>

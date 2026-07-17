@@ -26,11 +26,15 @@ export interface DocumentoCondiviso {
 }
 
 export function tokenDati(): string {
-  if (typeof localStorage === 'undefined') return ''
+  // Token cablato al build (attivo per TUTTI, senza configurazione per browser):
+  // impostare NEXT_PUBLIC_BLOCCHI_TOKEN sul servizio `sito` = WORKER_TOKEN del blocco-dati.
+  // Un valore in localStorage (per test/override) ha comunque la precedenza.
+  const cablato = process.env.NEXT_PUBLIC_BLOCCHI_TOKEN ?? ''
+  if (typeof localStorage === 'undefined') return cablato
   return (
     localStorage.getItem(CHIAVE_TOKEN_DATI) ??
     localStorage.getItem('visual-worker-token') ??
-    ''
+    cablato
   )
 }
 

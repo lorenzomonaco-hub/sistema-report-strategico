@@ -140,6 +140,15 @@ export async function scaricaPdfReportAF(token: string, jobId: string, nomeFile:
   URL.revokeObjectURL(url)
 }
 
+/** Il PDF del report come Blob (per allegarlo/zipparlo, senza scaricarlo su disco). */
+export async function blobPdfReportAF(token: string, jobId: string): Promise<Blob> {
+  const r = await fetch(`${URL_REPORT_AF}/jobs/${jobId}/out`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) throw new Error(`download PDF fallito (${r.status})`)
+  return r.blob()
+}
+
 export async function leggiMarkdownReportAF(token: string, jobId: string): Promise<string> {
   const r = await fetch(`${URL_REPORT_AF}/jobs/${jobId}/markdown`, {
     headers: { Authorization: `Bearer ${token}` },

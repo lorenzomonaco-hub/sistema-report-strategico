@@ -15,8 +15,12 @@ import { tokenDati } from '@/lib/datiblocco'
 import { ASSESSFIRST_TIPI, PersonaAF, Qualifica } from '@/lib/types'
 import {
   ETICHETTA_PASSO_AF, LimitiReportAF, StatoJobReportAF, URL_REPORT_AF,
-  creaJobReportAF, leggiSaluteReportAF, meseCorrenteAF, scaricaPdfReportAF, statoJobReportAF,
+  blobPdfReportAF, creaJobReportAF, leggiSaluteReportAF, meseCorrenteAF, scaricaPdfReportAF, statoJobReportAF,
 } from '@/lib/reportaf'
+import { inviaEmailConZip } from '@/lib/email'
+
+/** Indirizzo di TEST per l'invio al tutor (poi diventerà l'email del tutor reale). */
+const EMAIL_TEST_TUTOR = 'irene.delbelbelluz@metodomerenda.com'
 
 const PREZZI: Record<string, { input: number; output: number }> = {
   'claude-sonnet-5': { input: 2, output: 10 },
@@ -126,8 +130,9 @@ function SlotsAF({ onChange }: { onChange: (files: File[]) => void }) {
 }
 
 // ─── Generazione del report AF di UNA persona ───
-function GenPersona({ persona, piano, token, modello, limiti }: {
+function GenPersona({ persona, piano, token, modello, limiti, onReport }: {
   persona: PersonaAF; piano: File | null; token: string; modello: string | null; limiti: LimitiReportAF | null
+  onReport: (jobId: string | null) => void
 }) {
   const [af, setAf] = useState<File[]>([])
   const [relazione, setRelazione] = useState<'a' | 'b' | 'c'>(relazioneDa(persona.qualifica))
@@ -159,6 +164,12 @@ function GenPersona({ persona, piano, token, modello, limiti }: {
     const iv = window.setInterval(async () => { if (await tick()) window.clearInterval(iv) }, 4000)
     return () => { fermo = true; window.clearInterval(iv) }
   }, [jobId, token])
+
+  // segnala verso l'alto quando il report di questa persona è pronto (per lo ZIP al tutor)
+  useEffect(() => {
+    onReport(stato?.fase === 'completato' && jobId ? jobId : null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stato?.fase, jobId])
 
   const genera = async () => {
     if (!piano) return
@@ -253,6 +264,12 @@ function CartaCliente({ cliente, token, modello, limiti }: {
   const [nome, setNome] = useState(''); const [cognome, setCognome] = useState('')
   const [email, setEmail] = useState(''); const [qualifica, setQualifica] = useState<Qualifica>('socio'); const [ruolo, setRuolo] = useState('')
   const [err, setErr] = useState('')
+  // report AF pronti (nome persona → jobId), per lo ZIP al tutor
+  const [reportPronti, setReportPronti] = useState<Record<string, string>>({})
+  const [confermaInvio, setConfermaInvio] = useState(false)
+  const [inviando, setInviando] = useState(false)
+  const [inviato, setInviato] = useState(false)
+  const [erroreInvio, setErroreInvio] = useState('')
 
   const daPratica = !!cliente.praticaId
   const persone: PersonaAF[] = daPratica
@@ -271,6 +288,32 @@ function CartaCliente({ cliente, token, modello, limiti }: {
   const togli = (n: string) => { if (daPratica) rimuoviPersona(cliente.praticaId!, n); else rimuoviPersonaCliente(cliente.slug, n) }
 
   const inp = 'rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35 focus:border-petrolio focus:outline-none'
+
+  // invio al tutor
+  const nReport = persone.filter((p) => reportPronti[p.nome]).length
+  const tuttiPronti = persone.length > 0 && persone.every((p) => reportPronti[p.nome])
+  const nFile = (piano ? 1 : 0) + nReport
+  const puoInviare = nFile > 0 && (daPratica ? tuttiPronti : true)
+
+  const inviaAlTutor = async () => {
+    setConfermaInvio(false); setErroreInvio(''); setInviando(true); setInviato(false)
+    try {
+      const files: { nome: string; blob: Blob }[] = []
+      if (piano) { const ext = /\.docx$/i.test(piano.name) ? 'docx' : 'pdf'; files.push({ nome: `piano-${cliente.nome}.${ext}`, blob: piano }) }
+      for (const p of persone) {
+        const jid = reportPronti[p.nome]
+        if (jid) { const b = await blobPdfReportAF(token, jid); files.push({ nome: `report-AF-${p.nome.replace(/\s+/g, '-')}.pdf`, blob: b }) }
+      }
+      await inviaEmailConZip({
+        token, a: EMAIL_TEST_TUTOR,
+        oggetto: `Report AssessFirst — ${cliente.nome}`,
+        corpo: `In allegato lo ZIP con il piano/report e i report AssessFirst di ${cliente.nome} (tutor ${cliente.tutor}).\n\n[Invio di TEST]`,
+        zipNome: `${cliente.nome.replace(/\s+/g, '-')}-report-AF.zip`,
+        files,
+      })
+      setInviato(true)
+    } catch (e) { setErroreInvio(e instanceof Error ? e.message : 'invio fallito') } finally { setInviando(false) }
+  }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-linea bg-carta shadow-sm">
@@ -324,11 +367,39 @@ function CartaCliente({ cliente, token, modello, limiti }: {
               {persone.map((p) => (
                 <div key={p.nome} className="relative">
                   <button onClick={() => togli(p.nome)} className="absolute right-2 top-2 z-10 text-[11px] font-semibold text-rose-400 hover:text-rose-700">rimuovi</button>
-                  <GenPersona persona={p} piano={piano} token={token} modello={modello} limiti={limiti} />
+                  <GenPersona persona={p} piano={piano} token={token} modello={modello} limiti={limiti}
+                    onReport={(jid) => setReportPronti((m) => { const n = { ...m }; if (jid) n[p.nome] = jid; else delete n[p.nome]; return n })} />
                 </div>
               ))}
             </div>
           )}
+
+          {/* invio al tutor: ZIP report + report AF */}
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+            <p className="text-[12px] font-bold text-inchiostro">Invia al tutor</p>
+            <p className="mt-0.5 text-[11px] text-inchiostro/80">
+              ZIP con il piano/report + i report AF generati. {daPratica ? 'Si abilita quando tutte le persone hanno il report.' : 'Cliente inserito manualmente: invio sempre disponibile.'} <b>Invio di TEST a {EMAIL_TEST_TUTOR}</b>.
+            </p>
+            {daPratica && !tuttiPronti && persone.length > 0 && (
+              <p className="mt-1 text-[11px] text-rose-600">Mancano i report di: {persone.filter((p) => !reportPronti[p.nome]).map((p) => p.nome).join(', ')}</p>
+            )}
+            {!confermaInvio ? (
+              <button onClick={() => setConfermaInvio(true)} disabled={!puoInviare || inviando}
+                className="mt-2 rounded-lg bg-emerald-700 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40">
+                📧 Invia ZIP al tutor
+              </button>
+            ) : (
+              <div className="mt-2 rounded-lg border border-emerald-300 bg-carta px-3 py-2 text-[12px] text-inchiostro">
+                Invio lo ZIP ({nFile} file: {piano ? 'piano + ' : ''}{nReport} report AF) a <b>{EMAIL_TEST_TUTOR}</b>. Confermi?
+                <div className="mt-2 flex gap-2">
+                  <button onClick={() => setConfermaInvio(false)} className="rounded-lg border border-linea bg-carta px-2.5 py-1 text-[11px] font-semibold text-inchiostro/80">Annulla</button>
+                  <button onClick={inviaAlTutor} disabled={inviando} className="rounded-lg bg-emerald-700 px-3 py-1 text-[11px] font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{inviando ? 'Invio…' : 'Sì, invia'}</button>
+                </div>
+              </div>
+            )}
+            {inviato && <p className="mt-1.5 text-[11px] font-semibold text-green-700">✓ Email inviata a {EMAIL_TEST_TUTOR}.</p>}
+            {erroreInvio && <p className="mt-1.5 text-[11px] font-semibold text-rose-600">{erroreInvio}</p>}
+          </div>
         </div>
       )}
     </div>

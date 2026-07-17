@@ -61,6 +61,11 @@ export default function NoteCliente({ cliente, azienda, nome, slug, siloRientro 
         {note.length > 0 && (
           <span className="rounded-full bg-petrolio/12 px-1.5 py-0.5 text-[10px] font-bold text-petrolio-scuro">{note.length}</span>
         )}
+        {bloccato && (
+          <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
+            🔒 Bloccato{info?.reminder ? ` · sblocco ${fmtData(info.reminder)}` : ''}
+          </span>
+        )}
       </button>
 
       {aperto && (

@@ -14,6 +14,8 @@ import {
 } from '@/lib/consulenzeFrank'
 import { PRONTO_CONSULENZA, ProntoConsulenza, pcPerTutor } from '@/lib/prontoConsulenza'
 import { fmtData } from '@/lib/quadroaziendale'
+import { clientiBloccati } from '@/lib/blocco'
+import { useApp } from '@/lib/store'
 import ExportTutorExcel from '@/components/ExportTutorExcel'
 
 const fmtGiorno = (iso: string) =>
@@ -23,7 +25,7 @@ function Carta({ children, className = '' }: { children: React.ReactNode; classN
   return <div className={`rounded-2xl border border-linea bg-carta p-4 shadow-sm ${className}`}>{children}</div>
 }
 
-type FiltroKey = 'erogazione' | 'documenti' | 'senza-call' | 'call-da-fissare' | 'call-prenotata'
+type FiltroKey = 'erogazione' | 'documenti' | 'senza-call' | 'call-da-fissare' | 'call-prenotata' | 'bloccati'
 
 /** una riga cliente generica da mostrare nell'elenco filtrato */
 type Voce = { nome: string; destra: string; tono: 'verde' | 'rosso' | 'neutro' }
@@ -56,11 +58,21 @@ function vociTutor(tutor: string, filtro: FiltroKey): Voce[] {
       return (pcDi(tutor)?.fissate ?? []).map((c: ProntoConsulenza) => ({
         nome: c.cliente, destra: `${fmtGiorno(c.consulenza as string)}${c.ora ? ` · ${c.ora}` : ''}`, tono: 'verde',
       }))
+    default:
+      return [] // 'bloccati' è gestito a parte (serve lo stato condiviso)
   }
 }
 
 export default function TutorIndex() {
   const [filtro, setFiltro] = useState<FiltroKey | null>(null)
+  const { state, silos, bloccoInfo } = useApp()
+
+  // clienti bloccati (silo -1), risolti a cliente/tutor reale
+  const bloccati = clientiBloccati(silos, bloccoInfo, state.pratiche)
+  const vociBloccatiTutor = (tutor: string): Voce[] =>
+    bloccati
+      .filter((b) => b.tutor.toUpperCase() === tutor.toUpperCase())
+      .map((b) => ({ nome: b.nome, destra: b.reminder ? `sblocco ${fmtGiorno(b.reminder)}` : 'bloccato', tono: 'rosso' as const }))
 
   // numeri aggregati (tutti i tutor)
   const inProd = CONSULENZE_FRANK.length
@@ -76,11 +88,12 @@ export default function TutorIndex() {
     { key: 'senza-call', valore: senzaCall, titolo: 'Senza call fissata', sub: 'in erogazione, consulenza non prenotata', classe: 'bg-rose-50', num: 'text-rose-700' },
     { key: 'call-da-fissare', valore: callDaFissare, titolo: 'In attesa di call', sub: 'report pronto, consulenza da fissare', classe: 'bg-orange-50', num: 'text-orange-700' },
     { key: 'call-prenotata', valore: callPrenotata, titolo: 'Call prenotata', sub: 'report pronto, consulenza fissata', classe: 'bg-green-50', num: 'text-green-700' },
+    { key: 'bloccati', valore: bloccati.length, titolo: 'Bloccati', sub: 'in pausa, con data di sblocco prevista', classe: 'bg-inchiostro/[0.06]', num: 'text-inchiostro' },
   ]
 
   // in modalità filtro: solo i tutor che hanno clienti in quella categoria
   const tutorVisibili = filtro
-    ? TUTOR_FRANK.map((t) => ({ t, voci: vociTutor(t.tutor, filtro) })).filter((x) => x.voci.length > 0)
+    ? TUTOR_FRANK.map((t) => ({ t, voci: filtro === 'bloccati' ? vociBloccatiTutor(t.tutor) : vociTutor(t.tutor, filtro) })).filter((x) => x.voci.length > 0)
     : TUTOR_FRANK.map((t) => ({ t, voci: [] as Voce[] }))
 
   const titoloFiltro = tiles.find((x) => x.key === filtro)?.titolo
@@ -108,7 +121,7 @@ export default function TutorIndex() {
         </header>
 
         {/* blocchi KPI interattivi (aggregati di tutti i tutor) */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {tiles.map((tile) => {
             const attivo = filtro === tile.key
             return (

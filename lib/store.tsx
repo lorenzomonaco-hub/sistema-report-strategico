@@ -69,6 +69,8 @@ type Azione =
   | { type: 'RIMUOVI_NOTA_CLIENTE'; chiave: string; id: string }
   | { type: 'INVIA_ELISA'; praticaId: string; inviato: boolean; autore: string }
   | { type: 'SET_SENZA_TRASCRIZIONE'; praticaId: string; valore: boolean }
+  | { type: 'AGG_PERSONA_CLIENTE'; slug: string; persona: PersonaAF }
+  | { type: 'RIM_PERSONA_CLIENTE'; slug: string; nome: string }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 const ora = () => new Date().toISOString()
@@ -558,6 +560,18 @@ function reducer(state: AppState, azione: Azione): AppState {
     case 'SET_SENZA_TRASCRIZIONE':
       return aggiornaPratica(state, azione.praticaId, (p) => ({ ...p, senzaTrascrizione: azione.valore }))
 
+    case 'AGG_PERSONA_CLIENTE': {
+      const m = state.personeCliente ?? {}
+      const attuali = m[azione.slug] ?? []
+      if (attuali.some((d) => d.nome.toLowerCase() === azione.persona.nome.toLowerCase())) return state
+      return { ...state, personeCliente: { ...m, [azione.slug]: [...attuali, azione.persona] } }
+    }
+
+    case 'RIM_PERSONA_CLIENTE': {
+      const m = state.personeCliente ?? {}
+      return { ...state, personeCliente: { ...m, [azione.slug]: (m[azione.slug] ?? []).filter((d) => d.nome !== azione.nome) } }
+    }
+
     case 'INVIA_ELISA':
       return aggiornaPratica(state, azione.praticaId, (p) => ({
         ...p,
@@ -618,6 +632,10 @@ interface StoreContextValue {
   inviaElisa: (praticaId: string, inviato: boolean, autore: string) => void
   /** segna che il cliente non ha la trascrizione (la rende non obbligatoria) */
   setSenzaTrascrizione: (praticaId: string, valore: boolean) => void
+  /** persone inserite da Irene sui clienti non-Pratica (slug → persone) */
+  personeCliente: Record<string, PersonaAF[]>
+  aggiungiPersonaCliente: (slug: string, persona: PersonaAF) => void
+  rimuoviPersonaCliente: (slug: string, nome: string) => void
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -776,6 +794,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     rimuoviNotaCliente: (chiave, id) => dispatch({ type: 'RIMUOVI_NOTA_CLIENTE', chiave, id }),
     inviaElisa: (praticaId, inviato, autore) => dispatch({ type: 'INVIA_ELISA', praticaId, inviato, autore }),
     setSenzaTrascrizione: (praticaId, valore) => dispatch({ type: 'SET_SENZA_TRASCRIZIONE', praticaId, valore }),
+    personeCliente: state.personeCliente ?? {},
+    aggiungiPersonaCliente: (slug, persona) => dispatch({ type: 'AGG_PERSONA_CLIENTE', slug, persona }),
+    rimuoviPersonaCliente: (slug, nome) => dispatch({ type: 'RIM_PERSONA_CLIENTE', slug, nome }),
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

@@ -228,6 +228,10 @@ export interface AppState {
   /** Note/aggiornamenti per cliente (chiave cliente → registro cronologico).
    *  Alimentate dall'amministrazione con gli update dei tutor. */
   noteClienti?: Record<string, NotaCliente[]>
+  /** Persone (soci/dipendenti) inserite da Irene sui clienti che NON sono
+   *  Pratiche (es. i 34 «frank» in erogazione): slug cliente → persone. Per i
+   *  clienti-Pratica le persone restano in pratica.dipendenti. */
+  personeCliente?: Record<string, PersonaAF[]>
   /** Posizione nel silo di OGNI cliente della pipeline Consulenze Frank
    *  (slug → SiloId): i 34 ufficiali + i clienti nuovi registrati in area
    *  commerciale. Fonte condivisa per board /erogazione, Gantt e vista tutor.

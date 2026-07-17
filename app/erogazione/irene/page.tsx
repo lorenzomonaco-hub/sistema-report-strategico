@@ -235,7 +235,9 @@ function CartaCliente({ cliente, token, modello, limiti }: {
 
           {/* generazione per persona */}
           {persone.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-inchiostro/20 px-3 py-4 text-center text-[12px] text-inchiostro/80">Aggiungi almeno una persona per generare i report.</p>
+            <p className="rounded-xl border border-dashed border-inchiostro/25 px-3 py-4 text-center text-[12px] text-inchiostro">
+              Aggiungi qui sopra ogni persona da valutare. <b>Per ciascuna comparirà qui sotto il caricamento dei suoi 4 AssessFirst</b> (SWIPE, DRIVE, BRAIN, Comportamenti) e il tasto «Genera report AF».
+            </p>
           ) : (
             <div className="space-y-2">
               {persone.map((p) => (

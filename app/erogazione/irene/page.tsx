@@ -88,13 +88,13 @@ function GenPersona({ persona, piano, token, modello, limiti }: {
     <div className="rounded-xl border border-linea bg-carta p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-inchiostro">{persona.nome}</span>
-        <span className="rounded-full bg-inchiostro/10 px-2 py-0.5 text-[11px] text-inchiostro/60">{persona.ruolo || persona.qualifica}</span>
+        <span className="rounded-full bg-inchiostro/10 px-2 py-0.5 text-[11px] text-inchiostro/80">{persona.ruolo || persona.qualifica}</span>
         {stato?.fase === 'completato' && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-700">✓ report pronto</span>}
       </div>
 
       {!jobId && (
         <div className="mt-2 flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/45">
+          <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/80">
             Relazione (caso)
             <select value={relazione} onChange={(e) => setRelazione(e.target.value as 'a' | 'b' | 'c')}
               className="rounded-lg border border-linea bg-carta px-2 py-1.5 text-[12px] text-inchiostro focus:border-petrolio focus:outline-none">
@@ -103,8 +103,8 @@ function GenPersona({ persona, piano, token, modello, limiti }: {
               <option value="c">c — dipendente, più figure</option>
             </select>
           </label>
-          <label className="flex-1 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/45">
-            PDF AssessFirst della persona (SWIPE/DRIVE/BRAIN/comportamenti)
+          <label className="flex-1 text-[11px] font-bold uppercase tracking-wide text-inchiostro">
+            I 4 AssessFirst di questo dipendente <span className="font-semibold normal-case text-inchiostro/80">(SWIPE · DRIVE · BRAIN · Comportamenti — caricali insieme)</span>
             <input type="file" multiple accept=".pdf"
               onChange={(e) => {
                 const files = e.target.files ? Array.from(e.target.files) : []
@@ -112,11 +112,11 @@ function GenPersona({ persona, piano, token, modello, limiti }: {
                 if (nonPdf.length) { setErrore(`Non PDF: ${nonPdf.map((f) => f.name).join(', ')}`); setAf([]); e.target.value = ''; return }
                 setErrore(''); setAf(files)
               }}
-              className="mt-1 block w-full text-[12px] text-inchiostro/60 file:mr-2 file:rounded-lg file:border-0 file:bg-inchiostro/[0.06] file:px-2 file:py-1 file:text-[11px] file:font-semibold" />
+              className="mt-1 block w-full text-[12px] text-inchiostro/80 file:mr-2 file:rounded-lg file:border-0 file:bg-inchiostro/[0.06] file:px-2 file:py-1 file:text-[11px] file:font-semibold" />
           </label>
         </div>
       )}
-      {af.length > 0 && !jobId && <p className="mt-1 text-[11px] text-inchiostro/50">{af.length} file · {troppi ? `max ${limiti?.max_file_af}!` : 'ok'}</p>}
+      {af.length > 0 && !jobId && <p className="mt-1 text-[11px] text-inchiostro/80">{af.length} file · {troppi ? `max ${limiti?.max_file_af}!` : 'ok'}</p>}
 
       {!jobId && !conferma && (
         <button onClick={() => setConferma(true)} disabled={!pronto}
@@ -125,14 +125,14 @@ function GenPersona({ persona, piano, token, modello, limiti }: {
         </button>
       )}
       {!jobId && !pronto && !conferma && (
-        <p className="mt-1 text-[11px] text-inchiostro/45">Serve il piano del cliente {piano ? '✓' : '(manca)'} e almeno un PDF AssessFirst.</p>
+        <p className="mt-1 text-[11px] text-inchiostro/80">Serve il piano del cliente {piano ? '✓' : '(manca)'} e almeno un PDF AssessFirst.</p>
       )}
 
       {conferma && stima && (
         <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
           Tetto di costo: fino a <strong>${stima.euro}</strong> ({stima.token.toLocaleString('it-IT')} token, {modello}). Il costo reale è quasi sempre più basso. Confermi la generazione?
           <div className="mt-2 flex gap-2">
-            <button onClick={() => setConferma(false)} className="rounded-lg border border-linea bg-carta px-2.5 py-1 text-[11px] font-semibold text-inchiostro/60">Annulla</button>
+            <button onClick={() => setConferma(false)} className="rounded-lg border border-linea bg-carta px-2.5 py-1 text-[11px] font-semibold text-inchiostro/80">Annulla</button>
             <button onClick={genera} disabled={invio} className="rounded-lg bg-amber-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-amber-700 disabled:opacity-40">{invio ? 'Invio…' : `Sì, genera (fino a $${stima.euro})`}</button>
           </div>
         </div>
@@ -142,9 +142,9 @@ function GenPersona({ persona, piano, token, modello, limiti }: {
         <div className="mt-2">
           <ul className="space-y-1">
             {(stato?.passi ?? []).map((p, i) => (
-              <li key={i} className="flex items-center gap-2 text-[11px] text-inchiostro/70"><span className="text-green-600">✓</span>{ETICHETTA_PASSO_AF[p.passo] ?? p.passo}</li>
+              <li key={i} className="flex items-center gap-2 text-[11px] text-inchiostro"><span className="text-green-600">✓</span>{ETICHETTA_PASSO_AF[p.passo] ?? p.passo}</li>
             ))}
-            {!finale && <li className="flex items-center gap-2 text-[11px] text-inchiostro/40"><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ambra border-t-transparent" />{stato ? (ETICHETTA_PASSO_AF[stato.fase] ?? stato.fase) : 'collegamento'}…</li>}
+            {!finale && <li className="flex items-center gap-2 text-[11px] text-inchiostro/80"><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ambra border-t-transparent" />{stato ? (ETICHETTA_PASSO_AF[stato.fase] ?? stato.fase) : 'collegamento'}…</li>}
           </ul>
           {stato?.fase === 'completato' && (
             <button onClick={() => scaricaPdfReportAF(token, jobId, stato.pdf ?? 'report-af.pdf').catch((e) => setErrore(String(e)))}
@@ -196,30 +196,30 @@ function CartaCliente({ cliente, token, modello, limiti }: {
       <button onClick={() => setAperto((v) => !v)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-inchiostro/[0.02]">
         <div className="min-w-0">
           <p className="truncate font-display font-bold text-inchiostro">{cliente.nome}</p>
-          <p className="truncate text-[11px] text-inchiostro/55">tutor {cliente.tutor} · {persone.length} {persone.length === 1 ? 'persona' : 'persone'}</p>
+          <p className="truncate text-[11px] text-inchiostro/80">tutor {cliente.tutor} · {persone.length} {persone.length === 1 ? 'persona' : 'persone'}</p>
         </div>
-        <span className="text-inchiostro/40">{aperto ? '▲' : '▼'}</span>
+        <span className="text-inchiostro/80">{aperto ? '▲' : '▼'}</span>
       </button>
 
       {aperto && (
         <div className="space-y-3 border-t border-linea bg-inchiostro/[0.015] p-4">
           {/* piano del cliente (1 volta) */}
           <div className="rounded-xl border border-linea bg-carta p-3">
-            <p className="text-[12px] font-bold text-inchiostro">Piano di consulenza <span className="font-normal text-inchiostro/45">— 1 per cliente (Word/PDF), vale per tutte le persone</span></p>
+            <p className="text-[12px] font-bold text-inchiostro">Piano di consulenza / report <span className="font-semibold text-inchiostro/80">— UNO per cliente (Word/PDF), vale per tutte le persone</span></p>
             <input type="file" accept=".pdf,.docx"
               onChange={(e) => {
                 const f = e.target.files?.[0] ?? null
                 if (f && !/\.(pdf|docx)$/i.test(f.name)) { setErr('Il piano dev’essere Word (.docx) o PDF.'); setPiano(null); e.target.value = ''; return }
                 setErr(''); setPiano(f)
               }}
-              className="mt-1.5 block w-full text-[12px] text-inchiostro/60 file:mr-2 file:rounded-lg file:border-0 file:bg-petrolio file:px-3 file:py-1.5 file:text-[11px] file:font-semibold file:text-white" />
+              className="mt-1.5 block w-full text-[12px] text-inchiostro/80 file:mr-2 file:rounded-lg file:border-0 file:bg-petrolio file:px-3 file:py-1.5 file:text-[11px] file:font-semibold file:text-white" />
             {piano && <p className="mt-1 text-[11px] text-green-700">✓ {piano.name}</p>}
           </div>
 
           {/* inserimento persone */}
           <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3">
             <p className="text-[12px] font-bold text-indigo-900">Persone da valutare</p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_1fr_auto_auto]">
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
               <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome" className={inp} />
               <input value={cognome} onChange={(e) => setCognome(e.target.value)} placeholder="Cognome" className={inp} />
               <input value={ruolo} onChange={(e) => setRuolo(e.target.value)} placeholder="Ruolo in azienda" className={inp} />
@@ -228,14 +228,14 @@ function CartaCliente({ cliente, token, modello, limiti }: {
                 <option value="socio">Socio</option>
                 <option value="dipendente">Dipendente</option>
               </select>
-              <button onClick={aggiungi} className="rounded-xl border border-indigo-200 bg-carta px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">+ Aggiungi</button>
             </div>
-            {err && <p className="mt-1.5 text-[11px] text-rose-600">{err}</p>}
+            <button onClick={aggiungi} className="mt-2 w-full rounded-xl border border-indigo-200 bg-carta px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 sm:w-auto">+ Aggiungi persona</button>
+            {err && <p className="mt-1.5 text-[11px] font-semibold text-rose-600">{err}</p>}
           </div>
 
           {/* generazione per persona */}
           {persone.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-inchiostro/20 px-3 py-4 text-center text-[12px] text-inchiostro/50">Aggiungi almeno una persona per generare i report.</p>
+            <p className="rounded-xl border border-dashed border-inchiostro/20 px-3 py-4 text-center text-[12px] text-inchiostro/80">Aggiungi almeno una persona per generare i report.</p>
           ) : (
             <div className="space-y-2">
               {persone.map((p) => (
@@ -273,16 +273,16 @@ export default function AreaIrene() {
 
   return (
     <div className="min-h-screen flex-1 sfondo-trama">
-      <div className="mx-auto max-w-3xl px-6 py-10">
+      <div className="mx-auto max-w-4xl px-6 py-10">
         <header className="flex flex-wrap items-center gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-ambra">Erogazione · Irene</p>
             <h1 className="font-display mt-1 text-3xl font-bold tracking-tight text-inchiostro">Report AssessFirst</h1>
-            <p className="mt-1 max-w-2xl text-sm text-inchiostro/70">
+            <p className="mt-1 max-w-2xl text-sm text-inchiostro">
               Per ogni cliente in erogazione: inserisci le persone (restano salvate), carica il piano di consulenza una volta e genera il report AF di ciascuna persona. La generazione usa l&rsquo;agente sul server.
             </p>
           </div>
-          <div className="ml-auto"><Link href="/erogazione" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">← Pipeline</Link></div>
+          <div className="ml-auto"><Link href="/erogazione" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/80 hover:text-inchiostro">← Pipeline</Link></div>
         </header>
 
         {saluteErr ? (
@@ -294,7 +294,7 @@ export default function AreaIrene() {
 
         <div className="mt-6 space-y-3">
           {inErogazione.length === 0 ? (
-            <p className="rounded-2xl border border-linea bg-carta px-4 py-10 text-center text-sm text-inchiostro/50">Nessun cliente in erogazione al momento.</p>
+            <p className="rounded-2xl border border-linea bg-carta px-4 py-10 text-center text-sm text-inchiostro/80">Nessun cliente in erogazione al momento.</p>
           ) : (
             inErogazione.map((c) => <CartaCliente key={c.slug} cliente={c} token={token} modello={modello} limiti={limiti} />)
           )}

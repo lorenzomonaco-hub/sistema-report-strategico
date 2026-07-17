@@ -1,11 +1,19 @@
-// ─── Clienti per tutor ─── (indice)
-// Gli stessi clienti del Gantt Consulenze Frank, raggruppati per tutor. Per
-// ciascun tutor: quanti clienti in produzione e quanti NON hanno ancora la
-// consulenza con Frank prenotata (così il tutor sa chi manca e può segnalarlo).
+'use client'
 
+// ─── Clienti per tutor ─── (indice)
+// In alto: blocchi KPI interattivi con i numeri AGGREGATI di tutti i tutor
+// (in erogazione, manca documenti, senza call, in attesa di call, call prenotata).
+// Cliccando un blocco l'elenco sotto si filtra: ogni tutor mostra solo i clienti
+// di quella categoria. Senza filtro, ogni card mostra il riepilogo + pronto-consulenza.
+
+import { useState } from 'react'
 import Link from 'next/link'
-import { CONSULENZE_FRANK, IN_ATTESA, TUTOR_FRANK } from '@/lib/consulenzeFrank'
-import { PRONTO_CONSULENZA, pcPerTutor } from '@/lib/prontoConsulenza'
+import {
+  CONSULENZE_FRANK, IN_ATTESA, TUTOR_FRANK, RigaFrank, ClienteAttesa,
+  clientiTutorFrank, attesaTutor,
+} from '@/lib/consulenzeFrank'
+import { PRONTO_CONSULENZA, ProntoConsulenza, pcPerTutor } from '@/lib/prontoConsulenza'
+import { fmtData } from '@/lib/quadroaziendale'
 import ExportTutorExcel from '@/components/ExportTutorExcel'
 
 const fmtGiorno = (iso: string) =>
@@ -15,11 +23,67 @@ function Carta({ children, className = '' }: { children: React.ReactNode; classN
   return <div className={`rounded-2xl border border-linea bg-carta p-4 shadow-sm ${className}`}>{children}</div>
 }
 
+type FiltroKey = 'erogazione' | 'documenti' | 'senza-call' | 'call-da-fissare' | 'call-prenotata'
+
+/** una riga cliente generica da mostrare nell'elenco filtrato */
+type Voce = { nome: string; destra: string; tono: 'verde' | 'rosso' | 'neutro' }
+
+const pcMap = new Map(pcPerTutor().map((g) => [g.tutor.toUpperCase(), g]))
+const pcDi = (tutor: string) => pcMap.get(tutor.toUpperCase())
+
+/** clienti di un tutor per la categoria filtrata */
+function vociTutor(tutor: string, filtro: FiltroKey): Voce[] {
+  switch (filtro) {
+    case 'erogazione':
+      return clientiTutorFrank(tutor).map((r: RigaFrank) => ({
+        nome: r.cliente,
+        destra: r.consulenzaFrank ? `call ${fmtData(r.consulenzaFrank)}` : 'call da prenotare',
+        tono: r.consulenzaFrank ? 'verde' : 'rosso',
+      }))
+    case 'senza-call':
+      return clientiTutorFrank(tutor).filter((r) => !r.consulenzaFrank).map((r) => ({
+        nome: r.cliente, destra: 'call da prenotare', tono: 'rosso',
+      }))
+    case 'documenti':
+      return attesaTutor(tutor).map((c: ClienteAttesa) => ({
+        nome: c.nome, destra: c.servizio || '—', tono: 'neutro',
+      }))
+    case 'call-da-fissare':
+      return (pcDi(tutor)?.daFissare ?? []).map((c: ProntoConsulenza) => ({
+        nome: c.cliente, destra: 'da fissare', tono: 'rosso',
+      }))
+    case 'call-prenotata':
+      return (pcDi(tutor)?.fissate ?? []).map((c: ProntoConsulenza) => ({
+        nome: c.cliente, destra: `${fmtGiorno(c.consulenza as string)}${c.ora ? ` · ${c.ora}` : ''}`, tono: 'verde',
+      }))
+  }
+}
+
 export default function TutorIndex() {
+  const [filtro, setFiltro] = useState<FiltroKey | null>(null)
+
+  // numeri aggregati (tutti i tutor)
   const inProd = CONSULENZE_FRANK.length
   const inAttesa = IN_ATTESA.length
-  const senzaConsTot = CONSULENZE_FRANK.filter((r) => !r.consulenzaFrank).length
-  const pcMap = new Map(pcPerTutor().map((g) => [g.tutor.toUpperCase(), g]))
+  const senzaCall = CONSULENZE_FRANK.filter((r) => !r.consulenzaFrank).length
+  const callDaFissare = PRONTO_CONSULENZA.filter((c) => !c.consulenza).length
+  const callPrenotata = PRONTO_CONSULENZA.filter((c) => c.consulenza).length
+  const totaleClienti = inProd + inAttesa + PRONTO_CONSULENZA.length
+
+  const tiles: { key: FiltroKey; valore: number; titolo: string; sub: string; classe: string; num: string }[] = [
+    { key: 'documenti', valore: inAttesa, titolo: 'Manca documenti', sub: 'questionario / AssessFirst da compilare', classe: 'bg-amber-50', num: 'text-amber-700' },
+    { key: 'erogazione', valore: inProd, titolo: 'In erogazione', sub: 'report in lavorazione nella pipeline', classe: 'bg-petrolio/10', num: 'text-petrolio-scuro' },
+    { key: 'senza-call', valore: senzaCall, titolo: 'Senza call fissata', sub: 'in erogazione, consulenza non prenotata', classe: 'bg-rose-50', num: 'text-rose-700' },
+    { key: 'call-da-fissare', valore: callDaFissare, titolo: 'In attesa di call', sub: 'report pronto, consulenza da fissare', classe: 'bg-orange-50', num: 'text-orange-700' },
+    { key: 'call-prenotata', valore: callPrenotata, titolo: 'Call prenotata', sub: 'report pronto, consulenza fissata', classe: 'bg-green-50', num: 'text-green-700' },
+  ]
+
+  // in modalità filtro: solo i tutor che hanno clienti in quella categoria
+  const tutorVisibili = filtro
+    ? TUTOR_FRANK.map((t) => ({ t, voci: vociTutor(t.tutor, filtro) })).filter((x) => x.voci.length > 0)
+    : TUTOR_FRANK.map((t) => ({ t, voci: [] as Voce[] }))
+
+  const titoloFiltro = tiles.find((x) => x.key === filtro)?.titolo
 
   return (
     <div className="min-h-screen flex-1 sfondo-trama">
@@ -29,10 +93,7 @@ export default function TutorIndex() {
             <p className="text-xs font-semibold uppercase tracking-widest text-ambra">Solo amministratori</p>
             <h1 className="font-display mt-1 text-3xl font-bold tracking-tight text-inchiostro">Clienti per tutor</h1>
             <p className="mt-1 max-w-2xl text-sm text-inchiostro/55">
-              {inProd} clienti in produzione + {inAttesa} in attesa (questionario/AssessFirst non ancora compilati), {TUTOR_FRANK.length} tutor. Il badge rosso segnala chi non ha ancora prenotato la consulenza con Frank.
-            </p>
-            <p className="mt-1 max-w-2xl text-[12px] text-inchiostro/50">
-              Pronto per consulenza: <b className="text-inchiostro/70">{PRONTO_CONSULENZA.length}</b> clienti col report finito · <span className="font-semibold text-green-700">{PRONTO_CONSULENZA.filter((c) => c.consulenza).length} fissate</span> · <span className="font-semibold text-rose-700">{PRONTO_CONSULENZA.filter((c) => !c.consulenza).length} da fissare</span> (elencati dentro la casella di ogni tutor).
+              {totaleClienti} clienti su {TUTOR_FRANK.length} tutor. I blocchi qui sotto sono i totali di tutti i tutor: cliccane uno per vedere <b className="text-inchiostro/70">chi</b> è in quella situazione, tutor per tutor.
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -46,80 +107,99 @@ export default function TutorIndex() {
           </div>
         </header>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Carta className="bg-petrolio/10">
-            <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">{inProd + inAttesa} clienti · {TUTOR_FRANK.length} tutor</p>
-            <p className="font-display mt-1 text-3xl font-bold tracking-tight text-petrolio-scuro">{inProd}</p>
-            <p className="mt-1 text-[11px] text-inchiostro/50">in produzione</p>
-          </Carta>
-          <Carta>
-            <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">In attesa</p>
-            <p className="font-display mt-1 text-2xl font-bold text-inchiostro/70">{inAttesa}</p>
-            <p className="mt-1 text-[11px] text-inchiostro/50">questionario / AssessFirst da compilare</p>
-          </Carta>
-          <Carta className={senzaConsTot > 0 ? 'bg-rose-50' : ''}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Senza consulenza prenotata</p>
-            <p className="font-display mt-1 text-2xl font-bold text-rose-700">{senzaConsTot}</p>
-            <p className="mt-1 text-[11px] text-inchiostro/50">da sollecitare / segnalare</p>
-          </Carta>
-          <Carta>
-            <p className="text-xs font-semibold uppercase tracking-wide text-inchiostro/40">Consulenza prenotata</p>
-            <p className="font-display mt-1 text-2xl font-bold text-green-700">{inProd - senzaConsTot}</p>
-          </Carta>
+        {/* blocchi KPI interattivi (aggregati di tutti i tutor) */}
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {tiles.map((tile) => {
+            const attivo = filtro === tile.key
+            return (
+              <button
+                key={tile.key}
+                onClick={() => setFiltro(attivo ? null : tile.key)}
+                className={`rounded-2xl border p-4 text-left shadow-sm transition ${tile.classe} ${attivo ? 'border-inchiostro/40 ring-2 ring-inchiostro/15' : 'border-linea hover:border-inchiostro/25'}`}
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-inchiostro/45">{tile.titolo}</p>
+                <p className={`font-display mt-1 text-3xl font-bold tracking-tight ${tile.num}`}>{tile.valore}</p>
+                <p className="mt-1 text-[10.5px] leading-tight text-inchiostro/50">{tile.sub}</p>
+                <p className={`mt-1.5 text-[10px] font-semibold ${attivo ? 'text-inchiostro/60' : 'text-inchiostro/30'}`}>{attivo ? '● filtro attivo — clicca per togliere' : 'clicca per filtrare'}</p>
+              </button>
+            )
+          })}
         </div>
 
+        {filtro && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-inchiostro/60">Filtro: <b className="text-inchiostro">{titoloFiltro}</b> · {tutorVisibili.reduce((s, x) => s + x.voci.length, 0)} clienti su {tutorVisibili.length} tutor</span>
+            <button onClick={() => setFiltro(null)} className="rounded-lg border border-linea bg-carta px-2.5 py-1 text-xs font-semibold text-petrolio hover:bg-petrolio/5">mostra tutti</button>
+          </div>
+        )}
+
+        {/* elenco tutor */}
         <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {TUTOR_FRANK.map((t) => (
+          {tutorVisibili.map(({ t, voci }) => (
             <Link key={t.slug} href={`/amministrazione/tutor/${t.slug}`} className="block">
               <Carta className="h-full transition-colors hover:border-petrolio/40">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-display text-base font-bold text-inchiostro">{t.tutor}</p>
-                  <span className="shrink-0 rounded-full bg-inchiostro/[0.06] px-2 py-0.5 text-[11px] font-bold text-inchiostro/60">{t.totale}</span>
+                  <span className="shrink-0 rounded-full bg-inchiostro/[0.06] px-2 py-0.5 text-[11px] font-bold text-inchiostro/60">
+                    {filtro ? voci.length : t.totale}
+                  </span>
                 </div>
-                <p className="mt-1 text-[11px] text-inchiostro/45">{t.produzione} in produzione · {t.inAttesa} in attesa</p>
-                <div className="mt-2">
-                  {t.senzaConsulenza > 0 ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700">
-                      ⚠ {t.senzaConsulenza} senza consulenza
-                    </span>
-                  ) : t.produzione > 0 ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-700">
-                      ✓ consulenze a posto
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-inchiostro/[0.06] px-2 py-0.5 text-[11px] font-bold text-inchiostro/50">
-                      nessuno in produzione
-                    </span>
-                  )}
-                </div>
-                {(() => {
-                  const pc = pcMap.get(t.tutor.toUpperCase())
-                  if (!pc) return null
-                  return (
-                    <div className="mt-3 border-t border-linea/60 pt-2">
-                      <p className="text-[11px]">
-                        <span className="font-semibold text-inchiostro/60">Pronto per consulenza</span>
-                        {' · '}<span className="font-semibold text-green-700">{pc.fissate.length} fissate</span>
-                        {pc.daFissare.length > 0 && <span className="font-semibold text-rose-700"> · {pc.daFissare.length} da fissare</span>}
-                      </p>
-                      <ul className="mt-1.5 space-y-1">
-                        {[...pc.fissate, ...pc.daFissare].map((c, i) => (
-                          <li key={c.cliente + i} className="flex items-center justify-between gap-2 border-t border-linea/50 pt-1 text-[11px] first:border-t-0 first:pt-0">
-                            <span className="min-w-0 truncate text-inchiostro">{c.cliente}</span>
-                            {c.consulenza
-                              ? <span className="shrink-0 font-semibold text-green-700">{fmtGiorno(c.consulenza)}{c.ora ? ` · ${c.ora}` : ''}</span>
-                              : <span className="shrink-0 font-semibold text-rose-600">da fissare</span>}
-                          </li>
-                        ))}
-                      </ul>
+
+                {filtro ? (
+                  // modalità filtro: elenco dei clienti di quella categoria
+                  <ul className="mt-2 space-y-1">
+                    {voci.map((v, i) => (
+                      <li key={v.nome + i} className="flex items-center justify-between gap-2 border-t border-linea/50 pt-1 text-[11px] first:border-t-0 first:pt-0">
+                        <span className="min-w-0 truncate text-inchiostro">{v.nome}</span>
+                        <span className={`shrink-0 font-semibold ${v.tono === 'verde' ? 'text-green-700' : v.tono === 'rosso' ? 'text-rose-600' : 'text-inchiostro/45'}`}>{v.destra}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  // vista di default: riepilogo + pronto-consulenza
+                  <>
+                    <p className="mt-1 text-[11px] text-inchiostro/45">{t.produzione} in produzione · {t.inAttesa} in attesa</p>
+                    <div className="mt-2">
+                      {t.senzaConsulenza > 0 ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700">⚠ {t.senzaConsulenza} senza call</span>
+                      ) : t.produzione > 0 ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-700">✓ call a posto</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-inchiostro/[0.06] px-2 py-0.5 text-[11px] font-bold text-inchiostro/50">nessuno in produzione</span>
+                      )}
                     </div>
-                  )
-                })()}
+                    {(() => {
+                      const pc = pcDi(t.tutor)
+                      if (!pc) return null
+                      return (
+                        <div className="mt-3 border-t border-linea/60 pt-2">
+                          <p className="text-[11px]">
+                            <span className="font-semibold text-inchiostro/60">Pronto per consulenza</span>
+                            {' · '}<span className="font-semibold text-green-700">{pc.fissate.length} fissate</span>
+                            {pc.daFissare.length > 0 && <span className="font-semibold text-rose-700"> · {pc.daFissare.length} da fissare</span>}
+                          </p>
+                          <ul className="mt-1.5 space-y-1">
+                            {[...pc.fissate, ...pc.daFissare].map((c, i) => (
+                              <li key={c.cliente + i} className="flex items-center justify-between gap-2 border-t border-linea/50 pt-1 text-[11px] first:border-t-0 first:pt-0">
+                                <span className="min-w-0 truncate text-inchiostro">{c.cliente}</span>
+                                {c.consulenza
+                                  ? <span className="shrink-0 font-semibold text-green-700">{fmtGiorno(c.consulenza)}{c.ora ? ` · ${c.ora}` : ''}</span>
+                                  : <span className="shrink-0 font-semibold text-rose-600">da fissare</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )
+                    })()}
+                  </>
+                )}
               </Carta>
             </Link>
           ))}
+          {filtro && tutorVisibili.length === 0 && (
+            <p className="text-sm text-inchiostro/50">Nessun cliente in questa categoria.</p>
+          )}
         </div>
-
       </div>
     </div>
   )

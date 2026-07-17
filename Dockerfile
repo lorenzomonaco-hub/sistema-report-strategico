@@ -6,6 +6,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+# Token del blocco dati: deve essere presente a BUILD (Next inlina i NEXT_PUBLIC_*).
+# Railway passa le variabili del servizio come build-arg: qui le dichiariamo e le
+# esponiamo nell'ambiente di `next build`, altrimenti il bundle esce senza token.
+ARG NEXT_PUBLIC_BLOCCHI_TOKEN
+ENV NEXT_PUBLIC_BLOCCHI_TOKEN=$NEXT_PUBLIC_BLOCCHI_TOKEN
 RUN npm run build
 
 FROM node:22-alpine

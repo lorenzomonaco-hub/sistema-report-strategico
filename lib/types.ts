@@ -221,6 +221,21 @@ export interface NotaCliente {
   dataOra: string
 }
 
+/** Report AF generato per una persona (jobId sul worker report-af). */
+export interface ReportAFPersona {
+  jobId: string
+  pdf?: string
+  dataOra: string
+}
+
+/** Lavoro di Irene su un cliente: piano caricato (fileId su blocco-dati) +
+ *  report AF generati, per persona. Persistente nel backend condiviso. */
+export interface GenerazioneClienteAF {
+  pianoFileId?: string
+  pianoNome?: string
+  report: Record<string, ReportAFPersona>
+}
+
 export interface AppState {
   pratiche: Pratica[]
   apprendimenti: Apprendimento[]
@@ -232,6 +247,9 @@ export interface AppState {
    *  Pratiche (es. i 34 «frank» in erogazione): slug cliente → persone. Per i
    *  clienti-Pratica le persone restano in pratica.dipendenti. */
   personeCliente?: Record<string, PersonaAF[]>
+  /** Lavoro di Irene sui report AF, PERSISTENTE (slug cliente → piano caricato
+   *  su blocco-dati + report generati per persona). Sopravvive al refresh. */
+  generazioneAF?: Record<string, GenerazioneClienteAF>
   /** Posizione nel silo di OGNI cliente della pipeline Consulenze Frank
    *  (slug → SiloId): i 34 ufficiali + i clienti nuovi registrati in area
    *  commerciale. Fonte condivisa per board /erogazione, Gantt e vista tutor.

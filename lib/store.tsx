@@ -71,6 +71,9 @@ type Azione =
   | { type: 'SET_SENZA_TRASCRIZIONE'; praticaId: string; valore: boolean }
   | { type: 'AGG_PERSONA_CLIENTE'; slug: string; persona: PersonaAF }
   | { type: 'RIM_PERSONA_CLIENTE'; slug: string; nome: string }
+  | { type: 'SET_PIANO_AF'; slug: string; fileId?: string; nome?: string }
+  | { type: 'SET_REPORT_AF'; slug: string; persona: string; jobId: string; pdf?: string }
+  | { type: 'RIM_REPORT_AF'; slug: string; persona: string }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 const ora = () => new Date().toISOString()
@@ -572,6 +575,26 @@ function reducer(state: AppState, azione: Azione): AppState {
       return { ...state, personeCliente: { ...m, [azione.slug]: (m[azione.slug] ?? []).filter((d) => d.nome !== azione.nome) } }
     }
 
+    case 'SET_PIANO_AF': {
+      const g = state.generazioneAF ?? {}
+      const c = g[azione.slug] ?? { report: {} }
+      return { ...state, generazioneAF: { ...g, [azione.slug]: { ...c, pianoFileId: azione.fileId, pianoNome: azione.nome } } }
+    }
+
+    case 'SET_REPORT_AF': {
+      const g = state.generazioneAF ?? {}
+      const c = g[azione.slug] ?? { report: {} }
+      return { ...state, generazioneAF: { ...g, [azione.slug]: { ...c, report: { ...c.report, [azione.persona]: { jobId: azione.jobId, pdf: azione.pdf, dataOra: ora() } } } } }
+    }
+
+    case 'RIM_REPORT_AF': {
+      const g = state.generazioneAF ?? {}
+      const c = g[azione.slug]
+      if (!c) return state
+      const report = { ...c.report }; delete report[azione.persona]
+      return { ...state, generazioneAF: { ...g, [azione.slug]: { ...c, report } } }
+    }
+
     case 'INVIA_ELISA':
       return aggiornaPratica(state, azione.praticaId, (p) => ({
         ...p,
@@ -636,6 +659,11 @@ interface StoreContextValue {
   personeCliente: Record<string, PersonaAF[]>
   aggiungiPersonaCliente: (slug: string, persona: PersonaAF) => void
   rimuoviPersonaCliente: (slug: string, nome: string) => void
+  /** lavoro AF persistente di Irene (slug → piano + report per persona) */
+  generazioneAF: Record<string, import('./types').GenerazioneClienteAF>
+  setPianoAF: (slug: string, fileId?: string, nome?: string) => void
+  setReportAF: (slug: string, persona: string, jobId: string, pdf?: string) => void
+  rimuoviReportAF: (slug: string, persona: string) => void
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -797,6 +825,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     personeCliente: state.personeCliente ?? {},
     aggiungiPersonaCliente: (slug, persona) => dispatch({ type: 'AGG_PERSONA_CLIENTE', slug, persona }),
     rimuoviPersonaCliente: (slug, nome) => dispatch({ type: 'RIM_PERSONA_CLIENTE', slug, nome }),
+    generazioneAF: state.generazioneAF ?? {},
+    setPianoAF: (slug, fileId, nome) => dispatch({ type: 'SET_PIANO_AF', slug, fileId, nome }),
+    setReportAF: (slug, persona, jobId, pdf) => dispatch({ type: 'SET_REPORT_AF', slug, persona, jobId, pdf }),
+    rimuoviReportAF: (slug, persona) => dispatch({ type: 'RIM_REPORT_AF', slug, persona }),
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

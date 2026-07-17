@@ -18,6 +18,7 @@ import {
   blobPdfReportAF, creaJobReportAF, leggiSaluteReportAF, meseCorrenteAF, scaricaPdfReportAF, statoJobReportAF,
 } from '@/lib/reportaf'
 import { inviaEmailConZip } from '@/lib/email'
+import { blobFile, caricaFile } from '@/lib/archivioblocco'
 
 /** Indirizzo di TEST per l'invio al tutor (poi diventerà l'email del tutor reale). */
 const EMAIL_TEST_TUTOR = 'irene.delbelbelluz@metodomerenda.com'
@@ -130,13 +131,14 @@ function SlotsAF({ onChange }: { onChange: (files: File[]) => void }) {
 }
 
 // ─── Generazione del report AF di UNA persona ───
-function GenPersona({ persona, piano, token, modello, limiti, onReport }: {
-  persona: PersonaAF; piano: File | null; token: string; modello: string | null; limiti: LimitiReportAF | null
+function GenPersona({ persona, pianoFileId, pianoNome, jobIdIniziale, token, modello, limiti, onReport }: {
+  persona: PersonaAF; pianoFileId?: string; pianoNome?: string; jobIdIniziale?: string
+  token: string; modello: string | null; limiti: LimitiReportAF | null
   onReport: (jobId: string | null) => void
 }) {
   const [af, setAf] = useState<File[]>([])
   const [relazione, setRelazione] = useState<'a' | 'b' | 'c'>(relazioneDa(persona.qualifica))
-  const [jobId, setJobId] = useState<string | null>(null)
+  const [jobId, setJobId] = useState<string | null>(jobIdIniziale ?? null)
   const [stato, setStato] = useState<StatoJobReportAF | null>(null)
   const [errore, setErrore] = useState('')
   const [conferma, setConferma] = useState(false)
@@ -144,7 +146,7 @@ function GenPersona({ persona, piano, token, modello, limiti, onReport }: {
 
   const finale = stato?.fase === 'completato' || stato?.fase === 'errore'
   const troppi = !!limiti && af.length > limiti.max_file_af
-  const pronto = !!token && !!piano && af.length > 0 && !!modello && !!limiti && !troppi
+  const pronto = !!token && !!pianoFileId && af.length > 0 && !!modello && !!limiti && !troppi
   const stima = limiti && modello ? stimaTettoCosto(af.length, limiti, modello) : null
 
   useEffect(() => {
@@ -165,16 +167,21 @@ function GenPersona({ persona, piano, token, modello, limiti, onReport }: {
     return () => { fermo = true; window.clearInterval(iv) }
   }, [jobId, token])
 
-  // segnala verso l'alto quando il report di questa persona è pronto (per lo ZIP al tutor)
+  // persiste il report SOLO su stato definitivo: completato → salva, errore →
+  // rimuovi. In pending (o al montaggio) NON tocca lo stato salvato.
   useEffect(() => {
-    onReport(stato?.fase === 'completato' && jobId ? jobId : null)
+    if (stato?.fase === 'completato' && jobId) onReport(jobId)
+    else if (stato?.fase === 'errore') onReport(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stato?.fase, jobId])
 
   const genera = async () => {
-    if (!piano) return
+    if (!pianoFileId) return
     setConferma(false); setErrore(''); setInvio(true)
     try {
+      // il piano è salvato su blocco-dati: lo riprendo come File per inviarlo al worker
+      const b = await blobFile(pianoFileId)
+      const piano = new File([b], pianoNome || 'piano.pdf', { type: b.type || 'application/octet-stream' })
       const id = await creaJobReportAF({
         token, piano, assessfirst: af,
         destinatario: persona.nome, candidato: persona.nome, ruolo: persona.ruolo || persona.qualifica,
@@ -217,7 +224,7 @@ function GenPersona({ persona, piano, token, modello, limiti, onReport }: {
         </button>
       )}
       {!jobId && !pronto && !conferma && (
-        <p className="mt-1 text-[11px] text-inchiostro/80">Serve il piano del cliente {piano ? '✓' : '(manca)'} e almeno un PDF AssessFirst.</p>
+        <p className="mt-1 text-[11px] text-inchiostro/80">Serve il piano del cliente {pianoFileId ? '✓' : '(manca)'} e almeno un PDF AssessFirst.</p>
       )}
 
       {conferma && stima && (
@@ -258,18 +265,22 @@ function GenPersona({ persona, piano, token, modello, limiti, onReport }: {
 function CartaCliente({ cliente, token, modello, limiti }: {
   cliente: ClientePipeline; token: string; modello: string | null; limiti: LimitiReportAF | null
 }) {
-  const { state, aggiungiPersona, rimuoviPersona, personeCliente, aggiungiPersonaCliente, rimuoviPersonaCliente } = useApp()
+  const { state, aggiungiPersona, rimuoviPersona, personeCliente, aggiungiPersonaCliente, rimuoviPersonaCliente,
+    generazioneAF, setPianoAF, setReportAF, rimuoviReportAF } = useApp()
   const [aperto, setAperto] = useState(false)
-  const [piano, setPiano] = useState<File | null>(null)
+  const [pianoInCorso, setPianoInCorso] = useState(false)
   const [nome, setNome] = useState(''); const [cognome, setCognome] = useState('')
   const [email, setEmail] = useState(''); const [qualifica, setQualifica] = useState<Qualifica>('socio'); const [ruolo, setRuolo] = useState('')
   const [err, setErr] = useState('')
-  // report AF pronti (nome persona → jobId), per lo ZIP al tutor
-  const [reportPronti, setReportPronti] = useState<Record<string, string>>({})
   const [confermaInvio, setConfermaInvio] = useState(false)
   const [inviando, setInviando] = useState(false)
   const [inviato, setInviato] = useState(false)
   const [erroreInvio, setErroreInvio] = useState('')
+
+  // lavoro AF PERSISTENTE del cliente (piano + report per persona)
+  const gen = generazioneAF[cliente.slug] ?? { report: {} }
+  const pianoFileId = gen.pianoFileId
+  const pianoNome = gen.pianoNome
 
   const daPratica = !!cliente.praticaId
   const persone: PersonaAF[] = daPratica
@@ -289,19 +300,29 @@ function CartaCliente({ cliente, token, modello, limiti }: {
 
   const inp = 'rounded-lg border border-linea bg-carta px-2.5 py-2 text-sm text-inchiostro placeholder:text-inchiostro/35 focus:border-petrolio focus:outline-none'
 
+  // caricamento piano → salvato su blocco-dati (persistente)
+  const caricaPiano = async (f: File) => {
+    if (!/\.(pdf|docx)$/i.test(f.name)) { setErr('Il piano dev’essere Word (.docx) o PDF.'); return }
+    setErr(''); setPianoInCorso(true)
+    try {
+      const c = await caricaFile(f, { praticaId: cliente.slug, categoria: 'piano' })
+      setPianoAF(cliente.slug, c.id, c.nome)
+    } catch (e) { setErr(e instanceof Error ? e.message : 'caricamento piano fallito') } finally { setPianoInCorso(false) }
+  }
+
   // invio al tutor
-  const nReport = persone.filter((p) => reportPronti[p.nome]).length
-  const tuttiPronti = persone.length > 0 && persone.every((p) => reportPronti[p.nome])
-  const nFile = (piano ? 1 : 0) + nReport
+  const nReport = persone.filter((p) => gen.report[p.nome]).length
+  const tuttiPronti = persone.length > 0 && persone.every((p) => gen.report[p.nome])
+  const nFile = (pianoFileId ? 1 : 0) + nReport
   const puoInviare = nFile > 0 && (daPratica ? tuttiPronti : true)
 
   const inviaAlTutor = async () => {
     setConfermaInvio(false); setErroreInvio(''); setInviando(true); setInviato(false)
     try {
       const files: { nome: string; blob: Blob }[] = []
-      if (piano) { const ext = /\.docx$/i.test(piano.name) ? 'docx' : 'pdf'; files.push({ nome: `piano-${cliente.nome}.${ext}`, blob: piano }) }
+      if (pianoFileId) { const ext = /\.docx$/i.test(pianoNome || '') ? 'docx' : 'pdf'; files.push({ nome: `piano-${cliente.nome}.${ext}`, blob: await blobFile(pianoFileId) }) }
       for (const p of persone) {
-        const jid = reportPronti[p.nome]
+        const jid = gen.report[p.nome]?.jobId
         if (jid) { const b = await blobPdfReportAF(token, jid); files.push({ nome: `report-AF-${p.nome.replace(/\s+/g, '-')}.pdf`, blob: b }) }
       }
       await inviaEmailConZip({
@@ -330,14 +351,13 @@ function CartaCliente({ cliente, token, modello, limiti }: {
           {/* piano del cliente (1 volta) */}
           <div className="rounded-xl border border-linea bg-carta p-3">
             <p className="text-[12px] font-bold text-inchiostro">Piano di consulenza / report <span className="font-semibold text-inchiostro/80">— UNO per cliente (Word/PDF), vale per tutte le persone</span></p>
-            <input type="file" accept=".pdf,.docx"
-              onChange={(e) => {
-                const f = e.target.files?.[0] ?? null
-                if (f && !/\.(pdf|docx)$/i.test(f.name)) { setErr('Il piano dev’essere Word (.docx) o PDF.'); setPiano(null); e.target.value = ''; return }
-                setErr(''); setPiano(f)
-              }}
+            <input type="file" accept=".pdf,.docx" disabled={pianoInCorso}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) caricaPiano(f); e.target.value = '' }}
               className="mt-1.5 block w-full text-[12px] text-inchiostro/80 file:mr-2 file:rounded-lg file:border-0 file:bg-petrolio file:px-3 file:py-1.5 file:text-[11px] file:font-semibold file:text-white" />
-            {piano && <p className="mt-1 text-[11px] text-green-700">✓ {piano.name}</p>}
+            {pianoInCorso && <p className="mt-1 text-[11px] text-inchiostro/80">Carico il piano…</p>}
+            {pianoFileId && !pianoInCorso && (
+              <p className="mt-1 flex items-center gap-2 text-[11px] text-green-700">✓ {pianoNome} <button onClick={() => setPianoAF(cliente.slug, undefined, undefined)} className="text-rose-500 hover:text-rose-700">rimuovi</button></p>
+            )}
           </div>
 
           {/* inserimento persone */}
@@ -367,8 +387,9 @@ function CartaCliente({ cliente, token, modello, limiti }: {
               {persone.map((p) => (
                 <div key={p.nome} className="relative">
                   <button onClick={() => togli(p.nome)} className="absolute right-2 top-2 z-10 text-[11px] font-semibold text-rose-400 hover:text-rose-700">rimuovi</button>
-                  <GenPersona persona={p} piano={piano} token={token} modello={modello} limiti={limiti}
-                    onReport={(jid) => setReportPronti((m) => { const n = { ...m }; if (jid) n[p.nome] = jid; else delete n[p.nome]; return n })} />
+                  <GenPersona persona={p} pianoFileId={pianoFileId} pianoNome={pianoNome} jobIdIniziale={gen.report[p.nome]?.jobId}
+                    token={token} modello={modello} limiti={limiti}
+                    onReport={(jid) => { if (jid) setReportAF(cliente.slug, p.nome, jid); else rimuoviReportAF(cliente.slug, p.nome) }} />
                 </div>
               ))}
             </div>
@@ -381,7 +402,7 @@ function CartaCliente({ cliente, token, modello, limiti }: {
               ZIP con il piano/report + i report AF generati. {daPratica ? 'Si abilita quando tutte le persone hanno il report.' : 'Cliente inserito manualmente: invio sempre disponibile.'} <b>Invio di TEST a {EMAIL_TEST_TUTOR}</b>.
             </p>
             {daPratica && !tuttiPronti && persone.length > 0 && (
-              <p className="mt-1 text-[11px] text-rose-600">Mancano i report di: {persone.filter((p) => !reportPronti[p.nome]).map((p) => p.nome).join(', ')}</p>
+              <p className="mt-1 text-[11px] text-rose-600">Mancano i report di: {persone.filter((p) => !gen.report[p.nome]).map((p) => p.nome).join(', ')}</p>
             )}
             {!confermaInvio ? (
               <button onClick={() => setConfermaInvio(true)} disabled={!puoInviare || inviando}
@@ -390,7 +411,7 @@ function CartaCliente({ cliente, token, modello, limiti }: {
               </button>
             ) : (
               <div className="mt-2 rounded-lg border border-emerald-300 bg-carta px-3 py-2 text-[12px] text-inchiostro">
-                Invio lo ZIP ({nFile} file: {piano ? 'piano + ' : ''}{nReport} report AF) a <b>{EMAIL_TEST_TUTOR}</b>. Confermi?
+                Invio lo ZIP ({nFile} file: {pianoFileId ? 'piano + ' : ''}{nReport} report AF) a <b>{EMAIL_TEST_TUTOR}</b>. Confermi?
                 <div className="mt-2 flex gap-2">
                   <button onClick={() => setConfermaInvio(false)} className="rounded-lg border border-linea bg-carta px-2.5 py-1 text-[11px] font-semibold text-inchiostro/80">Annulla</button>
                   <button onClick={inviaAlTutor} disabled={inviando} className="rounded-lg bg-emerald-700 px-3 py-1 text-[11px] font-semibold text-white hover:bg-emerald-800 disabled:opacity-40">{inviando ? 'Invio…' : 'Sì, invia'}</button>

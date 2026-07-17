@@ -61,3 +61,13 @@ export async function cancellaFile(id: string): Promise<void> {
 /** URL per rileggere/scaricare un file (con token in header non si può linkare
  *  direttamente: si usa fetch + blob quando serve mostrarlo). */
 export const urlFile = (id: string) => `${URL_DATI}/file/${id}`
+
+/** Scarica un file salvato come Blob (per riusarlo, es. allegarlo a un'email). */
+export async function blobFile(id: string): Promise<Blob> {
+  const token = tokenDati()
+  const r = await fetch(`${URL_DATI}/file/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!r.ok) throw new Error(`download file fallito (${r.status})`)
+  return r.blob()
+}

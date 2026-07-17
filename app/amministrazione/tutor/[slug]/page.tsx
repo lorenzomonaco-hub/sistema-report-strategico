@@ -5,11 +5,11 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
-  FASI_FRANK, FaseFrank, RigaFrank, TUTOR_FRANK, attesaTutor, clientiTutorFrank,
+  FASI_FRANK, FaseFrank, IN_ATTESA, RigaFrank, TUTOR_FRANK, attesaTutor, clientiTutorFrank,
   slugFrank, tutorFrankDaSlug,
 } from '@/lib/consulenzeFrank'
 import { fmtData } from '@/lib/quadroaziendale'
-import { pcPerTutor } from '@/lib/prontoConsulenza'
+import { PRONTO_CONSULENZA, pcPerTutor, slugConsulenza } from '@/lib/prontoConsulenza'
 import NoteCliente from '@/components/NoteCliente'
 
 export function generateStaticParams() {
@@ -67,7 +67,7 @@ function RigaCliente({ r }: { r: RigaFrank }) {
           )}
         </div>
       </Link>
-      <NoteCliente cliente={r.cliente} nome={r.cliente} />
+      <NoteCliente cliente={r.cliente} nome={r.cliente} slug={slugFrank(r.cliente)} siloRientro="copy" />
     </div>
   )
 }
@@ -128,7 +128,7 @@ export default async function TutorPage({ params }: { params: Promise<{ slug: st
                     </div>
                     <span className="shrink-0 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">in attesa</span>
                   </div>
-                  <NoteCliente cliente={c.nome} azienda={c.azienda} nome={c.nome} />
+                  <NoteCliente cliente={c.nome} azienda={c.azienda} nome={c.nome} slug={`p-pr-attesa-${IN_ATTESA.indexOf(c)}`} siloRientro="documenti" />
                 </div>
               ))}
             </div>
@@ -156,7 +156,7 @@ export default async function TutorPage({ params }: { params: Promise<{ slug: st
                       <span className="shrink-0 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">⚠ da fissare</span>
                     )}
                   </div>
-                  <NoteCliente cliente={c.cliente} azienda={c.azienda} nome={c.cliente} />
+                  <NoteCliente cliente={c.cliente} azienda={c.azienda} nome={c.cliente} slug={slugConsulenza(PRONTO_CONSULENZA.indexOf(c), c)} siloRientro="consegnato" />
                 </div>
               ))}
             </div>

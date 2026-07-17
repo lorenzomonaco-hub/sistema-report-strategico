@@ -2,6 +2,8 @@
 // Dal file "CONSULENZE FRANK - Report in lavorazione" (stato PRONTO PER CONSULENZA).
 // consulenza = data ISO se già fissata (colonna DATA CONSULENZA), null = da fissare.
 
+import { slugFrank } from './consulenzeFrank'
+
 export type ProntoConsulenza = {
   cliente: string
   azienda: string
@@ -11,6 +13,10 @@ export type ProntoConsulenza = {
   dataVendita?: string
   prezzo?: string
 }
+
+/** Slug stabile con cui un cliente «pronto per consulenza» compare nella pipeline. */
+export const slugConsulenza = (i: number, c: { azienda?: string; cliente: string }) =>
+  `pc-${i}-${slugFrank(c.azienda || c.cliente)}`
 
 /** Pronto-consulenza raggruppati per tutor, con consulenza fissata / da fissare. */
 export function pcPerTutor(): { tutor: string; fissate: ProntoConsulenza[]; daFissare: ProntoConsulenza[]; totale: number }[] {

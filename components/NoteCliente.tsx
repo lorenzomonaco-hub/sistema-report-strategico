@@ -7,16 +7,31 @@
 
 import { useState } from 'react'
 import { useApp, chiaveNoteCliente } from '@/lib/store'
+import { SiloId } from '@/lib/pipelineSilos'
 
 const fmtQuando = (iso: string) =>
   new Date(iso).toLocaleString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' })
+const fmtData = (iso: string) =>
+  new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Rome' })
 
-export default function NoteCliente({ cliente, azienda, nome }: { cliente: string; azienda?: string; nome?: string }) {
-  const { noteClienti, aggiungiNotaCliente, rimuoviNotaCliente } = useApp()
+export default function NoteCliente({ cliente, azienda, nome, slug, siloRientro = 'copy' }: {
+  cliente: string; azienda?: string; nome?: string
+  /** slug del cliente nella pipeline: se presente, abilita il blocco */
+  slug?: string
+  /** silo in cui rientra quando viene sbloccato (dipende dall'origine) */
+  siloRientro?: SiloId
+}) {
+  const { noteClienti, aggiungiNotaCliente, rimuoviNotaCliente, silos, spostaSilo, setBloccoInfo, bloccoInfo } = useApp()
   const chiave = chiaveNoteCliente(cliente, azienda)
   const note = noteClienti[chiave] ?? []
   const [aperto, setAperto] = useState(false)
   const [testo, setTesto] = useState('')
+
+  const bloccato = slug ? silos[slug] === 'bloccato' : false
+  const info = slug ? bloccoInfo[slug] : undefined
+  const [dataSblocco, setDataSblocco] = useState(info?.reminder ?? '')
+
+  const ultimaNota = note.length ? note[note.length - 1].testo : ''
 
   const salva = () => {
     const t = testo.trim()
@@ -24,6 +39,16 @@ export default function NoteCliente({ cliente, azienda, nome }: { cliente: strin
     aggiungiNotaCliente(chiave, t, 'Amministrazione')
     setTesto('')
   }
+
+  const blocca = () => {
+    if (!slug) return
+    spostaSilo(slug, 'bloccato')
+    // la nota più recente resta come motivo del blocco; la data come reminder di sblocco
+    setBloccoInfo(slug, testo.trim() || ultimaNota || 'Bloccato', dataSblocco || undefined)
+    if (testo.trim()) { aggiungiNotaCliente(chiave, testo.trim(), 'Amministrazione'); setTesto('') }
+  }
+  const sblocca = () => { if (slug) spostaSilo(slug, siloRientro) }
+  const aggiornaData = () => { if (slug) setBloccoInfo(slug, info?.nota || ultimaNota || 'Bloccato', dataSblocco || undefined) }
 
   return (
     <div className="mt-2 border-t border-linea/60 pt-2">
@@ -75,6 +100,41 @@ export default function NoteCliente({ cliente, azienda, nome }: { cliente: strin
               <span className="text-[10px] text-inchiostro/35">⌘/Ctrl + Invio</span>
             </div>
           </div>
+
+          {/* Blocco cliente: lo sposta nella colonna «Bloccato» della pipeline + data di sblocco */}
+          {slug && (
+            <div className={`rounded-lg border p-2.5 ${bloccato ? 'border-rose-200 bg-rose-50/60' : 'border-linea bg-inchiostro/[0.015]'}`}>
+              {bloccato ? (
+                <>
+                  <p className="text-[11px] font-bold text-rose-700">🔒 Bloccato — è nella colonna «Bloccato» della pipeline</p>
+                  {info?.reminder && <p className="mt-0.5 text-[11px] text-inchiostro/55">Sblocco previsto: <b className="text-inchiostro/70">{fmtData(info.reminder)}</b></p>}
+                  <div className="mt-2 flex flex-wrap items-end gap-2">
+                    <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/45">
+                      Data di sblocco prevista
+                      <input type="date" value={dataSblocco} onChange={(e) => setDataSblocco(e.target.value)}
+                        className="rounded-lg border border-linea bg-carta px-2 py-1.5 text-[12px] text-inchiostro focus:border-petrolio focus:outline-none" />
+                    </label>
+                    <button onClick={aggiornaData} className="rounded-lg border border-linea bg-carta px-2.5 py-1.5 text-[11px] font-semibold text-inchiostro/70 hover:border-petrolio/40 hover:text-petrolio">Aggiorna data</button>
+                    <button onClick={sblocca} className="ml-auto rounded-lg border border-green-300 bg-carta px-2.5 py-1.5 text-[11px] font-semibold text-green-700 hover:bg-green-50">🔓 Sblocca — rimetti in pipeline</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-[11px] font-bold text-inchiostro/70">Blocca il cliente</p>
+                  <p className="mt-0.5 text-[11px] text-inchiostro/55">Lo sposta nella colonna «Bloccato» della pipeline. La nota resta come motivo; la data serve al tutor per ricordarsi quando ricontattarlo.</p>
+                  <div className="mt-2 flex flex-wrap items-end gap-2">
+                    <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/45">
+                      Data di sblocco prevista
+                      <input type="date" value={dataSblocco} onChange={(e) => setDataSblocco(e.target.value)}
+                        className="rounded-lg border border-linea bg-carta px-2 py-1.5 text-[12px] text-inchiostro focus:border-petrolio focus:outline-none" />
+                    </label>
+                    <button onClick={blocca} className="ml-auto rounded-lg bg-rose-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-rose-700">🔒 Sposta in Bloccato</button>
+                  </div>
+                  {note.length === 0 && !testo.trim() && <p className="mt-1.5 text-[10px] text-amber-700">Consiglio: scrivi prima una nota col motivo del blocco.</p>}
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

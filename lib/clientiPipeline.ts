@@ -12,7 +12,7 @@ import { SiloId } from './pipelineSilos'
 import { Pratica } from './types'
 import { slugPratica, useApp } from './store'
 import { venditaDaNome } from './venditeElisa'
-import { PRONTO_CONSULENZA } from './prontoConsulenza'
+import { PRONTO_CONSULENZA, slugConsulenza } from './prontoConsulenza'
 
 export type ClientePipeline = {
   slug: string
@@ -91,11 +91,12 @@ export function useClientiPipeline(): ClientePipeline[] {
 
   // Clienti PRONTO PER CONSULENZA (report finito, in attesa consulenza) → silo Consegnato.
   const consulenza: ClientePipeline[] = PRONTO_CONSULENZA.map((c, i) => ({
-    slug: `pc-${i}-${slugFrank(c.azienda || c.cliente)}`,
+    slug: slugConsulenza(i, c),
     nome: c.cliente,
     owner: c.azienda,
     tutor: c.tutor,
-    silo: 'consegnato' as SiloId,
+    // di norma «consegnato»; ma se l'admin lo ha spostato (es. Bloccato) vince lo stato condiviso
+    silo: (silos[slugConsulenza(i, c)] ?? 'consegnato') as SiloId,
     consegnaPrevista: null,
     origine: 'consulenza' as const,
     consulenza: c.consulenza,

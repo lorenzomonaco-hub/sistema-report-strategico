@@ -12,7 +12,7 @@ import Link from 'next/link'
 import { useApp } from '@/lib/store'
 import { useClientiPipeline, ClientePipeline } from '@/lib/clientiPipeline'
 import { tokenDati } from '@/lib/datiblocco'
-import { PersonaAF, Qualifica } from '@/lib/types'
+import { ASSESSFIRST_TIPI, PersonaAF, Qualifica } from '@/lib/types'
 import {
   ETICHETTA_PASSO_AF, LimitiReportAF, StatoJobReportAF, URL_REPORT_AF,
   creaJobReportAF, leggiSaluteReportAF, meseCorrenteAF, scaricaPdfReportAF, statoJobReportAF,
@@ -33,6 +33,97 @@ function stimaTettoCosto(nFileAF: number, limiti: LimitiReportAF, modello: strin
 }
 
 const relazioneDa = (q: Qualifica): 'a' | 'b' | 'c' => (q === 'dipendente' ? 'b' : 'a')
+
+/** Riconosce quale dei 4 AssessFirst è un file dal suo nome (come lato Elisa). */
+function categoriaDaNome(nome: string): string | null {
+  const n = nome.toLowerCase()
+  if (n.includes('swipe')) return 'SWIPE'
+  if (n.includes('drive')) return 'DRIVE'
+  if (n.includes('brain')) return 'BRAIN'
+  if (n.includes('comportament')) return 'Comportamenti chiave'
+  return null
+}
+
+/** 4 caselle AssessFirst di UNA persona (stesso schema di Elisa): un caricamento
+ *  multiplo che riconosce SWIPE/DRIVE/BRAIN/Comportamenti dal nome; i non
+ *  riconosciuti si assegnano a mano. Tiene i File in memoria e li passa su. */
+function SlotsAF({ onChange }: { onChange: (files: File[]) => void }) {
+  const [slot, setSlot] = useState<Record<string, File | undefined>>({})
+  const [daAssegnare, setDaAssegnare] = useState<File[]>([])
+  const [errore, setErrore] = useState('')
+
+  const emetti = (s: Record<string, File | undefined>) =>
+    onChange(ASSESSFIRST_TIPI.map((t) => s[t]).filter((f): f is File => !!f))
+
+  const processa = (files: File[]) => {
+    const nonPdf = files.filter((f) => !f.name.toLowerCase().endsWith('.pdf'))
+    if (nonPdf.length) { setErrore(`Non PDF: ${nonPdf.map((f) => f.name).join(', ')}`); return }
+    setErrore('')
+    const s = { ...slot }; const rest: File[] = []
+    files.forEach((f) => { const c = categoriaDaNome(f.name); if (c) s[c] = f; else rest.push(f) })
+    setSlot(s); setDaAssegnare(rest); emetti(s)
+  }
+  const assegna = (tipo: string, f: File) => {
+    const s = { ...slot, [tipo]: f }; setSlot(s); emetti(s)
+  }
+  const rimuovi = (tipo: string) => {
+    const s = { ...slot }; delete s[tipo]; setSlot(s); emetti(s)
+  }
+
+  const completi = ASSESSFIRST_TIPI.every((t) => slot[t])
+
+  return (
+    <div className={`rounded-lg border p-2.5 ${completi ? 'border-green-200 bg-green-50/50' : 'border-linea bg-carta'}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-inchiostro">I 4 AssessFirst di questo dipendente</span>
+        <label className="ml-auto cursor-pointer rounded-lg bg-petrolio px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-petrolio-scuro">
+          {completi ? 'Ricarica i file' : 'Carica i 4 file insieme'}
+          <input type="file" multiple accept=".pdf" className="hidden"
+            onChange={(e) => { processa(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+        </label>
+        {completi && <span className="text-[11px] font-semibold text-green-700">4/4 ✓</span>}
+      </div>
+      <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+        {ASSESSFIRST_TIPI.map((t) => {
+          const f = slot[t]
+          return (
+            <div key={t} className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[12px] ${f ? 'border-green-200 bg-green-50/60' : 'border-linea bg-carta'}`}>
+              <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${f ? 'bg-green-100 text-green-700' : 'border-2 border-inchiostro/20 text-transparent'}`}>✓</span>
+              <span className="w-28 shrink-0 font-semibold text-inchiostro">{t}</span>
+              {f ? (
+                <>
+                  <span className="min-w-0 truncate text-inchiostro/80" title={f.name}>{f.name}</span>
+                  <button onClick={() => rimuovi(t)} className="ml-auto shrink-0 text-rose-500 hover:text-rose-700">rimuovi</button>
+                </>
+              ) : (
+                <label className="ml-auto shrink-0 cursor-pointer text-petrolio hover:underline">
+                  scegli
+                  <input type="file" accept=".pdf" className="hidden"
+                    onChange={(e) => { const x = e.target.files?.[0]; if (x) assegna(t, x); e.target.value = '' }} />
+                </label>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      {daAssegnare.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {daAssegnare.map((f, i) => (
+            <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg bg-rose-50 px-2.5 py-1.5 text-[11px] text-rose-800">
+              <span className="min-w-0 truncate">Non riconosciuto: <b>{f.name}</b></span>
+              <select defaultValue="" onChange={(e) => { if (e.target.value) { assegna(e.target.value, f); setDaAssegnare(daAssegnare.filter((_, j) => j !== i)) } }}
+                className="ml-auto rounded border border-rose-200 bg-white px-1.5 py-0.5 text-[11px]">
+                <option value="">assegna a…</option>
+                {ASSESSFIRST_TIPI.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
+      {errore && <p className="mt-1.5 text-[11px] font-semibold text-rose-600">{errore}</p>}
+    </div>
+  )
+}
 
 // ─── Generazione del report AF di UNA persona ───
 function GenPersona({ persona, piano, token, modello, limiti }: {
@@ -93,30 +184,20 @@ function GenPersona({ persona, piano, token, modello, limiti }: {
       </div>
 
       {!jobId && (
-        <div className="mt-2 flex flex-wrap items-end gap-2">
+        <div className="mt-2 space-y-2">
           <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-wide text-inchiostro/80">
             Relazione (caso)
             <select value={relazione} onChange={(e) => setRelazione(e.target.value as 'a' | 'b' | 'c')}
-              className="rounded-lg border border-linea bg-carta px-2 py-1.5 text-[12px] text-inchiostro focus:border-petrolio focus:outline-none">
+              className="w-full max-w-xs rounded-lg border border-linea bg-carta px-2 py-1.5 text-[12px] text-inchiostro focus:border-petrolio focus:outline-none">
               <option value="a">a — titolare/socio</option>
               <option value="b">b — dipendente, un titolare</option>
               <option value="c">c — dipendente, più figure</option>
             </select>
           </label>
-          <label className="flex-1 text-[11px] font-bold uppercase tracking-wide text-inchiostro">
-            I 4 AssessFirst di questo dipendente <span className="font-semibold normal-case text-inchiostro/80">(SWIPE · DRIVE · BRAIN · Comportamenti — caricali insieme)</span>
-            <input type="file" multiple accept=".pdf"
-              onChange={(e) => {
-                const files = e.target.files ? Array.from(e.target.files) : []
-                const nonPdf = files.filter((f) => !f.name.toLowerCase().endsWith('.pdf'))
-                if (nonPdf.length) { setErrore(`Non PDF: ${nonPdf.map((f) => f.name).join(', ')}`); setAf([]); e.target.value = ''; return }
-                setErrore(''); setAf(files)
-              }}
-              className="mt-1 block w-full text-[12px] text-inchiostro/80 file:mr-2 file:rounded-lg file:border-0 file:bg-inchiostro/[0.06] file:px-2 file:py-1 file:text-[11px] file:font-semibold" />
-          </label>
+          <SlotsAF onChange={setAf} />
         </div>
       )}
-      {af.length > 0 && !jobId && <p className="mt-1 text-[11px] text-inchiostro/80">{af.length} file · {troppi ? `max ${limiti?.max_file_af}!` : 'ok'}</p>}
+      {troppi && !jobId && <p className="mt-1 text-[11px] font-semibold text-rose-600">Massimo {limiti?.max_file_af} file per persona.</p>}
 
       {!jobId && !conferma && (
         <button onClick={() => setConferma(true)} disabled={!pronto}

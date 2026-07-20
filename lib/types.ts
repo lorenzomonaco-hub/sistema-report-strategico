@@ -226,6 +226,9 @@ export interface ReportAFPersona {
   jobId: string
   pdf?: string
   dataOra: string
+  /** i 4 AssessFirst grezzi caricati per questa persona, salvati su blocco-dati
+   *  (per allegarli poi all'email al tutor) */
+  af?: { nome: string; fileId: string }[]
 }
 
 /** Lavoro di Irene su un cliente: piano caricato (fileId su blocco-dati) +

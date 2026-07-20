@@ -131,12 +131,13 @@ function SlotsAF({ onChange }: { onChange: (files: File[]) => void }) {
 }
 
 // ─── Generazione del report AF di UNA persona ───
-function GenPersona({ persona, pianoFileId, pianoNome, jobIdIniziale, token, modello, limiti, onReport }: {
-  persona: PersonaAF; pianoFileId?: string; pianoNome?: string; jobIdIniziale?: string
+function GenPersona({ persona, slug, pianoFileId, pianoNome, jobIdIniziale, token, modello, limiti, onReport }: {
+  persona: PersonaAF; slug: string; pianoFileId?: string; pianoNome?: string; jobIdIniziale?: string
   token: string; modello: string | null; limiti: LimitiReportAF | null
-  onReport: (jobId: string | null) => void
+  onReport: (jobId: string | null, af?: { nome: string; fileId: string }[]) => void
 }) {
   const [af, setAf] = useState<File[]>([])
+  const [afSalvati, setAfSalvati] = useState<{ nome: string; fileId: string }[]>([])
   const [relazione, setRelazione] = useState<'a' | 'b' | 'c'>(relazioneDa(persona.qualifica))
   const [jobId, setJobId] = useState<string | null>(jobIdIniziale ?? null)
   const [stato, setStato] = useState<StatoJobReportAF | null>(null)
@@ -167,10 +168,11 @@ function GenPersona({ persona, pianoFileId, pianoNome, jobIdIniziale, token, mod
     return () => { fermo = true; window.clearInterval(iv) }
   }, [jobId, token])
 
-  // persiste il report SOLO su stato definitivo: completato → salva, errore →
-  // rimuovi. In pending (o al montaggio) NON tocca lo stato salvato.
+  // persiste il report SOLO su stato definitivo: completato → salva (con gli AF
+  // salvati su blocco-dati, se appena caricati), errore → rimuovi. In pending o
+  // al montaggio non tocca lo stato salvato (af undefined = mantieni esistente).
   useEffect(() => {
-    if (stato?.fase === 'completato' && jobId) onReport(jobId)
+    if (stato?.fase === 'completato' && jobId) onReport(jobId, afSalvati.length ? afSalvati : undefined)
     else if (stato?.fase === 'errore') onReport(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stato?.fase, jobId])
@@ -182,6 +184,13 @@ function GenPersona({ persona, pianoFileId, pianoNome, jobIdIniziale, token, mod
       // il piano è salvato su blocco-dati: lo riprendo come File per inviarlo al worker
       const b = await blobFile(pianoFileId)
       const piano = new File([b], pianoNome || 'piano.pdf', { type: b.type || 'application/octet-stream' })
+      // salvo i 4 AssessFirst grezzi su blocco-dati, così potranno finire nell'email al tutor
+      const salvati: { nome: string; fileId: string }[] = []
+      for (const f of af) {
+        const c = await caricaFile(f, { praticaId: slug, categoria: 'assessfirst', dipendente: persona.nome })
+        salvati.push({ nome: f.name, fileId: c.id })
+      }
+      setAfSalvati(salvati)
       const id = await creaJobReportAF({
         token, piano, assessfirst: af,
         destinatario: persona.nome, candidato: persona.nome, ruolo: persona.ruolo || persona.qualifica,
@@ -322,8 +331,11 @@ function CartaCliente({ cliente, token, modello, limiti }: {
       const files: { nome: string; blob: Blob }[] = []
       if (pianoFileId) { const ext = /\.docx$/i.test(pianoNome || '') ? 'docx' : 'pdf'; files.push({ nome: `piano-${cliente.nome}.${ext}`, blob: await blobFile(pianoFileId) }) }
       for (const p of persone) {
-        const jid = gen.report[p.nome]?.jobId
-        if (jid) { const b = await blobPdfReportAF(token, jid); files.push({ nome: `report-AF-${p.nome.replace(/\s+/g, '-')}.pdf`, blob: b }) }
+        const r = gen.report[p.nome]
+        const slug = p.nome.replace(/\s+/g, '-')
+        if (r?.jobId) { const b = await blobPdfReportAF(token, r.jobId); files.push({ nome: `report-AF-${slug}.pdf`, blob: b }) }
+        // i 4 AssessFirst grezzi salvati per la persona
+        for (const a of r?.af ?? []) { const b = await blobFile(a.fileId); files.push({ nome: `AssessFirst-${slug}-${a.nome}`, blob: b }) }
       }
       await inviaEmailConZip({
         token, a: EMAIL_TEST_TUTOR,
@@ -387,9 +399,9 @@ function CartaCliente({ cliente, token, modello, limiti }: {
               {persone.map((p) => (
                 <div key={p.nome} className="relative">
                   <button onClick={() => togli(p.nome)} className="absolute right-2 top-2 z-10 text-[11px] font-semibold text-rose-400 hover:text-rose-700">rimuovi</button>
-                  <GenPersona persona={p} pianoFileId={pianoFileId} pianoNome={pianoNome} jobIdIniziale={gen.report[p.nome]?.jobId}
+                  <GenPersona persona={p} slug={cliente.slug} pianoFileId={pianoFileId} pianoNome={pianoNome} jobIdIniziale={gen.report[p.nome]?.jobId}
                     token={token} modello={modello} limiti={limiti}
-                    onReport={(jid) => { if (jid) setReportAF(cliente.slug, p.nome, jid); else rimuoviReportAF(cliente.slug, p.nome) }} />
+                    onReport={(jid, af) => { if (jid) setReportAF(cliente.slug, p.nome, jid, undefined, af); else rimuoviReportAF(cliente.slug, p.nome) }} />
                 </div>
               ))}
             </div>

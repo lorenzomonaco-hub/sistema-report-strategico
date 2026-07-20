@@ -5,11 +5,12 @@
 // pipeline v2 — ogni step autonomo qui è un'azione "simula avanzamento".
 
 import React, { createContext, useContext, useEffect, useReducer, useRef } from 'react'
-import { AppState, Apprendimento, DocumentoAllegato, FaseId, NotaCliente, PersonaAF, Pratica, VersioneDocumento, relazioneAF } from './types'
+import { AppState, Apprendimento, ClienteRegistro, DocumentoAllegato, FaseId, NotaCliente, PersonaAF, Pratica, TipoCall, VersioneDocumento, relazioneAF, tipoCallDaProdotto } from './types'
 import { CronologiaFasi, leggiStatoCondiviso, scriviStatoCondiviso, tokenDati } from './datiblocco'
 import { documentiTutorPronti, faseSuccessiva, faseById } from './fasi'
 import { SiloId, normalizzaSilo, siloPrecedente, siloSeed, siloSuccessivo } from './pipelineSilos'
-import { IN_ATTESA } from './consulenzeFrank'
+import { CONSULENZE_FRANK, IN_ATTESA } from './consulenzeFrank'
+import { PRONTO_CONSULENZA } from './prontoConsulenza'
 import { batteriaIdPerTipo, batteriaPerTipo, ETICHETTA_TIPO } from './batterie'
 import {
   REPORT_AI_MOCK,
@@ -68,6 +69,8 @@ type Azione =
   | { type: 'AGGIUNGI_NOTA_CLIENTE'; chiave: string; testo: string; autore: string }
   | { type: 'RIMUOVI_NOTA_CLIENTE'; chiave: string; id: string }
   | { type: 'SET_STATO_CLIENTE'; chiave: string; stato: string }
+  | { type: 'MODIFICA_REGISTRO'; id: string; campi: Partial<ClienteRegistro> }
+  | { type: 'AGGIUNGI_REGISTRO'; cliente: ClienteRegistro }
   | { type: 'INVIA_ELISA'; praticaId: string; inviato: boolean; autore: string }
   | { type: 'SET_SENZA_TRASCRIZIONE'; praticaId: string; valore: boolean }
   | { type: 'AGG_PERSONA_CLIENTE'; slug: string; persona: PersonaAF }
@@ -151,8 +154,26 @@ function seminaAttesa(s: AppState): AppState {
   }
 }
 
-/** Prepara uno stato in ingresso: pulizia demo + import dei 52 in attesa. */
-const preparaStato = (s: AppState): AppState => seminaAttesa(pulisciSeed(s))
+/** Migrazione: semina il registro clienti editabile (una volta sola) dai 34
+ *  frank + 52 in attesa + 63 pronto. La chiave coincide con quella di note/stato
+ *  così la triage già fatta resta agganciata. Le coincidenze di chiave (stessa
+ *  persona+azienda su più prodotti) ricevono un suffisso per restare uniche. */
+function seminaRegistro(s: AppState): AppState {
+  if (s.registroSeed) return s
+  const visti = new Set<string>()
+  const idUnico = (base: string) => { let k = base, i = 2; while (visti.has(k)) k = `${base}-${i++}`; visti.add(k); return k }
+  const reg: ClienteRegistro[] = []
+  CONSULENZE_FRANK.forEach((r) =>
+    reg.push({ id: idUnico(chiaveNoteCliente(r.cliente)), nome: r.cliente, azienda: '', tutor: r.tutor, prodotto: '', tipoCall: 'Frank', origine: 'frank' }))
+  IN_ATTESA.forEach((c) =>
+    reg.push({ id: idUnico(chiaveNoteCliente(c.nome, c.azienda)), nome: c.nome, azienda: c.azienda, tutor: c.tutor, prodotto: c.servizio, tipoCall: tipoCallDaProdotto(c.servizio), origine: 'attesa' }))
+  PRONTO_CONSULENZA.forEach((c) =>
+    reg.push({ id: idUnico(chiaveNoteCliente(c.cliente, c.azienda)), nome: c.cliente, azienda: c.azienda, tutor: c.tutor, prodotto: '', tipoCall: 'Frank', origine: 'consulenza' }))
+  return { ...s, registro: reg, registroSeed: true }
+}
+
+/** Prepara uno stato in ingresso: pulizia demo + import dei 52 in attesa + registro. */
+const preparaStato = (s: AppState): AppState => seminaRegistro(seminaAttesa(pulisciSeed(s)))
 
 const aggiornaPratica = (state: AppState, praticaId: string, fn: (p: Pratica) => Pratica): AppState => ({
   ...state,
@@ -604,6 +625,12 @@ function reducer(state: AppState, azione: Azione): AppState {
       return { ...state, statoCliente: m }
     }
 
+    case 'MODIFICA_REGISTRO':
+      return { ...state, registro: (state.registro ?? []).map((c) => (c.id === azione.id ? { ...c, ...azione.campi } : c)) }
+
+    case 'AGGIUNGI_REGISTRO':
+      return { ...state, registro: [...(state.registro ?? []), azione.cliente] }
+
     case 'INVIA_ELISA':
       return aggiornaPratica(state, azione.praticaId, (p) => ({
         ...p,
@@ -663,6 +690,10 @@ interface StoreContextValue {
   /** stato di lavorazione per cliente (stessa chiave delle note) */
   statoCliente: Record<string, string>
   setStatoCliente: (chiave: string, stato: string) => void
+  /** registro clienti editabile (hub gestione/triage) */
+  registro: ClienteRegistro[]
+  modificaRegistro: (id: string, campi: Partial<ClienteRegistro>) => void
+  aggiungiRegistro: (cliente: ClienteRegistro) => void
   /** il tutor invia (o ritira) un cliente all'area Elisa */
   inviaElisa: (praticaId: string, inviato: boolean, autore: string) => void
   /** segna che il cliente non ha la trascrizione (la rende non obbligatoria) */
@@ -834,6 +865,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     rimuoviNotaCliente: (chiave, id) => dispatch({ type: 'RIMUOVI_NOTA_CLIENTE', chiave, id }),
     statoCliente: state.statoCliente ?? {},
     setStatoCliente: (chiave, stato) => dispatch({ type: 'SET_STATO_CLIENTE', chiave, stato }),
+    registro: state.registro ?? [],
+    modificaRegistro: (id, campi) => dispatch({ type: 'MODIFICA_REGISTRO', id, campi }),
+    aggiungiRegistro: (cliente) => dispatch({ type: 'AGGIUNGI_REGISTRO', cliente }),
     inviaElisa: (praticaId, inviato, autore) => dispatch({ type: 'INVIA_ELISA', praticaId, inviato, autore }),
     setSenzaTrascrizione: (praticaId, valore) => dispatch({ type: 'SET_SENZA_TRASCRIZIONE', praticaId, valore }),
     personeCliente: state.personeCliente ?? {},

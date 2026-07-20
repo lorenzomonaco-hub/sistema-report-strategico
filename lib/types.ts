@@ -221,6 +221,33 @@ export interface NotaCliente {
   dataOra: string
 }
 
+/** Tipo di consulenza dovuta, dipende dal prodotto:
+ *  - Branding/Rebranding puro → nessuna call
+ *  - Piano Strategico Smart → call con Moreno
+ *  - il resto (Strategica, Piano Marketing, Startup, Marbella…) → call con Frank */
+export type TipoCall = 'Frank' | 'Moreno' | 'Nessuna'
+export function tipoCallDaProdotto(prodotto: string): TipoCall {
+  const s = (prodotto || '').toUpperCase()
+  if (s.includes('SMART')) return 'Moreno'
+  if ((s.includes('BRAND') || s.includes('REBRAND')) && !/STRATEG|PIANO|MARKET|STARTUP|MARBELLA|ONLINE/.test(s)) return 'Nessuna'
+  return 'Frank'
+}
+
+/** Un cliente nel registro editabile (hub di gestione/triage): chiave stabile,
+ *  rinominabile, con prodotto/tipo-call, che si può nascondere o creare a mano
+ *  (split di un cliente in più prodotti, o cliente nuovo). Vive nello stato
+ *  condiviso, così le modifiche non toccano il codice né rompono gli indici. */
+export interface ClienteRegistro {
+  id: string
+  nome: string
+  azienda: string
+  tutor: string
+  prodotto: string
+  tipoCall: TipoCall
+  origine: 'frank' | 'attesa' | 'consulenza' | 'manuale'
+  nascosto?: boolean
+}
+
 /** Stato di lavorazione strutturato di un cliente (assegnato dall'amministrazione
  *  in base alle note dei colloqui). Alimenta il riepilogo e i filtri. */
 export const STATI_CLIENTE = [
@@ -286,4 +313,10 @@ export interface AppState {
   /** Flag di migrazione: i 52 clienti «in attesa questionario» sono stati
    *  importati come Pratiche reali (una volta sola). */
   clientiAttesaSeed?: boolean
+  /** Registro clienti editabile (hub gestione/triage): seminato una volta dai
+   *  34 frank + 52 in attesa + 63 pronto, poi rinominabile/splittabile/estendibile
+   *  senza toccare il codice. Chiave stabile = stessa chiave di note/stato. */
+  registro?: ClienteRegistro[]
+  /** Flag di migrazione: il registro clienti è stato seminato (una volta sola). */
+  registroSeed?: boolean
 }

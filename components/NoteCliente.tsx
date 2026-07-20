@@ -15,15 +15,18 @@ const fmtQuando = (iso: string) =>
 const fmtData = (iso: string) =>
   new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Rome' })
 
-export default function NoteCliente({ cliente, azienda, nome, slug, siloRientro = 'copy' }: {
+export default function NoteCliente({ cliente, azienda, nome, slug, siloRientro = 'copy', chiaveOverride }: {
   cliente: string; azienda?: string; nome?: string
   /** slug del cliente nella pipeline: se presente, abilita il blocco */
   slug?: string
   /** silo in cui rientra quando viene sbloccato (dipende dall'origine) */
   siloRientro?: SiloId
+  /** chiave stabile esplicita (registro): se presente, note/stato restano
+   *  agganciati anche dopo una rinomina del cliente */
+  chiaveOverride?: string
 }) {
   const { noteClienti, aggiungiNotaCliente, rimuoviNotaCliente, silos, spostaSilo, setBloccoInfo, bloccoInfo, statoCliente, setStatoCliente } = useApp()
-  const chiave = chiaveNoteCliente(cliente, azienda)
+  const chiave = chiaveOverride ?? chiaveNoteCliente(cliente, azienda)
   const note = noteClienti[chiave] ?? []
   const stato = statoCliente[chiave] ?? ''
   const [aperto, setAperto] = useState(false)

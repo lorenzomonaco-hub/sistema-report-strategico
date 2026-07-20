@@ -123,6 +123,9 @@ export default function TutorIndex() {
           </div>
           <div className="ml-auto flex items-center gap-2">
             <ExportTutorExcel />
+            <Link href="/amministrazione/gestione-clienti" className="rounded-xl border border-petrolio/40 bg-petrolio/[0.06] px-3 py-1.5 text-xs font-semibold text-petrolio-scuro hover:bg-petrolio/10">
+              ⚙ Gestione clienti →
+            </Link>
             <Link href="/amministrazione/consulenze-frank" className="rounded-xl border border-linea bg-carta px-3 py-1.5 text-xs font-semibold text-inchiostro/60 hover:text-inchiostro">
               Gantt Consulenze Frank →
             </Link>

@@ -9,8 +9,19 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useApp } from '@/lib/store'
+import { tokenDati } from '@/lib/datiblocco'
+import { inviaEmail } from '@/lib/email'
 import { ClienteRegistro, STATI_CLIENTE, TipoCall, tipoCallDaProdotto } from '@/lib/types'
 import NoteCliente from '@/components/NoteCliente'
+
+// Indirizzo di TEST per gli invii ai tutor (poi si passa alle email reali dei tutor).
+const EMAIL_TEST = 'irene.delbelbelluz@metodomerenda.com'
+const emailTutor = (t: string) => {
+  const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z]/g, '')
+  const p = (t || '').trim().split(/\s+/); const n = norm(p[0] || ''); const c = norm(p.slice(1).join('') || '')
+  return n && c ? `${n}.${c}@metodomerenda.com` : ''
+}
+const fmtGiorno = (iso: string) => new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })
 
 const TIPI_CALL: TipoCall[] = ['Frank', 'Moreno', 'Nessuna']
 const coloreCall: Record<TipoCall, string> = {
@@ -28,6 +39,20 @@ function Riga({ c }: { c: ClienteRegistro }) {
   const [prodotto, setProdotto] = useState(c.prodotto)
   const [tipoCall, setTipoCall] = useState<TipoCall>(c.tipoCall)
   const [salvato, setSalvato] = useState(false)
+  const [emailStato, setEmailStato] = useState('')
+  const tutorMail = emailTutor(c.tutor)
+
+  const chiediAggiornamento = async () => {
+    setEmailStato('invio')
+    try {
+      await inviaEmail({
+        token: tokenDati(), a: EMAIL_TEST,
+        oggetto: `Aggiornamento cliente — ${c.nome}`,
+        corpo: `Ciao ${c.tutor},\n\nci puoi aggiornare sullo stato di ${c.nome}${c.azienda ? ` (${c.azienda})` : ''}?\n${c.dataSollecito ? `Sollecito previsto: ${fmtGiorno(c.dataSollecito)}.\n` : ''}\nGrazie.\n\n[Invio di TEST — destinatario reale del tutor: ${tutorMail || '—'}]`,
+      })
+      setEmailStato('ok')
+    } catch (e) { setEmailStato('err:' + (e instanceof Error ? e.message : 'invio fallito')) }
+  }
 
   const stato = statoCliente[c.id] ?? ''
   const inp = 'rounded-lg border border-linea bg-carta px-2.5 py-1.5 text-sm text-inchiostro focus:border-petrolio focus:outline-none'
@@ -76,6 +101,18 @@ function Riga({ c }: { c: ClienteRegistro }) {
             {salvato && <span className="text-[11px] font-semibold text-green-700">✓ salvato</span>}
             <button onClick={split} className="rounded-lg border border-linea bg-carta px-3 py-1.5 text-[12px] font-semibold text-inchiostro/70 hover:border-petrolio/40">➕ Split (aggiungi prodotto/cliente derivato)</button>
             <button onClick={() => modificaRegistro(c.id, { nascosto: !c.nascosto })} className="rounded-lg border border-linea bg-carta px-3 py-1.5 text-[12px] font-semibold text-rose-600 hover:bg-rose-50">{c.nascosto ? 'Ripristina' : '🙈 Nascondi'}</button>
+          </div>
+
+          {/* sollecito: data + email al tutor per aggiornamenti */}
+          <div className="flex flex-wrap items-end gap-2 rounded-lg border border-linea bg-carta p-2.5">
+            <label className="text-[10px] font-semibold uppercase tracking-wide text-inchiostro/50">Data sollecito
+              <input type="date" value={c.dataSollecito ?? ''} onChange={(e) => modificaRegistro(c.id, { dataSollecito: e.target.value || undefined })}
+                className={`mt-1 block ${inp}`} /></label>
+            <button onClick={chiediAggiornamento} disabled={emailStato === 'invio'}
+              className="rounded-lg bg-petrolio px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-petrolio-scuro disabled:opacity-40">📧 Chiedi aggiornamento al tutor</button>
+            <span className="text-[11px] text-inchiostro/55">tutor: {tutorMail || c.tutor} <span className="text-inchiostro/40">(test → {EMAIL_TEST})</span></span>
+            {emailStato === 'ok' && <span className="text-[11px] font-semibold text-green-700">✓ inviata</span>}
+            {emailStato.startsWith('err:') && <span className="text-[11px] font-semibold text-rose-600">{emailStato.slice(4)}</span>}
           </div>
 
           {/* stato + note (chiave stabile del registro) */}

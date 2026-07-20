@@ -246,6 +246,8 @@ export interface ClienteRegistro {
   tipoCall: TipoCall
   origine: 'frank' | 'attesa' | 'consulenza' | 'manuale'
   nascosto?: boolean
+  /** data del prossimo sollecito/promemoria (YYYY-MM-DD) */
+  dataSollecito?: string
 }
 
 /** Stato di lavorazione strutturato di un cliente (assegnato dall'amministrazione

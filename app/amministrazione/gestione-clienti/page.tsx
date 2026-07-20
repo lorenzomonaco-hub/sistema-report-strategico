@@ -14,8 +14,6 @@ import { inviaEmail } from '@/lib/email'
 import { ClienteRegistro, STATI_CLIENTE, TipoCall, tipoCallDaProdotto } from '@/lib/types'
 import NoteCliente from '@/components/NoteCliente'
 
-// Indirizzo di TEST per gli invii ai tutor (poi si passa alle email reali dei tutor).
-const EMAIL_TEST = 'irene.delbelbelluz@metodomerenda.com'
 const emailTutor = (t: string) => {
   const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z]/g, '')
   const p = (t || '').trim().split(/\s+/); const n = norm(p[0] || ''); const c = norm(p.slice(1).join('') || '')
@@ -43,12 +41,13 @@ function Riga({ c }: { c: ClienteRegistro }) {
   const tutorMail = emailTutor(c.tutor)
 
   const chiediAggiornamento = async () => {
+    if (!tutorMail) { setEmailStato('err:email del tutor non determinabile'); return }
     setEmailStato('invio')
     try {
       await inviaEmail({
-        token: tokenDati(), a: EMAIL_TEST,
+        token: tokenDati(), a: tutorMail,
         oggetto: `Aggiornamento cliente — ${c.nome}`,
-        corpo: `Ciao ${c.tutor},\n\nci puoi aggiornare sullo stato di ${c.nome}${c.azienda ? ` (${c.azienda})` : ''}?\n${c.dataSollecito ? `Sollecito previsto: ${fmtGiorno(c.dataSollecito)}.\n` : ''}\nGrazie.\n\n[Invio di TEST — destinatario reale del tutor: ${tutorMail || '—'}]`,
+        corpo: `Ciao ${c.tutor.split(' ')[0]},\n\nmi puoi aggiornare sullo stato di ${c.nome}${c.azienda ? ` (${c.azienda})` : ''}?\n${c.dataSollecito ? `Sollecito previsto: ${fmtGiorno(c.dataSollecito)}.\n` : ''}\nGrazie mille,\nLorenzo`,
       })
       setEmailStato('ok')
     } catch (e) { setEmailStato('err:' + (e instanceof Error ? e.message : 'invio fallito')) }
@@ -103,17 +102,23 @@ function Riga({ c }: { c: ClienteRegistro }) {
             <button onClick={() => modificaRegistro(c.id, { nascosto: !c.nascosto })} className="rounded-lg border border-linea bg-carta px-3 py-1.5 text-[12px] font-semibold text-rose-600 hover:bg-rose-50">{c.nascosto ? 'Ripristina' : '🙈 Nascondi'}</button>
           </div>
 
-          {/* sollecito: data + email al tutor per aggiornamenti */}
-          <div className="flex flex-wrap items-end gap-2 rounded-lg border border-linea bg-carta p-2.5">
-            <label className="text-[10px] font-semibold uppercase tracking-wide text-inchiostro/50">Data sollecito
-              <input type="date" value={c.dataSollecito ?? ''} onChange={(e) => modificaRegistro(c.id, { dataSollecito: e.target.value || undefined })}
-                className={`mt-1 block ${inp}`} /></label>
-            <button onClick={chiediAggiornamento} disabled={emailStato === 'invio'}
-              className="rounded-lg bg-petrolio px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-petrolio-scuro disabled:opacity-40">📧 Chiedi aggiornamento al tutor</button>
-            <span className="text-[11px] text-inchiostro/55">tutor: {tutorMail || c.tutor} <span className="text-inchiostro/40">(test → {EMAIL_TEST})</span></span>
-            {emailStato === 'ok' && <span className="text-[11px] font-semibold text-green-700">✓ inviata</span>}
-            {emailStato.startsWith('err:') && <span className="text-[11px] font-semibold text-rose-600">{emailStato.slice(4)}</span>}
-          </div>
+          {/* Distinzione follow-up vs bloccati: sollecito + email tutor SOLO se non è Bloccato */}
+          {stato === 'Bloccato' ? (
+            <div className="rounded-lg border border-rose-200 bg-rose-50/60 p-2.5 text-[12px] text-rose-800">
+              🔒 <b>Bloccato — non ricontattare</b> (nessuna data di sollecito, nessuna email al tutor).
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-end gap-2 rounded-lg border border-linea bg-carta p-2.5">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-inchiostro/50">Data sollecito
+                <input type="date" value={c.dataSollecito ?? ''} onChange={(e) => modificaRegistro(c.id, { dataSollecito: e.target.value || undefined })}
+                  className={`mt-1 block ${inp}`} /></label>
+              <button onClick={chiediAggiornamento} disabled={emailStato === 'invio' || !tutorMail}
+                className="rounded-lg bg-petrolio px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-petrolio-scuro disabled:opacity-40">📧 Chiedi aggiornamento al tutor</button>
+              <span className="text-[11px] text-inchiostro/55">→ {tutorMail || '(email tutor non disponibile)'}</span>
+              {emailStato === 'ok' && <span className="text-[11px] font-semibold text-green-700">✓ inviata</span>}
+              {emailStato.startsWith('err:') && <span className="text-[11px] font-semibold text-rose-600">{emailStato.slice(4)}</span>}
+            </div>
+          )}
 
           {/* stato + note (chiave stabile del registro) */}
           <NoteCliente cliente={c.nome} azienda={c.azienda} nome={c.nome} chiaveOverride={c.id} />

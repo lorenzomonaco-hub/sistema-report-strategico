@@ -16,7 +16,7 @@ const dataIt = (iso: string) =>
   new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Rome' })
 
 export default function ExportTutorExcel() {
-  const { silos, bloccoInfo, noteClienti } = useApp()
+  const { silos, bloccoInfo, noteClienti, statoCliente } = useApp()
 
   const scarica = () => {
     // note di un cliente, concatenate in un'unica cella
@@ -24,10 +24,11 @@ export default function ExportTutorExcel() {
       (noteClienti[chiaveNoteCliente(cliente, azienda)] ?? [])
         .map((n) => `${dataIt(n.dataOra)}: ${n.testo}`)
         .join(' | ')
+    const stato = (cliente: string, azienda?: string) => statoCliente[chiaveNoteCliente(cliente, azienda)] ?? ''
     const bloccato = (slug: string) => (silos[slug] === 'bloccato' ? 'Sì' : '')
     const sblocco = (slug: string) => (bloccoInfo[slug]?.reminder ? dataIt(bloccoInfo[slug]!.reminder!) : '')
 
-    const intest = ['Tutor', 'Cliente', 'Azienda', 'Stato', 'Fase', 'Consegna prevista', 'Consulenza Frank', 'Data vendita', 'Prezzo', 'Bloccato', 'Data sblocco prevista', 'Note']
+    const intest = ['Tutor', 'Cliente', 'Azienda', 'Categoria pipeline', 'Stato lavorazione', 'Fase', 'Consegna prevista', 'Consulenza Frank', 'Data vendita', 'Prezzo', 'Bloccato', 'Data sblocco prevista', 'Note']
 
     const righeProd = [...CONSULENZE_FRANK]
       .sort((a, b) => a.tutor.localeCompare(b.tutor) || a.consegnaPrevista.getTime() - b.consegnaPrevista.getTime())
@@ -35,7 +36,7 @@ export default function ExportTutorExcel() {
         const v = venditaDaNome(r.cliente)
         const slug = slugFrank(r.cliente)
         return [
-          r.tutor, r.cliente, v?.azienda ?? '', 'In produzione',
+          r.tutor, r.cliente, v?.azienda ?? '', 'In produzione', stato(r.cliente),
           r.fase === 6 ? 'Consegnato' : `${r.fase} · ${FASI_FRANK[r.fase]?.label ?? ''}`,
           fmtData(r.consegnaPrevista),
           r.consulenzaFrank ? fmtData(r.consulenzaFrank) : 'da prenotare',
@@ -50,7 +51,7 @@ export default function ExportTutorExcel() {
       .map(({ c, slug }) => {
         const v = venditaDaNome(c.nome, c.azienda)
         return [
-          c.tutor, c.nome, c.azienda, 'In attesa (questionario mancante)', '', '', '',
+          c.tutor, c.nome, c.azienda, 'In attesa (questionario mancante)', stato(c.nome, c.azienda), '', '', '',
           v ? dataIt(v.dataVendita) : '', v?.prezzo ?? '',
           bloccato(slug), sblocco(slug), note(c.nome, c.azienda),
         ]
@@ -60,7 +61,7 @@ export default function ExportTutorExcel() {
       .map((c, i) => ({ c, slug: slugConsulenza(i, c) }))
       .sort((a, b) => a.c.tutor.localeCompare(b.c.tutor) || a.c.cliente.localeCompare(b.c.cliente))
       .map(({ c, slug }) => [
-        c.tutor, c.cliente, c.azienda, 'Pronto per consulenza', '', '',
+        c.tutor, c.cliente, c.azienda, 'Pronto per consulenza', stato(c.cliente, c.azienda), '',
         c.consulenza ? `${dataIt(c.consulenza)}${c.ora ? ` ${c.ora}` : ''}` : 'da fissare',
         c.dataVendita ? dataIt(c.dataVendita) : '', c.prezzo ?? '',
         bloccato(slug), sblocco(slug), note(c.cliente, c.azienda),

@@ -67,6 +67,7 @@ type Azione =
   | { type: 'MODIFICA_ANAGRAFICA'; praticaId: string; azienda?: string; cliente?: string; email?: string; dataVendita?: string; prodotto?: string; prezzo?: string }
   | { type: 'AGGIUNGI_NOTA_CLIENTE'; chiave: string; testo: string; autore: string }
   | { type: 'RIMUOVI_NOTA_CLIENTE'; chiave: string; id: string }
+  | { type: 'SET_STATO_CLIENTE'; chiave: string; stato: string }
   | { type: 'INVIA_ELISA'; praticaId: string; inviato: boolean; autore: string }
   | { type: 'SET_SENZA_TRASCRIZIONE'; praticaId: string; valore: boolean }
   | { type: 'AGG_PERSONA_CLIENTE'; slug: string; persona: PersonaAF }
@@ -596,6 +597,13 @@ function reducer(state: AppState, azione: Azione): AppState {
       return { ...state, generazioneAF: { ...g, [azione.slug]: { ...c, report } } }
     }
 
+    case 'SET_STATO_CLIENTE': {
+      const m = { ...(state.statoCliente ?? {}) }
+      if (azione.stato) m[azione.chiave] = azione.stato
+      else delete m[azione.chiave]
+      return { ...state, statoCliente: m }
+    }
+
     case 'INVIA_ELISA':
       return aggiornaPratica(state, azione.praticaId, (p) => ({
         ...p,
@@ -652,6 +660,9 @@ interface StoreContextValue {
   noteClienti: Record<string, NotaCliente[]>
   aggiungiNotaCliente: (chiave: string, testo: string, autore: string) => void
   rimuoviNotaCliente: (chiave: string, id: string) => void
+  /** stato di lavorazione per cliente (stessa chiave delle note) */
+  statoCliente: Record<string, string>
+  setStatoCliente: (chiave: string, stato: string) => void
   /** il tutor invia (o ritira) un cliente all'area Elisa */
   inviaElisa: (praticaId: string, inviato: boolean, autore: string) => void
   /** segna che il cliente non ha la trascrizione (la rende non obbligatoria) */
@@ -821,6 +832,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     noteClienti: state.noteClienti ?? {},
     aggiungiNotaCliente: (chiave, testo, autore) => dispatch({ type: 'AGGIUNGI_NOTA_CLIENTE', chiave, testo, autore }),
     rimuoviNotaCliente: (chiave, id) => dispatch({ type: 'RIMUOVI_NOTA_CLIENTE', chiave, id }),
+    statoCliente: state.statoCliente ?? {},
+    setStatoCliente: (chiave, stato) => dispatch({ type: 'SET_STATO_CLIENTE', chiave, stato }),
     inviaElisa: (praticaId, inviato, autore) => dispatch({ type: 'INVIA_ELISA', praticaId, inviato, autore }),
     setSenzaTrascrizione: (praticaId, valore) => dispatch({ type: 'SET_SENZA_TRASCRIZIONE', praticaId, valore }),
     personeCliente: state.personeCliente ?? {},

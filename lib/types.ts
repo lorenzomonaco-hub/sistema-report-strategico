@@ -221,6 +221,20 @@ export interface NotaCliente {
   dataOra: string
 }
 
+/** Stato di lavorazione strutturato di un cliente (assegnato dall'amministrazione
+ *  in base alle note dei colloqui). Alimenta il riepilogo e i filtri. */
+export const STATI_CLIENTE = [
+  'Erogato',
+  'No consulenza',
+  'Da sollecitare',
+  'In attesa documenti',
+  'Rimandato',
+  'Bloccato',
+  'Convertito/uscito',
+  'Stornato',
+] as const
+export type StatoCliente = (typeof STATI_CLIENTE)[number]
+
 /** Report AF generato per una persona (jobId sul worker report-af). */
 export interface ReportAFPersona {
   jobId: string
@@ -246,6 +260,8 @@ export interface AppState {
   /** Note/aggiornamenti per cliente (chiave cliente → registro cronologico).
    *  Alimentate dall'amministrazione con gli update dei tutor. */
   noteClienti?: Record<string, NotaCliente[]>
+  /** Stato di lavorazione strutturato per cliente (stessa chiave delle note). */
+  statoCliente?: Record<string, string>
   /** Persone (soci/dipendenti) inserite da Irene sui clienti che NON sono
    *  Pratiche (es. i 34 «frank» in erogazione): slug cliente → persone. Per i
    *  clienti-Pratica le persone restano in pratica.dipendenti. */

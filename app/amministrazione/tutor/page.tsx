@@ -15,7 +15,8 @@ import {
 import { PRONTO_CONSULENZA, ProntoConsulenza, pcPerTutor } from '@/lib/prontoConsulenza'
 import { fmtData } from '@/lib/quadroaziendale'
 import { clientiBloccati } from '@/lib/blocco'
-import { useApp } from '@/lib/store'
+import { useApp, chiaveNoteCliente } from '@/lib/store'
+import { STATI_CLIENTE } from '@/lib/types'
 import ExportTutorExcel from '@/components/ExportTutorExcel'
 
 const fmtGiorno = (iso: string) =>
@@ -65,7 +66,18 @@ function vociTutor(tutor: string, filtro: FiltroKey): Voce[] {
 
 export default function TutorIndex() {
   const [filtro, setFiltro] = useState<FiltroKey | null>(null)
-  const { state, silos, bloccoInfo } = useApp()
+  const { state, silos, bloccoInfo, statoCliente } = useApp()
+
+  // riepilogo per STATO di lavorazione: raggruppo tutti i clienti per lo stato
+  // assegnato nelle note (stessa chiave nome+azienda).
+  const universoStato = [
+    ...CONSULENZE_FRANK.map((r) => ({ nome: r.cliente, tutor: r.tutor, chiave: chiaveNoteCliente(r.cliente) })),
+    ...IN_ATTESA.map((c) => ({ nome: c.nome, tutor: c.tutor, chiave: chiaveNoteCliente(c.nome, c.azienda) })),
+    ...PRONTO_CONSULENZA.map((c) => ({ nome: c.cliente, tutor: c.tutor, chiave: chiaveNoteCliente(c.cliente, c.azienda) })),
+  ]
+  const perStato: Record<string, { nome: string; tutor: string }[]> = {}
+  for (const u of universoStato) { const s = statoCliente[u.chiave]; if (s) (perStato[s] ??= []).push({ nome: u.nome, tutor: u.tutor }) }
+  const conStato = Object.values(perStato).reduce((a, x) => a + x.length, 0)
 
   // clienti bloccati (silo -1), risolti a cliente/tutor reale
   const bloccati = clientiBloccati(silos, bloccoInfo, state.pratiche)
@@ -211,6 +223,36 @@ export default function TutorIndex() {
           ))}
           {filtro && tutorVisibili.length === 0 && (
             <p className="text-sm text-inchiostro/50">Nessun cliente in questa categoria.</p>
+          )}
+        </div>
+
+        {/* Riepilogo per STATO di lavorazione (assegnato nelle note dei colloqui) */}
+        <div className="mt-10">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <h2 className="font-display text-xl font-bold tracking-tight text-inchiostro">Riepilogo per stato</h2>
+            <span className="text-[12px] text-inchiostro/55">{conStato} clienti con uno stato assegnato · lo stato si imposta nel riquadro «Note & aggiornamenti» di ogni cliente</span>
+          </div>
+          {conStato === 0 ? (
+            <p className="mt-2 text-sm text-inchiostro/55">Nessuno stato assegnato per ora. Aprendo un cliente (scheda del tutor) e scegliendo lo «Stato lavorazione», comparirà qui raggruppato.</p>
+          ) : (
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {STATI_CLIENTE.filter((s) => (perStato[s]?.length ?? 0) > 0).map((s) => (
+                <Carta key={s} className="h-full">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-display text-sm font-bold text-inchiostro">{s}</p>
+                    <span className="shrink-0 rounded-full bg-inchiostro/[0.08] px-2 py-0.5 text-[11px] font-bold text-inchiostro/70">{perStato[s].length}</span>
+                  </div>
+                  <ul className="mt-2 space-y-1">
+                    {perStato[s].map((c, i) => (
+                      <li key={c.nome + i} className="flex items-center justify-between gap-2 border-t border-linea/60 pt-1 text-[11px] first:border-t-0 first:pt-0">
+                        <span className="min-w-0 truncate text-inchiostro">{c.nome}</span>
+                        <span className="shrink-0 text-inchiostro/45">{c.tutor}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </Carta>
+              ))}
+            </div>
           )}
         </div>
       </div>

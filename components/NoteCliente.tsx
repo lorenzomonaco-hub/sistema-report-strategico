@@ -8,6 +8,7 @@
 import { useState } from 'react'
 import { useApp, chiaveNoteCliente } from '@/lib/store'
 import { SiloId } from '@/lib/pipelineSilos'
+import { STATI_CLIENTE } from '@/lib/types'
 
 const fmtQuando = (iso: string) =>
   new Date(iso).toLocaleString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' })
@@ -21,9 +22,10 @@ export default function NoteCliente({ cliente, azienda, nome, slug, siloRientro 
   /** silo in cui rientra quando viene sbloccato (dipende dall'origine) */
   siloRientro?: SiloId
 }) {
-  const { noteClienti, aggiungiNotaCliente, rimuoviNotaCliente, silos, spostaSilo, setBloccoInfo, bloccoInfo } = useApp()
+  const { noteClienti, aggiungiNotaCliente, rimuoviNotaCliente, silos, spostaSilo, setBloccoInfo, bloccoInfo, statoCliente, setStatoCliente } = useApp()
   const chiave = chiaveNoteCliente(cliente, azienda)
   const note = noteClienti[chiave] ?? []
+  const stato = statoCliente[chiave] ?? ''
   const [aperto, setAperto] = useState(false)
   const [testo, setTesto] = useState('')
 
@@ -66,10 +68,21 @@ export default function NoteCliente({ cliente, azienda, nome, slug, siloRientro 
             🔒 Bloccato{info?.reminder ? ` · sblocco ${fmtData(info.reminder)}` : ''}
           </span>
         )}
+        {stato && !bloccato && (
+          <span className="rounded-full bg-inchiostro/[0.08] px-1.5 py-0.5 text-[10px] font-bold text-inchiostro/70">{stato}</span>
+        )}
       </button>
 
       {aperto && (
         <div className="mt-2 space-y-2">
+          <label className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-inchiostro/70">
+            Stato lavorazione
+            <select value={stato} onChange={(e) => setStatoCliente(chiave, e.target.value)}
+              className="rounded-lg border border-linea bg-carta px-2 py-1 text-[12px] font-normal text-inchiostro focus:border-petrolio focus:outline-none">
+              <option value="">— nessuno —</option>
+              {STATI_CLIENTE.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
           {note.length > 0 && (
             <ul className="space-y-1.5">
               {[...note].reverse().map((n) => (
